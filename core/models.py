@@ -238,6 +238,8 @@ class RunRecord:
         clean = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         if "configuration" in clean and isinstance(clean["configuration"], dict):
             clean["configuration"] = Configuration.from_dict(clean["configuration"])
+        clean.setdefault("experiment_id", data.get("experiment_id", ""))
+        clean.setdefault("workload_name", data.get("workload_name", "clean_build"))
         return cls(**clean)
 
 

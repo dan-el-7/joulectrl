@@ -460,6 +460,52 @@ export const SetupView: React.FC<SetupViewProps> = ({
               );
             })}
           </div>
+
+          {/* Quick link to Task Priority Kanban Board */}
+          <div
+            style={{
+              marginTop: '0.75rem',
+              padding: '0.65rem 0.85rem',
+              borderRadius: '0.375rem',
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.07)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: colors.textPrimary }}>
+                Manage individual process priorities
+              </div>
+              <div style={{ fontSize: '0.7rem', color: colors.textTertiary, marginTop: '0.15rem' }}>
+                Push background apps to Zen 5c eco cores or pin critical apps to Zen 5 fast cores.
+              </div>
+            </div>
+            {onOpenTasksTab && (
+              <button
+                type="button"
+                onClick={onOpenTasksTab}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '0.375rem',
+                  border: `1px solid ${colors.accent}`,
+                  background: 'rgba(113, 112, 255, 0.15)',
+                  color: colors.accentHover,
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <span>▦</span> Open Task Priority Kanban Board →
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Accuracy & Repeatability Control */}

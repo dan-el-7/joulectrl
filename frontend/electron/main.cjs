@@ -88,6 +88,24 @@ function createWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   Menu.setApplicationMenu(null);
+
+  // Clear HTTP and memory cache to ensure updated frontend assets load immediately
+  win.webContents.session.clearCache();
+
+  // Enable standard developer keyboard shortcuts (Ctrl+R / F5 reload, Ctrl+Shift+I DevTools)
+  win.webContents.on('before-input-event', (event, input) => {
+    if ((input.control || input.meta) && input.key.toLowerCase() === 'r') {
+      win.webContents.reloadIgnoringCache();
+      event.preventDefault();
+    } else if (input.key === 'F5') {
+      win.webContents.reloadIgnoringCache();
+      event.preventDefault();
+    } else if (((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i') || input.key === 'F12') {
+      win.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
   win.loadURL(`http://127.0.0.1:${PORT}/`);
 }
 

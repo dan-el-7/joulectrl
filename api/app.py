@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -1335,6 +1335,16 @@ def get_system_thermal_endpoint() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Single-Origin Frontend Serving (Vite build in frontend/dist)
 # ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html") or path.startswith("/assets") or path.startswith("/api/calibration") or path.startswith("/api/experiments"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists() and (FRONTEND_DIST / "index.html").exists():
