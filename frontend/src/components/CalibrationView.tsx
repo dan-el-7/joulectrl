@@ -24,8 +24,10 @@ interface CalPoint {
   energy_j: number;
   watts: number;
   perfPerWatt: number;
+  perf_per_watt?: number;
   throughput: number;
   scalingEfficiency?: number | null;
+  scaling_efficiency?: number | null;
 }
 
 interface ClassSummary {
@@ -426,13 +428,13 @@ export const CalibrationView: React.FC = () => {
             const list = filteredPointsByClass.get(c.label) ?? [];
             return list.map((p) => ({
               x: p.watts,
-              y: p.perfPerWatt,
+              y: (p as CalPoint & { perf_per_watt?: number }).perf_per_watt ?? p.perfPerWatt ?? 0,
               label: `${c.label} · ${p.control} · ${p.workers}w`,
               series: c.label,
               meta: {
                 runtime: `${fmt(p.runtime_s, 2)}s`,
                 energy: `${fmt(p.energy_j, 1)}J`,
-                'scaling eff': p.scalingEfficiency ? `${(p.scalingEfficiency * 100).toFixed(0)}%` : '—',
+                'scaling eff': (p.scalingEfficiency ?? p.scaling_efficiency) ? `${(((p.scalingEfficiency ?? p.scaling_efficiency) as number) * 100).toFixed(0)}%` : '—',
               },
             }));
           });
@@ -488,7 +490,7 @@ export const CalibrationView: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
                     <span style={{ ...type.h1, color: colors.textPrimary, fontSize: 18 }}>
-                      {p.scalingEfficiency ? `${(p.scalingEfficiency * 100).toFixed(0)}%` : '—'}
+                      {(p.scalingEfficiency ?? p.scaling_efficiency) ? `${(((p.scalingEfficiency ?? p.scaling_efficiency) as number) * 100).toFixed(0)}%` : '—'}
                     </span>
                     <span style={{ ...type.caption, color: colors.textTertiary }}>scaling efficiency vs C1</span>
                   </div>
