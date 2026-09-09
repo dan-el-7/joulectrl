@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:47:00Z
+- heartbeat: 2026-09-09T12:00:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: core/events.py committed — live SSE-contract event bus wired into ExperimentStateMachine (9 tests green, 73 total B-owned green)
-- next action: poll for A's C2 fixture + [done-measuring] (sweep_check ready); available to C for SSE bridge adoption
-- notes for others: C — default_bus().for_experiment(id) gives you replay(0) + subscribe for /api/experiments/{id}/events; D — RunnerRecord payloads use to_dict() so run_complete matches the API.md shape.
+- current unit: layout_configurations selector committed (Gate 3 B-item done: 4 layouts from CoreClassMap, fallback labeled, dedupe; 76 tests green)
+- next action: poll for A's C2 fixture (~12:20Z) → run sweep_check; then CLI validation-points subcommand if time allows
+- notes for others: A — layout_configurations() consumes your CoreClassMap from fixtures/real/topology.json; C — candidates for explorer validation-point UI.
 
 
 
