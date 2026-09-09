@@ -1,19 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { fetchWatchStatus, startWatch, stopWatch } from '../api';
 import { WatchStatus } from '../types';
+
+interface WatchSegmentResult {
+  segment_id: string;
+  onset_ts: string | null;
+  end_ts: string | null;
+  duration_s: number;
+  estimated_energy_j: number | null;
+  energy_available: boolean;
+  suggested_budget_s: number;
+  mode: string;
+  note: string;
+}
 
 interface WatchPanelProps {
   onApplySuggestedBudget: (budgetS: number) => void;
 }
 
+const SAMPLE_HISTORY = 60;
+
 export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }) => {
   const [status, setStatus] = useState<WatchStatus | null>(null);
   const [isToggling, setIsToggling] = useState<boolean>(false);
-  const [latestSegment, setLatestSegment] = useState<{ duration_s: number; estimated_energy_j: number; suggested_budget_s: number } | null>({
-    duration_s: 47.0,
-    estimated_energy_j: 1410.0,
-    suggested_budget_s: 49.35,
-  });
+  const [latestSegment, setLatestSegment] = useState<WatchSegmentResult | null>(null);
+  const [samples, setSamples] = useState<{ t: string; w: number; inBand: boolean }[]>([]);
+  const [liveState, setLiveState] = useState<{ state: string; baseline_median_w: number | null } | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   const refreshStatus = async () => {
     try {
@@ -23,6 +36,38 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       console.error(e);
     }
   };
+
+  // Live SSE: samples, state transitions, closed segments (real detector).
+  useEffect(() => {
+    if (!status?.active) {
+      esRef.current?.close();
+      esRef.current = null;
+      return;
+    }
+    const es = new EventSource('/api/watch/events');
+    esRef.current = es;
+    es.addEventListener('watch_sample', (ev) => {
+      try {
+        const d = JSON.parse((ev as MessageEvent).data);
+        setSamples((prev) => [
+          ...prev.slice(-SAMPLE_HISTORY + 1),
+          { t: d.timestamp, w: d.power_w, inBand: d.in_idle_band },
+        ]);
+      } catch { /* ignore malformed frame */ }
+    });
+    es.addEventListener('watch_state', (ev) => {
+      try {
+        setLiveState(JSON.parse((ev as MessageEvent).data));
+      } catch { /* ignore */ }
+    });
+    es.addEventListener('watch_segment', (ev) => {
+      try {
+        setLatestSegment(JSON.parse((ev as MessageEvent).data));
+      } catch { /* ignore */ }
+    });
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, [status?.active]);
 
   useEffect(() => {
     refreshStatus();
@@ -36,9 +81,12 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       if (status?.active) {
         const res = await stopWatch();
         if (res.segments && res.segments.length > 0) {
-          setLatestSegment(res.segments[0]);
+          setLatestSegment(res.segments[res.segments.length - 1]);
         }
       } else {
+        setSamples([]);
+        setLatestSegment(null);
+        setLiveState(null);
         await startWatch();
       }
       await refreshStatus();
@@ -47,6 +95,27 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
     } finally {
       setIsToggling(false);
     }
+  };
+
+  const stateLabel = liveState?.state ?? status?.state ?? 'idle';
+  const power = samples.length > 0 ? samples[samples.length - 1].w : status?.current_power_w;
+  const baseline = liveState?.baseline_median_w ?? status?.baseline_median_w;
+
+  // Mini sparkline of the live power trace
+  const sparkline = () => {
+    if (samples.length < 2) return null;
+    const ws = samples.map((s) => s.w);
+    const min = Math.min(...ws, 5);
+    const max = Math.max(...ws, 10);
+    const span = Math.max(max - min, 1);
+    const pts = samples
+      .map((s, i) => `${(i / (samples.length - 1)) * 100},${28 - ((s.w - min) / span) * 26}`)
+      .join(' ');
+    return (
+      <svg viewBox="0 0 100 28" preserveAspectRatio="none" style={{ width: '100%', height: '44px', marginTop: '0.5rem' }}>
+        <polyline points={pts} fill="none" stroke="#10b981" strokeWidth="1" />
+      </svg>
+    );
   };
 
   return (
@@ -82,7 +151,10 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             </span>
           </div>
           <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-            Watches package power passively (1 Hz) while you run your own task. Automatically suggests a runtime budget.
+            Watches package power passively (0.5–1 Hz) while you run your own task. Automatically suggests a runtime budget.
+            {status?.source?.synthetic && (
+              <span style={{ color: '#f59e0b' }}> · demo source: synthetic scripted profile (no readable package counter on this machine)</span>
+            )}
           </div>
         </div>
 
@@ -109,27 +181,28 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         <div style={{ background: '#111827', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #1f2937' }}>
           <div style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>Current Package Power</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#f3f4f6', marginTop: '0.3rem' }}>
-            {status?.current_power_w ?? 8.6} W
+            {power != null ? `${power.toFixed ? power.toFixed(1) : power} W` : '—'}
           </div>
+          {status?.active && sparkline()}
           <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
-            {status?.active ? '● Featherweight polling (1 Hz)' : '○ Standby'}
+            {status?.active ? `● Featherweight polling (${status?.poll_hz ?? 1} Hz)` : '○ Standby'}
           </div>
         </div>
 
         <div style={{ background: '#111827', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #1f2937' }}>
           <div style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>Learned Idle Baseline</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#60a5fa', marginTop: '0.3rem' }}>
-            {status?.baseline_median_w ?? 8.6} W
+            {baseline != null ? `${baseline.toFixed ? baseline.toFixed(1) : baseline} W` : 'learning…'}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
-            Spread: ±{status?.baseline_spread_w ?? 0.4} W (30s median)
+            Spread: ±{status?.baseline_spread_w ?? '—'} W (median over baseline window)
           </div>
         </div>
 
         <div style={{ background: '#111827', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #1f2937' }}>
           <div style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>Detection State</div>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.5rem', textTransform: 'capitalize' }}>
-            {status?.state?.replace('_', ' ') ?? 'Idle'}
+            {String(stateLabel).replace('_', ' ')}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
             {status?.active ? 'Monitoring power trace' : 'Watcher inactive'}
@@ -152,13 +225,16 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         >
           <div>
             <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, textTransform: 'uppercase' }}>
-              Detected Task Observation (Idle-to-Idle Window)
+              Detected Task Observation (Idle-to-Idle Window) — {latestSegment.segment_id}
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f3f4f6', marginTop: '0.25rem' }}>
-              Observed Duration: {latestSegment.duration_s}s · Est. Energy: {latestSegment.estimated_energy_j} J
+              Observed Duration: {latestSegment.duration_s}s ·{' '}
+              {latestSegment.estimated_energy_j != null
+                ? `Est. Energy: ${latestSegment.estimated_energy_j} J`
+                : 'Energy unavailable (never reported as zero)'}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#a7f3d0', marginTop: '0.25rem' }}>
-              Calculated suggested runtime budget: <strong>{latestSegment.suggested_budget_s}s</strong> (includes 5% headroom)
+              Suggested runtime budget: <strong>{latestSegment.suggested_budget_s}s</strong> ({latestSegment.note})
             </div>
           </div>
 

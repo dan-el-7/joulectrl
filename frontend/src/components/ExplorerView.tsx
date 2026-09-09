@@ -1,6 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Experiment } from '../types';
+import { fetchValidationPoints } from '../api';
 import { ParetoChart } from './ParetoChart';
+
+interface ValidationPointCandidate {
+  kind: 'layout' | 'calibration';
+  config_id: string;
+  layout: string;
+  cpu_mask?: string;
+  cpus?: number[];
+  workers?: number;
+  core_class?: string;
+  description?: string;
+  median_runtime_s?: number;
+  median_energy_j?: number | null;
+  energy_available?: boolean;
+  measured: boolean;
+}
 
 interface ExplorerViewProps {
   experiment: Experiment;
@@ -15,6 +31,33 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 }) => {
   const { profile, selection } = experiment;
   const [tempBudget, setTempBudget] = useState<number>(selection.runtime_budget_s ?? 45.0);
+  const [candidates, setCandidates] = useState<ValidationPointCandidate[] | null>(null);
+  const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
+  const [candidatesError, setCandidatesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchValidationPoints(experiment.id)
+      .then((data) => {
+        if (cancelled) return;
+        setCandidates([...(data.layout_candidates ?? []), ...(data.calibration_points ?? [])]);
+      })
+      .catch((e) => {
+        if (!cancelled) setCandidatesError(String(e?.message ?? e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [experiment.id]);
+
+  const toggleCandidate = (id: string) => {
+    setSelectedCandidates((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const configs = profile.configurations;
   const baselineId = profile.baseline_config_id;
@@ -194,6 +237,58 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           // Point click selection
         }}
       />
+
+      {/* Validation-Point Candidates (B's layout selector + measured calibration points) */}
+      <div style={{ background: '#111827', borderRadius: '0.75rem', padding: '1rem 1.5rem', border: '1px solid #1f2937' }}>
+        <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', color: '#f3f4f6', fontWeight: 600 }}>
+          Validation-Point Candidates
+        </h3>
+        <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.75rem' }}>
+          Execution layouts built from the discovered core-class map plus measured calibration points. Select the
+          configurations worth validating with fresh runs — suggestions only; the selector still checks all usable
+          configurations. {selectedCandidates.size > 0 && `${selectedCandidates.size} selected.`}
+        </div>
+        {candidatesError && (
+          <div style={{ fontSize: '0.8rem', color: '#f59e0b' }}>Failed to load candidates: {candidatesError}</div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {(candidates ?? []).map((c) => {
+            const selected = selectedCandidates.has(c.config_id);
+            return (
+              <button
+                key={c.config_id}
+                onClick={() => toggleCandidate(c.config_id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem 0.7rem',
+                  borderRadius: '0.5rem',
+                  border: `1.5px solid ${selected ? '#10b981' : '#374151'}`,
+                  backgroundColor: selected ? '#064e3b33' : '#1f2937',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  color: selected ? '#6ee7b7' : '#d1d5db',
+                }}
+                title={c.description ?? (c.cpus ? `cpus: ${c.cpus.join(',')}` : c.cpu_mask)}
+              >
+                <span style={{ fontWeight: 700 }}>{selected ? '✓' : '＋'}</span>
+                <span style={{ fontFamily: 'monospace' }}>{c.config_id}</span>
+                {c.measured ? (
+                  <span style={{ fontSize: '0.65rem', color: '#60a5fa' }}>(
+                    {c.median_energy_j != null ? `${Math.round(c.median_energy_j)} J` : 'energy unavailable'}
+                    {c.median_runtime_s != null ? `, ${c.median_runtime_s.toFixed(1)}s` : ''})</span>
+                ) : (
+                  <span style={{ fontSize: '0.65rem', color: '#9ca3af' }}>(unmeasured layout)</span>
+                )}
+              </button>
+            );
+          })}
+          {candidates !== null && candidates.length === 0 && !candidatesError && (
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>No candidates available for this machine.</span>
+          )}
+        </div>
+      </div>
 
       {/* Complete Run List Table */}
       <div style={{ background: '#111827', borderRadius: '0.75rem', padding: '1rem 1.5rem', border: '1px solid #1f2937' }}>

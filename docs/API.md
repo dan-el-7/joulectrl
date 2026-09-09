@@ -32,6 +32,7 @@
 | `POST` | `/api/restore` | Emergency / manual restore of original CPU and power settings | PLAN §8, §9 |
 | `POST` | `/api/explain` | Generate deterministic or LLM explanation for selection | PLAN §8, §10 |
 | `GET` | `/api/experiments/{id}/export` | Export defensible, auditable JSON archive of experiment | PLAN §8 |
+| `GET` | `/api/experiments/{id}/validation-points` | Validation-point candidates: layout configs + measured calibration points | AGENTS §6, B AFFECTS(c) |
 | `POST` | `/api/watch/start` | Start passive background power watcher (idle→task→idle) | AGENTS §6b, TEAM §4.5 |
 | `POST` | `/api/watch/stop` | Stop passive watcher, return observed activity segments | AGENTS §6b, TEAM §4.5 |
 | `GET` | `/api/watch/status` | Current watcher state, baseline power, active observations | AGENTS §6b, TEAM §4.5 |
@@ -419,20 +420,28 @@ Stops passive watcher and returns recorded activity segments with suggested budg
 ```json
 {
   "status": "stopped",
+  "source": { "source": "powercap", "domain": "package-0", "synthetic": false },
   "segments": [
     {
       "segment_id": "seg_01",
+      "onset_ts": "2026-09-09T10:02:15Z",
+      "end_ts": "2026-09-09T10:03:02Z",
       "onset_timestamp": "2026-09-09T10:02:15Z",
       "end_timestamp": "2026-09-09T10:03:02Z",
       "duration_s": 47.0,
       "estimated_energy_j": 1410.0,
-      "suggested_budget_s": 49.35,
+      "energy_available": true,
+      "suggested_budget_s": 48.0,
       "mode": "watch",
       "note": "Estimated via idle-return detection. Uncertainty ±1.0s."
     }
   ]
 }
 ```
+*Notes:* `onset_timestamp`/`end_timestamp` are aliases of `onset_ts`/`end_ts`.
+`estimated_energy_j` is `null` (never `0`) when the counter was unavailable; `energy_available` says why.
+`suggested_budget_s` = observed runtime + one poll interval (detection uncertainty).
+`source` labels the energy source — real `powercap` or `synthetic_scripted` (dev machines without a readable package counter); never silent.
 
 #### `GET /api/watch/status`
 Returns live state of watcher.
@@ -441,7 +450,9 @@ Returns live state of watcher.
 ```json
 {
   "active": true,
-  "state": "monitoring",
+  "state": "idle",
+  "source": { "source": "powercap", "domain": "package-0", "synthetic": false },
+  "poll_hz": 1.0,
   "current_power_w": 8.4,
   "baseline_median_w": 8.1,
   "baseline_spread_w": 0.5,
@@ -449,6 +460,7 @@ Returns live state of watcher.
   "completed_segments_count": 1
 }
 ```
+*Detector states:* `calibrating` → `idle` ⇄ `active` (B's `WatchDetector`), plus `stopped` after `/api/watch/stop`.
 
 ---
 

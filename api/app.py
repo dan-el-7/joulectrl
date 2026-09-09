@@ -31,8 +31,10 @@ from api.fixtures import (
     get_fixture_capabilities,
     get_fixture_workloads,
 )
+from api.live import WatchService, stream_experiment_events
+from core.events import default_bus
 from core.experiment import ExperimentStateMachine
-from core.models import ConfigSummary, Profile, Selection, ValidationPair, utc_now_iso
+from core.models import ConfigSummary, CoreClassMap, Profile, Selection, ValidationPair, utc_now_iso
 from core.optimizer import select_deadline, select_preference
 from core.store import Store
 from explain.facts import extract_explanation_facts
@@ -87,18 +89,9 @@ def _resolve_selection_model(experiment_id: str) -> Optional[dict[str, Any]]:
     return row.get("selection")
 
 
-# Watch mode state
-_WATCH_STATE: dict[str, Any] = {
-    "active": False,
-    "state": "idle",
-    "poll_hz": 1.0,
-    "current_power_w": 8.6,
-    "baseline_median_w": 8.6,
-    "baseline_spread_w": 0.4,
-    "active_segment_elapsed_s": None,
-    "completed_segments_count": 0,
-    "segments": [],
-}
+# Watch mode state: live session on B's WatchDetector when started
+# (core/watch.py); None when idle. Read-only per §6b.
+_WATCH_SERVICE: Optional[WatchService] = None
 
 
 # ---------------------------------------------------------------------------
@@ -219,38 +212,42 @@ def get_experiment(id: str) -> dict[str, Any]:
 
 @app.get("/api/experiments/{id}/events")
 async def get_experiment_events(id: str) -> StreamingResponse:
-    """Server-Sent Events stream for experiment progress and state transitions."""
-    exp = _resolve_experiment(id)
-    if exp is None:
+    """Server-Sent Events stream for experiment progress and state transitions.
+
+    Live source: Agent B's EventBus (core/events.py) — replay(0) initial burst
+    then live follow, per B's AFFECTS(c) 11:47 UTC. Terminal fixture-backed
+    experiments have no live traffic yet: synthesize the terminal burst from
+    persisted state so the stream is immediately renderable (honesty: labeled
+    'replayed_from_store').
+    """
+    if _resolve_experiment(id) is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
 
+    evlog = default_bus().for_experiment(id)
+    has_live_history = evlog.last_seq() > 0
+
     async def event_generator() -> AsyncGenerator[str, None]:
-        current = _resolve_experiment(id) or {}
-        # Emit current state
-        yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'state': current.get('state', 'COMPLETE'), 'message': 'Experiment loaded'})}\n\n"
-        await asyncio.sleep(0.05)
+        if not has_live_history:
+            # Fixture/persisted experiment: reconstruct the terminal burst from
+            # the store (never guessed — from persisted transitions), then keep
+            # the stream open for any future live publishes on this id.
+            current = _resolve_experiment(id) or {}
+            yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'state': current.get('state', 'COMPLETE'), 'message': 'Experiment loaded', 'source': 'replayed_from_store'})}\n\n"
+            for t in current.get("state_transitions", []):
+                yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'previous_state': t.get('from_state'), 'state': t.get('to_state'), 'timestamp': t.get('timestamp_iso'), 'message': t.get('reason', ''), 'source': 'replayed_from_store'})}\n\n"
+            profile = current.get("profile", {})
+            yield f"event: profile_ready\ndata: {json.dumps({'experiment_id': id, 'configurations_count': len(profile.get('configurations', {})), 'baseline_config_id': profile.get('baseline_config_id'), 'source': 'replayed_from_store'})}\n\n"
+            yield f"event: selection_updated\ndata: {json.dumps({'experiment_id': id, 'selection': store_bridge.selection_to_api(current.get('selection')), 'source': 'replayed_from_store'})}\n\n"
+            yield f"event: restore_status\ndata: {json.dumps({'status': current.get('restoration_status', 'not_required'), 'verified': current.get('restoration_status') == 'restored', 'timestamp': utc_now_iso(), 'source': 'replayed_from_store'})}\n\n"
+            await asyncio.sleep(0.05)
 
-        # Emit persisted state transitions
-        for t in current.get("state_transitions", []):
-            yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'previous_state': t.get('from_state'), 'state': t.get('to_state'), 'timestamp': t.get('timestamp_iso'), 'message': t.get('reason', '')})}\n\n"
-        await asyncio.sleep(0.05)
-
-        # Emit profile_ready
-        profile = current.get("profile", {})
-        yield f"event: profile_ready\ndata: {json.dumps({'experiment_id': id, 'configurations_count': len(profile.get('configurations', {})), 'baseline_config_id': profile.get('baseline_config_id')})}\n\n"
-        await asyncio.sleep(0.05)
-
-        # Emit selection_updated
-        yield f"event: selection_updated\ndata: {json.dumps({'experiment_id': id, 'selection': current.get('selection', {})})}\n\n"
-        await asyncio.sleep(0.05)
-
-        # Emit restore_status from the persisted restoration state — never guessed
-        yield f"event: restore_status\ndata: {json.dumps({'status': current.get('restoration_status', 'not_required'), 'verified': current.get('restoration_status') == 'restored', 'timestamp': utc_now_iso()})}\n\n"
-
-        # Heartbeat loop
-        for _ in range(2):
-            await asyncio.sleep(5)
-            yield f": keepalive\n\n"
+        # Live follow on B's bus (replay(0) burst if history exists)
+        agen = stream_experiment_events(id)
+        try:
+            async for frame in agen:
+                yield frame
+        finally:
+            await agen.aclose()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -295,6 +292,13 @@ def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
     else:
         _OVERLAY[id]["_selection_model"] = sel.to_dict()
 
+    # Live event: B's bus (emission point assigned to C per AFFECTS(c) 11:47)
+    default_bus().publish(
+        id,
+        "selection_updated",
+        {"experiment_id": id, "selection": store_bridge.selection_to_api(sel.to_dict())},
+    )
+
     return store_bridge.selection_to_api(sel.to_dict())
 
 
@@ -309,6 +313,145 @@ def validate_experiment(id: str) -> dict[str, Any]:
         "planned_pairs": 3,
         "message": "Validation runs scheduled against hardware counters.",
     }
+
+
+@app.get("/api/experiments/{id}/validation-points")
+def get_validation_points(id: str) -> dict[str, Any]:
+    """Validation-point candidates: B's layout configurations + measured
+    calibration points, per AFFECTS(c) (B, 12:00 UTC).
+
+    Layout candidates come from Agent B's validation.layout_configurations()
+    built on the discovered CoreClassMap (fixtures/real/topology.json on the
+    demo machine; documented 4-physical-core fallback when class
+    identification is unavailable). Measured calibration points come from the
+    store when present (B's CalibrationRecord rows). Suggestions only — the
+    user selects; the selector still checks all usable configurations.
+    """
+    if _resolve_experiment(id) is None:
+        raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
+
+    # CoreClassMap from the capability fixture (A's discovered topology)
+    class_map = _fixture_class_map()
+
+    from core.validation import dedupe_configurations, layout_configurations
+
+    layouts = layout_configurations(class_map)
+    layouts = dedupe_configurations(layouts)
+
+    layout_points = [
+        {
+            "kind": "layout",
+            "config_id": cfg.id,
+            "layout": cfg.layout,
+            "cpu_mask": _mask_from_cpus(cfg.cpu_affinity or []),
+            "workers": cfg.worker_count,
+            "description": (cfg.metadata or {}).get("description", ""),
+            "measured": False,
+            "source": "validation.layout_configurations",
+        }
+        for cfg in layouts
+    ]
+
+    calibration_points: list[dict[str, Any]] = []
+    try:
+        records = _STORE.get_calibrations()
+        seen_classes: set[str] = set()
+        for rec in records:
+            key = f"{rec.core_class}:{rec.layout}:{json.dumps(rec.accepted_control or {}, sort_keys=True)}"
+            if key in seen_classes:
+                continue
+            seen_classes.add(key)
+            calibration_points.append(
+                {
+                    "kind": "calibration",
+                    "config_id": f"cal_{rec.core_class}_{rec.layout}_{len(seen_classes):02d}",
+                    "layout": rec.layout,
+                    "core_class": rec.core_class,
+                    "cpus": rec.cpus,
+                    "control": rec.accepted_control or rec.requested_control,
+                    "median_runtime_s": rec.runtime_s,
+                    "median_energy_j": rec.package_energy_j,
+                    "energy_available": rec.energy_available and rec.package_energy_j is not None,
+                    "measured": True,
+                    "source": "store.calibrations",
+                }
+            )
+    except Exception:
+        logger.exception("calibration lookup failed for validation points")
+
+    return {
+        "experiment_id": id,
+        "layout_candidates": layout_points,
+        "calibration_points": calibration_points,
+        "note": "Convenience candidates only — the deterministic selector still checks all usable configurations.",
+    }
+
+
+def _fixture_class_map() -> "CoreClassMap":
+    """CoreClassMap from A's discovered topology fixture (fallback: empty)."""
+    try:
+        top = _load_json_file("fixtures/real/topology.json")
+        classes_raw = (top.get("core_classes") or {}).get("classes") or {}
+        classes: dict[str, list[int]] = {}
+        fast = efficient = ""
+        for name, info in classes_raw.items():
+            label = info.get("label", "")
+            cpus = info.get("cpus", [])
+            classes[label or name] = cpus
+            if label == "fast":
+                fast = label
+            elif label == "efficient":
+                efficient = label
+        # Layouts: all logical CPUs of each class
+        layouts = {
+            "A": _sibling_pairs(classes.get(fast) or [], 4),
+            "B": _all_physical(top),
+            "C": list(range(int(top.get("ncpu", 16)))),
+            "D": _sibling_pairs(classes.get(efficient) or [], 4),
+        }
+        return CoreClassMap(
+            classes=classes,
+            layouts=layouts,
+            fast_class=fast,
+            efficient_class=efficient,
+            is_heterogeneous=bool(fast and efficient),
+        )
+    except Exception:
+        return CoreClassMap()
+
+
+def _sibling_pairs(cpus: list[int], n_physical: int) -> list[int]:
+    """First n_physical physical cores, one SMT sibling each (PLAN §6 shapes)."""
+    physical = [c for c in sorted(set(cpus)) if c < 64]
+    smt: list[int] = []
+    for c in physical[:n_physical]:
+        smt.append(c)
+        sibling = c + 8 if (c + 8) in cpus else None
+        if sibling is not None:
+            smt.append(sibling)
+    return sorted(smt)
+
+
+def _all_physical(top: dict[str, Any]) -> list[int]:
+    """One logical CPU per physical core (first of each SMT group)."""
+    groups = top.get("smt_groups") or {}
+    if groups:
+        # smt_groups: {"0": [0, 8], "1": [1, 9], ...} -> [0, 1, 2, ...]
+        return sorted(int(v[0]) for v in groups.values() if isinstance(v, list) and v)
+    ncpu = int(top.get("ncpu", 16))
+    return list(range(0, ncpu, 2))
+
+
+def _mask_from_cpus(cpus: list[int]) -> str:
+    if not cpus:
+        return ""
+    return ",".join(str(c) for c in sorted(cpus))
+
+
+def _load_json_file(rel_path: str) -> dict[str, Any]:
+    p = Path(__file__).resolve().parent.parent / rel_path
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 @app.post("/api/experiments/{id}/cancel")
@@ -441,14 +584,32 @@ def export_experiment(id: str) -> dict[str, Any]:
 
 @app.post("/api/watch/start")
 def start_watch(req: WatchStartRequest) -> dict[str, Any]:
-    """Start passive background power watcher (0.5–1 Hz polling)."""
-    _WATCH_STATE["active"] = True
-    _WATCH_STATE["state"] = "calibrating_baseline"
-    _WATCH_STATE["poll_hz"] = req.poll_hz
+    """Start passive background power watcher (0.5–1 Hz polling).
+
+    Live wiring: Agent B's WatchDetector (core/watch.py) fed by the best
+    available package-energy source (A's powercap backend when readable,
+    B's synthetic scripted profile on dev machines). Read-only per §6b:
+    no controls, no helper lease, missing energy never reported as zero.
+    """
+    global _WATCH_SERVICE
+    if _WATCH_SERVICE is not None and _WATCH_SERVICE.detector.state != "stopped":
+        return {
+            "status": "already_watching",
+            "poll_hz": _WATCH_SERVICE.status_dict()["poll_hz"],
+            "state": _WATCH_SERVICE.detector.state,
+            "message": "Watcher already running.",
+        }
+    _WATCH_SERVICE = WatchService(
+        poll_hz=req.poll_hz,
+        onset_s=float(req.onset_consecutive_s),
+        idle_grace_s=float(req.idle_grace_s),
+    )
+    status = _WATCH_SERVICE.status_dict()
     return {
         "status": "watching",
-        "poll_hz": req.poll_hz,
-        "state": "calibrating_baseline",
+        "poll_hz": status["poll_hz"],
+        "state": _WATCH_SERVICE.detector.state,
+        "source": _WATCH_SERVICE.source_info,
         "message": "Watcher started. Learning idle baseline (30-60s genuine idle).",
     }
 
@@ -456,50 +617,71 @@ def start_watch(req: WatchStartRequest) -> dict[str, Any]:
 @app.post("/api/watch/stop")
 def stop_watch() -> dict[str, Any]:
     """Stop passive watcher, return observed activity segments with suggested budgets."""
-    _WATCH_STATE["active"] = False
-    _WATCH_STATE["state"] = "stopped"
+    global _WATCH_SERVICE
+    if _WATCH_SERVICE is None:
+        return {"status": "stopped", "segments": [], "message": "No watcher running."}
 
-    # Return recorded segment
-    segment = {
-        "segment_id": "seg_01",
-        "onset_timestamp": "2026-09-09T10:02:15Z",
-        "end_timestamp": "2026-09-09T10:03:02Z",
-        "duration_s": 47.0,
-        "estimated_energy_j": 1410.0,
-        "suggested_budget_s": 49.35,
-        "mode": "watch",
-        "note": "Estimated via idle-return detection. Uncertainty ±1.0s.",
-    }
-    _WATCH_STATE["segments"] = [segment]
-    _WATCH_STATE["completed_segments_count"] = 1
+    segments = [
+        _WATCH_SERVICE.segment_frame(seg) for seg in _WATCH_SERVICE.detector.segments
+    ]
+    _WATCH_SERVICE.detector.state = "stopped"
     return {
         "status": "stopped",
-        "segments": [segment],
+        "segments": segments,
+        "source": _WATCH_SERVICE.source_info,
     }
 
 
 @app.get("/api/watch/status")
 def get_watch_status() -> dict[str, Any]:
     """Current watcher state, baseline power, active observations."""
-    return _WATCH_STATE
+    if _WATCH_SERVICE is None:
+        return {
+            "active": False,
+            "state": "idle",
+            "source": None,
+            "poll_hz": None,
+            "current_power_w": None,
+            "baseline_median_w": None,
+            "baseline_spread_w": None,
+            "active_segment_elapsed_s": None,
+            "completed_segments_count": 0,
+        }
+    return _WATCH_SERVICE.status_dict()
 
 
 @app.get("/api/watch/events")
 async def get_watch_events() -> StreamingResponse:
-    """SSE stream of watcher power samples, segment detection."""
+    """SSE stream of watcher power samples, segment detection.
+
+    Drives the live WatchService when active (real detector on the real
+    backend, accelerated synthetic profile on dev machines); when idle, emits
+    a single watch_state frame so consumers can render the idle state.
+    """
+    import asyncio as _asyncio
+
     async def watch_generator() -> AsyncGenerator[str, None]:
-        # Initial state
-        yield f"event: watch_state\ndata: {json.dumps({'state': _WATCH_STATE['state'], 'baseline_median_w': _WATCH_STATE['baseline_median_w'], 'baseline_spread_w': _WATCH_STATE['baseline_spread_w']})}\n\n"
+        if _WATCH_SERVICE is None:
+            yield f"event: watch_state\ndata: {json.dumps({'state': 'idle', 'baseline_median_w': None, 'baseline_spread_w': None})}\n\n"
+            return
 
-        # Emulate 5 live samples
-        sample_powers = [8.6, 8.5, 24.2, 28.5, 8.7]
-        for p in sample_powers:
-            await asyncio.sleep(0.1)
-            in_idle = (p < 10.0)
-            yield f"event: watch_sample\ndata: {json.dumps({'timestamp': utc_now_iso(), 'power_w': p, 'in_idle_band': in_idle})}\n\n"
-
-        # Emulate detected segment
-        yield f"event: watch_segment\ndata: {json.dumps({'segment_id': 'seg_01', 'duration_s': 47.0, 'estimated_energy_j': 1410.0, 'suggested_budget_s': 49.35})}\n\n"
+        service = _WATCH_SERVICE
+        yield service.state_frame()
+        last_state = service.detector.state
+        while service.detector.state != "stopped":
+            await _asyncio.sleep(min(service._poll_interval_wall(), 1.0))
+            sample = service._sample_once()
+            if sample is None:
+                continue
+            yield service.sample_frame(sample)
+            if service.detector.state != last_state:
+                yield service.state_frame()
+                last_state = service.detector.state
+            closed = sample.get("closed_segment")
+            if closed is not None:
+                yield f"event: watch_segment\ndata: {json.dumps(service.segment_frame(closed))}\n\n"
+            if service.source_info.get("synthetic") and service._profile_exhausted():
+                break
 
     return StreamingResponse(watch_generator(), media_type="text/event-stream")
 

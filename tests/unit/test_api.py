@@ -140,21 +140,223 @@ def test_watch_lifecycle(client):
     # Start watch
     res = client.post("/api/watch/start", json={"poll_hz": 1.0})
     assert res.status_code == 200
-    assert res.json()["status"] == "watching"
+    body = res.json()
+    assert body["status"] == "watching"
+    assert "source" in body  # real powercap or synthetic — always labeled
+    assert body["state"] == "calibrating"
 
     # Status
     res_st = client.get("/api/watch/status")
     assert res_st.status_code == 200
     assert res_st.json()["active"] is True
+    assert res_st.json()["poll_hz"] == 1.0
 
-    # Stop watch
+    # Stop watch before any segment closes (immediate stop) — no invented data
     res_stop = client.post("/api/watch/stop")
     assert res_stop.status_code == 200
     data = res_stop.json()
     assert data["status"] == "stopped"
-    assert len(data["segments"]) == 1
-    assert data["segments"][0]["mode"] == "watch"
-    assert data["segments"][0]["duration_s"] > 0
+    assert isinstance(data["segments"], list)  # empty until a segment actually closed
+    for seg in data["segments"]:
+        assert seg["mode"] == "watch"
+        assert seg["duration_s"] > 0
+        # honesty guards: missing energy is never zero
+        if not seg["energy_available"]:
+            assert seg["estimated_energy_j"] is None
+
+    # Stopping again without a session is a clean no-op
+    res_stop2 = client.post("/api/watch/stop")
+    assert res_stop2.status_code == 200
+    assert res_stop2.json()["status"] == "stopped"
+
+
+def test_watch_detector_closes_segment_on_scripted_profile():
+    """Live wiring: B's WatchDetector fed the full scripted idle→activity→idle
+    profile (with mid-task dip) must close exactly one segment with honest
+    energy and a suggested budget (§6b: dip absorbed, settle time excluded)."""
+    from energy.synthetic import SyntheticEnergyBackend
+
+    from api.live import WatchService
+
+    backend = SyntheticEnergyBackend()
+    backend.setup_standard_watch_profile()
+    service = WatchService(
+        poll_hz=1.0, onset_s=3.0, idle_grace_s=10.0, backend=backend, time_scale=1.0
+    )
+
+    frames = []
+    for _ in range(130):  # scripted profile is 120 s at 1 Hz
+        sample = service._sample_once()
+        if sample is None:
+            continue
+        frames.append(sample)
+        if sample.get("closed_segment") is not None:
+            break
+
+    closed = [f for f in frames if f.get("closed_segment")]
+    assert len(closed) == 1, "mid-task dip must not close the segment early"
+    seg = service.segment_frame(closed[0]["closed_segment"])
+    assert seg["mode"] == "watch"
+    assert seg["duration_s"] > 0
+    # Task window: 20s + 6s dip + 24s = ~44-50 s of activity, minus boundary
+    # samples; runtime must be in a sane band (not the full 120 s profile).
+    assert 30.0 < seg["duration_s"] < 70.0, f"unexpected runtime {seg['duration_s']}"
+    assert seg["estimated_energy_j"] is not None and seg["estimated_energy_j"] > 0
+    assert seg["suggested_budget_s"] >= seg["duration_s"]
+    assert "Uncertainty" in seg["note"]
+
+
+def test_watch_status_idle_when_never_started():
+    import api.app as app_module
+    from fastapi.testclient import TestClient
+
+    prev = app_module._WATCH_SERVICE
+    app_module._WATCH_SERVICE = None  # reset module state from earlier tests
+    try:
+        with TestClient(app_module.app) as fresh_client:
+            res = fresh_client.get("/api/watch/status")
+            assert res.status_code == 200
+            body = res.json()
+            assert body["active"] is False
+            assert body["state"] == "idle"
+            assert body["completed_segments_count"] == 0
+    finally:
+        app_module._WATCH_SERVICE = prev
+
+
+def test_select_publishes_selection_updated_on_bus(client):
+    """POST /select must publish selection_updated on B's EventBus (AFFECTS(c))."""
+    from core.events import default_bus
+
+    received = []
+    evlog = default_bus().for_experiment(SYNTHETIC_ID)
+    unsub = evlog.subscribe(lambda e: received.append(e))
+
+    res = client.post(
+        f"/api/experiments/{SYNTHETIC_ID}/select",
+        json={"objective": "deadline", "runtime_budget_s": 50.0},
+    )
+    assert res.status_code == 200
+    unsub()
+
+    events = [e for e in received if e.name == "selection_updated"]
+    assert events, "selection_updated must be published on the bus"
+    assert events[0].payload["selection"]["objective"] == "deadline"
+
+
+def test_sse_replays_live_bus_history():
+    """The SSE frame source must replay B's bus history for an experiment
+    (replay(0) burst) using B's authoritative sse_frame format.
+
+    Note: tested at the generator level because this TestClient/httpx stack
+    buffers infinite SSE responses (verified: iter_lines/iter_bytes block
+    until stream end on any infinite StreamingResponse). The HTTP endpoint is
+    a thin wrapper: it runs this exact generator; live TCP verification runs
+    in the C#3 session smoke (see HANDOFF).
+    """
+    import asyncio
+
+    from api.live import stream_experiment_events
+    from core.events import default_bus
+
+    bus = default_bus()
+    bus.publish(
+        SYNTHETIC_ID,
+        "experiment_state",
+        {"experiment_id": SYNTHETIC_ID, "state": "PROFILING", "previous_state": "PREPARING"},
+    )
+    bus.publish(
+        SYNTHETIC_ID,
+        "run_progress",
+        {"experiment_id": SYNTHETIC_ID, "phase": "profiling", "status": "running"},
+    )
+
+    async def collect():
+        agen = stream_experiment_events(SYNTHETIC_ID, keepalive_s=0.1)
+        frames = []
+
+        async def read():
+            async for frame in agen:
+                frames.append(frame)
+                # Bus history may carry events from earlier tests on the same
+                # experiment id — read until the run_progress replay lands.
+                if "event: run_progress" in frame:
+                    return
+
+        try:
+            await asyncio.wait_for(read(), timeout=3)
+        finally:
+            await agen.aclose()
+        return frames
+
+    frames = asyncio.run(collect())
+    text = "".join(frames)
+    assert "event: experiment_state" in text
+    assert "PROFILING" in text
+    assert "event: run_progress" in text
+    # B's sse_frame format is authoritative
+    assert 'data: {"experiment_id"' in text
+
+
+def test_sse_live_follow_publishes_after_replay():
+    """After the replay burst, a newly published bus event must be delivered
+    by the live-follow loop (proves subscribe wiring, not just replay)."""
+    import asyncio
+
+    from api.live import stream_experiment_events
+    from core.events import default_bus
+
+    exp_id = "exp_sse_live_follow_test"
+    bus = default_bus()
+    bus.publish(exp_id, "experiment_state", {"experiment_id": exp_id, "state": "PREPARING"})
+
+    async def collect():
+        evlog = default_bus().for_experiment(exp_id)
+        agen = stream_experiment_events(exp_id, keepalive_s=0.2)
+        frames = []
+
+        async def read():
+            async for frame in agen:
+                frames.append(frame)
+                # First frame = replay; then publish a live event mid-stream.
+                if len(frames) == 1:
+                    evlog.publish(
+                        "run_complete",
+                        {"experiment_id": exp_id, "phase": "profiling", "status": "success"},
+                    )
+                if len(frames) >= 2:
+                    return
+
+        try:
+            await asyncio.wait_for(read(), timeout=5)
+        finally:
+            await agen.aclose()
+        return frames
+
+    frames = asyncio.run(collect())
+    assert len(frames) >= 2
+    assert "event: experiment_state" in frames[0]
+    live = frames[1]
+    assert "event: run_complete" in live and "success" in live
+
+
+def test_validation_points_endpoint(client):
+    """Validation-point candidates: B's layouts + measured calibration points."""
+    res = client.get(f"/api/experiments/{SYNTHETIC_ID}/validation-points")
+    assert res.status_code == 200
+    body = res.json()
+    kinds = {p["kind"] for p in body["layout_candidates"]}
+    assert kinds == {"layout"}
+    ids = [p["config_id"] for p in body["layout_candidates"]]
+    assert "layout_B_all_physical" in ids
+    assert "layout_C_all_logical" in ids
+    for p in body["layout_candidates"]:
+        assert p["cpu_mask"], "layout candidates must carry a cpu mask"
+        assert p["measured"] is False
+    for p in body["calibration_points"]:
+        assert p["measured"] is True
+        if not p["energy_available"]:
+            assert p["median_energy_j"] is None
 
 
 def test_root_serves_frontend_or_fallback(client):

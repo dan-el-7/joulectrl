@@ -178,9 +178,16 @@ export interface Experiment {
 export interface WatchStatus {
   active: boolean;
   state: string;
-  current_power_w: number;
-  baseline_median_w: number;
-  baseline_spread_w: number;
+  source?: {
+    source: string;
+    domain: string;
+    synthetic: boolean;
+    note?: string;
+  } | null;
+  poll_hz?: number | null;
+  current_power_w: number | null;
+  baseline_median_w: number | null;
+  baseline_spread_w: number | null;
   active_segment_elapsed_s: number | null;
   completed_segments_count: number;
 }

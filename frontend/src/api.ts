@@ -84,6 +84,12 @@ export async function explainSelection(experimentId: string, provider: string = 
   return res.json();
 }
 
+export async function fetchValidationPoints(experimentId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/experiments/${experimentId}/validation-points`);
+  if (!res.ok) throw new Error(`Failed to fetch validation points: ${res.statusText}`);
+  return res.json();
+}
+
 export async function fetchWatchStatus(): Promise<WatchStatus> {
   const res = await fetch(`${API_BASE}/watch/status`);
   if (!res.ok) throw new Error(`Failed to fetch watch status: ${res.statusText}`);
