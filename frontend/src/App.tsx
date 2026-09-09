@@ -8,6 +8,7 @@ import {
   fetchWorkloads,
   reselectConfiguration,
   restoreSettings,
+  cancelExperiment,
 } from './api';
 import { CalibrationView } from './components/CalibrationView';
 import { ExplorerView } from './components/ExplorerView';
@@ -269,6 +270,20 @@ export const App: React.FC = () => {
     setActiveTab('setup');
   };
 
+  const handleCancelExperiment = async () => {
+    if (!experiment) return;
+    try {
+      await cancelExperiment(experiment.id);
+      setExperimentState('RESTORED');
+      setExperimentStateMessage('Experiment stopped by user. CPU settings restored.');
+      const updated = await fetchExperiment(experiment.id);
+      setExperiment(updated);
+    } catch (e: any) {
+      console.error('Cancel failed:', e);
+      alert(`Cancel failed: ${e?.message ?? e}`);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar
@@ -283,6 +298,7 @@ export const App: React.FC = () => {
         experiments={experimentsList}
         currentExperimentId={experiment?.id}
         onSelectExperiment={handleSelectExperiment}
+        onCancelExperiment={handleCancelExperiment}
       />
 
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: '1300px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>

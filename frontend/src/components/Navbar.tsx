@@ -13,6 +13,7 @@ interface NavbarProps {
   experiments?: any[];
   currentExperimentId?: string;
   onSelectExperiment?: (id: string) => void;
+  onCancelExperiment?: () => void;
 }
 
 const TABS = [
@@ -51,6 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   experiments,
   currentExperimentId,
   onSelectExperiment,
+  onCancelExperiment,
 }) => {
   const restored = restorationStatus === 'restored' || restorationStatus === 'not_required';
   const isRunning = !!experimentState && RUNNING_STATES[experimentState] !== undefined;
@@ -195,6 +197,31 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
             {stateLabel}
           </div>
+        )}
+
+        {/* Stop Calibration button */}
+        {isRunning && onCancelExperiment && (
+          <button
+            onClick={onCancelExperiment}
+            style={{
+              ...type.label,
+              padding: '4px 10px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: '#ef4444',
+              border: '1px solid rgba(239, 68, 68, 0.45)',
+              borderRadius: radii.md,
+              cursor: 'pointer',
+              font: 'inherit',
+              fontSize: 11,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+            title="Stop active profiling / calibration and restore CPU settings immediately"
+          >
+            <span>⏹</span> Stop Run
+          </button>
         )}
 
         {/* Experiment switcher dropdown */}

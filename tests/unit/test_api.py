@@ -620,3 +620,16 @@ def test_system_processes_and_priority_endpoints(client):
     assert res_restore.json()["ok"] is True
 
 
+def test_live_engine_cancellation_registry():
+    from api.engine import LiveEngine
+    import threading
+
+    test_exp = "exp_test_cancellation_123"
+    LiveEngine._cancel_events[test_exp] = threading.Event()
+    assert LiveEngine.is_cancelled(test_exp) is False
+
+    LiveEngine.cancel_active_experiment(test_exp)
+    assert LiveEngine.is_cancelled(test_exp) is True
+
+
+

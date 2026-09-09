@@ -515,33 +515,47 @@ export const CalibrationView: React.FC = () => {
           </div>
         </div>
 
-        {/* Hover metadata badge */}
-        {hovered && (
-          <div
-            style={{
-              ...type.monoLabel,
-              fontFamily: fonts.mono,
-              color: colors.textSecondary,
-              background: colors.surfaceElevated,
-              border: `1px solid ${colors.border}`,
-              borderRadius: radii.sm,
-              padding: '6px 12px',
-              marginBottom: 12,
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 12,
-              alignItems: 'center',
-            }}
-          >
-            <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{hovered.label}</span>
-            {hovered.meta &&
-              Object.entries(hovered.meta).map(([k, v]) => (
-                <span key={k}>
-                  <span style={{ color: colors.textTertiary }}>{k}:</span> {v}
-                </span>
-              ))}
-          </div>
-        )}
+        {/* Hover metadata badge — fixed height container ensures zero layout shifts or cursor jumping */}
+        <div style={{ minHeight: 44, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+          {hovered ? (
+            <div
+              style={{
+                ...type.monoLabel,
+                fontFamily: fonts.mono,
+                color: colors.textSecondary,
+                background: colors.surfaceElevated,
+                border: `1px solid ${colors.border}`,
+                borderRadius: radii.sm,
+                padding: '6px 12px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 12,
+                alignItems: 'center',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            >
+              <span style={{ color: colors.textPrimary, fontWeight: 600 }}>{hovered.label}</span>
+              {hovered.meta &&
+                Object.entries(hovered.meta).map(([k, v]) => (
+                  <span key={k}>
+                    <span style={{ color: colors.textTertiary }}>{k}:</span> {v}
+                  </span>
+                ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                ...type.caption,
+                color: colors.textQuaternary,
+                paddingLeft: 4,
+                fontStyle: 'italic',
+              }}
+            >
+              Hover over any point to inspect configuration details, power draw, and performance score.
+            </div>
+          )}
+        </div>
 
         {/* Graph rendering */}
         {(classFilter === 'all' ? [null] : visibleClasses.map((c) => c.label)).map((single) => {

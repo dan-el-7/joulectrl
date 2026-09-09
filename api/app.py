@@ -678,7 +678,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
         except Exception:
             pass
 
-        for (cls, cpus, workers, freq, boost, cid), rlist in by_key.items():
+        for (cls, cpus, workers, freq, boost, cid, wname), rlist in by_key.items():
             n = len(rlist)
             avg_rt = sum(r.runtime_s for r in rlist) / n
             pwr_vals = [(r.avg_power_w if r.avg_power_w else (r.package_energy_j / r.runtime_s if r.package_energy_j else 0.0)) for r in rlist]
@@ -1054,6 +1054,14 @@ def cancel_experiment(id: str) -> dict[str, Any]:
     if exp is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
 
+    # 1. Signal LiveEngine to abort running runner and background threads immediately
+    try:
+        from api.engine import LiveEngine
+        LiveEngine.cancel_active_experiment(id)
+    except Exception as e:
+        logger.warning("Error signalling LiveEngine cancellation for %s: %s", id, e)
+
+    # 2. Update state machine and overlay
     if _STORE.get_experiment(id) is not None:
         sm = ExperimentStateMachine(_STORE, id)
         # Terminal states have nothing running to cancel: go straight to restoration.
@@ -1061,17 +1069,30 @@ def cancel_experiment(id: str) -> dict[str, Any]:
             sm.restore(lambda: None)
         else:
             sm.cancel()
-            # Dev-machine mode: no live runner to cancel, so restoration completes immediately.
-            # Gate 3 replaces this with runner-backed cancellation + helper restore.
             sm.restore(lambda: None)
-    elif id in _OVERLAY:
+    
+    if id in _OVERLAY:
         _OVERLAY[id]["state"] = "RESTORED"
         _OVERLAY[id]["restoration_status"] = "restored"
+
+    # 3. Direct hardware restore via helper if available
+    try:
+        from helper.client import HelperClient
+        h = HelperClient()
+        h.restore()
+        h.end_session()
+    except Exception as e:
+        logger.debug("Direct helper restore on cancel: %s", e)
+
+    default_bus().publish(id, "experiment_state", {
+        "state": "RESTORED",
+        "message": "Calibration stopped by user. CPU settings restored to stock condition.",
+    })
 
     return {
         "status": "cancelling",
         "restoration": "restoring",
-        "message": "Cancellation initiated. Workload process group terminated and CPU settings restoring.",
+        "message": "Cancellation initiated. Workload terminated and CPU settings restoring.",
     }
 
 

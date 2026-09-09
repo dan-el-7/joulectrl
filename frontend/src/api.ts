@@ -71,6 +71,14 @@ export async function validateExperiment(experimentId: string): Promise<any> {
   return res.json();
 }
 
+export async function cancelExperiment(experimentId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/experiments/${experimentId}/cancel`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Failed to cancel experiment: ${res.statusText}`);
+  return res.json();
+}
+
 export async function restoreSettings(): Promise<any> {
   const res = await fetch(`${API_BASE}/restore`, { method: 'POST' });
   if (!res.ok) throw new Error(`Failed to restore: ${res.statusText}`);
