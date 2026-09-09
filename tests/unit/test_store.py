@@ -135,3 +135,100 @@ def test_profile_and_selection_and_export(store):
     assert exported["id"] == "exp-3"
     assert exported["profile"]["baseline_config_id"] == "stock"
     assert exported["selection"]["status"] == "selected"
+
+
+def test_same_run_id_in_different_experiments_is_not_clobbered(store):
+    """C's AFFECTS(b): identical run_ids across experiments must stay separate."""
+    store.create_experiment(experiment_id="exp-a", workload_name="clean_build")
+    store.create_experiment(experiment_id="exp-b", workload_name="clean_build")
+    for exp, energy in (("exp-a", 100.0), ("exp-b", 900.0)):
+        store.record_run(
+            RunRecord(
+                run_id="cfg_stock_r1",
+                experiment_id=exp,
+                config_id="stock",
+                workload_name="clean_build",
+                repetition=1,
+                runtime_s=10.0,
+                package_energy_j=energy,
+            )
+        )
+    assert len(store.get_runs("exp-a")) == 1
+    assert store.get_runs("exp-a")[0].package_energy_j == 100.0
+    assert len(store.get_runs("exp-b")) == 1
+    assert store.get_runs("exp-b")[0].package_energy_j == 900.0
+
+
+def test_legacy_run_id_primary_key_database_migrates(tmp_path):
+    """A legacy DB with run_id-only PK is migrated to (experiment_id, run_id)."""
+    import sqlite3
+
+    db_path = tmp_path / "legacy.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(
+        """
+        CREATE TABLE experiments (
+            id TEXT PRIMARY KEY, workload_name TEXT NOT NULL,
+            objective TEXT NOT NULL DEFAULT 'deadline',
+            state TEXT NOT NULL DEFAULT 'IDLE', runtime_budget_s REAL,
+            preference_json TEXT,
+            restoration_status TEXT NOT NULL DEFAULT 'not_required',
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            profile_json TEXT, selection_json TEXT, validation_json TEXT,
+            metadata_json TEXT
+        );
+        CREATE TABLE runs (
+            run_id TEXT PRIMARY KEY, experiment_id TEXT NOT NULL,
+            config_id TEXT NOT NULL, workload_name TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'harness',
+            phase TEXT NOT NULL DEFAULT 'profiling',
+            repetition INTEGER NOT NULL, runtime_s REAL NOT NULL,
+            package_energy_j REAL, energy_available INTEGER NOT NULL,
+            avg_power_w REAL, status TEXT NOT NULL,
+            data_json TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO experiments (id, workload_name, created_at, updated_at) "
+        "VALUES ('exp-old', 'clean_build', '2026-09-09T00:00:00Z', '2026-09-09T00:00:00Z')"
+    )
+    import json as _json
+
+    full_record = {
+        "run_id": "run-old", "experiment_id": "exp-old", "config_id": "stock",
+        "workload_name": "clean_build", "repetition": 1, "phase": "profiling",
+        "start_time_monotonic": 0.0, "end_time_monotonic": 10.0,
+        "runtime_s": 10.0, "package_energy_j": 500.0, "energy_available": True,
+        "status": "success", "output_verified": True,
+    }
+    conn.execute(
+        "INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "run-old", "exp-old", "stock", "clean_build", "harness",
+            "profiling", 1, 10.0, 500.0, 1, 50.0, "success",
+            _json.dumps(full_record), "2026-09-09T00:00:00Z",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    migrated = Store(str(db_path))
+    runs = migrated.get_runs("exp-old")
+    assert len(runs) == 1
+    assert runs[0].run_id == "run-old"
+    # New composite-key writes work on the migrated DB.
+    migrated.create_experiment(experiment_id="exp-new", workload_name="clean_build")
+    migrated.record_run(
+        RunRecord(
+            run_id="run-old",  # same id, different experiment
+            experiment_id="exp-new",
+            config_id="stock",
+            workload_name="clean_build",
+            repetition=1,
+            runtime_s=1.0,
+            package_energy_j=1.0,
+        )
+    )
+    assert len(migrated.get_runs("exp-old")) == 1
+    assert len(migrated.get_runs("exp-new")) == 1

@@ -62,8 +62,8 @@ class Store:
                 );
 
                 CREATE TABLE IF NOT EXISTS runs (
-                    run_id TEXT PRIMARY KEY,
                     experiment_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
                     config_id TEXT NOT NULL,
                     workload_name TEXT NOT NULL,
                     mode TEXT NOT NULL DEFAULT 'harness',
@@ -76,6 +76,7 @@ class Store:
                     status TEXT NOT NULL,
                     data_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
+                    PRIMARY KEY (experiment_id, run_id),
                     FOREIGN KEY (experiment_id) REFERENCES experiments (id)
                 );
 
@@ -108,6 +109,56 @@ class Store:
                 CREATE INDEX IF NOT EXISTS idx_runs_exp ON runs (experiment_id);
                 CREATE INDEX IF NOT EXISTS idx_transitions_exp ON state_transitions (experiment_id);
                 CREATE INDEX IF NOT EXISTS idx_cal_fingerprint ON calibrations (machine_fingerprint);
+                """
+            )
+        self._migrate_runs_composite_key()
+
+    def _migrate_runs_composite_key(self) -> None:
+        """Migrate legacy `runs` tables keyed on run_id alone to (experiment_id, run_id).
+
+        Legacy rows with duplicate run_ids across experiments were already
+        collapsed by INSERT OR REPLACE; surviving rows are kept as-is (one per
+        run_id) and copied into the new schema.
+        """
+        cur = self.conn.execute("PRAGMA table_info(runs)")
+        columns = {row["name"] for row in cur.fetchall()}
+        if not columns or "experiment_id" not in columns:
+            return
+        pk_cols = [
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(runs)")
+            if row["pk"]
+        ]
+        if pk_cols == ["experiment_id", "run_id"]:
+            return
+        with self.conn:
+            self.conn.executescript(
+                """
+                ALTER TABLE runs RENAME TO runs_legacy;
+                CREATE TABLE runs (
+                    experiment_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    config_id TEXT NOT NULL,
+                    workload_name TEXT NOT NULL,
+                    mode TEXT NOT NULL DEFAULT 'harness',
+                    phase TEXT NOT NULL DEFAULT 'profiling',
+                    repetition INTEGER NOT NULL,
+                    runtime_s REAL NOT NULL,
+                    package_energy_j REAL,
+                    energy_available INTEGER NOT NULL,
+                    avg_power_w REAL,
+                    status TEXT NOT NULL,
+                    data_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (experiment_id, run_id),
+                    FOREIGN KEY (experiment_id) REFERENCES experiments (id)
+                );
+                INSERT INTO runs SELECT experiment_id, run_id, config_id,
+                    workload_name, mode, phase, repetition, runtime_s,
+                    package_energy_j, energy_available, avg_power_w, status,
+                    data_json, created_at FROM runs_legacy;
+                DROP TABLE runs_legacy;
+                CREATE INDEX IF NOT EXISTS idx_runs_exp ON runs (experiment_id);
                 """
             )
 
