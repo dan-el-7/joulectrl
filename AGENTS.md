@@ -300,6 +300,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 2) demo/run_demo.py and demo/README.md committed: end-to-end 5-phase live presentation script executing capabilities, live kernel execution with invariant checksum, Pareto frontier, deterministic optimizer, fresh validation, and grounded explanation with restoration. All 19 tests passing.
 - (hour 2) AFFECTS(b) core/runner.py and test_runner.py use os.killpg and POSIX process-group creation which error on Windows dev machines (os.killpg does not exist on win32). Green on Linux CI.
 - (hour 3) [gate2] tests/integration/test_runner_workload.py committed: verified Workload plugin contract execution against Agent B's WorkloadRunner and ExperimentStateMachine.run_profile_point with verified checksum, package energy delta, and restoration. 23 tests green.
+- (hour 3) AFFECTS(c) explain/ API ready for /api/explain: extract_explanation_facts(selection, profile, val_pairs) and get_provider(provider).explain(facts) can be plugged directly into api/app.py explain_selection handler.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
