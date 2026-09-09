@@ -78,9 +78,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T10:10:00Z`
+- heartbeat: `2026-09-09T10:17:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/compute-kernel`
-- current unit: `committed compute kernel; starting workloads/base.py contract`
-- next action: `implement workloads/base.py Workload interface per PLAN §8 with unit tests`
-- notes for others: `compute kernel ready in workloads/kernel/ for Agent A C1/C2 calibration`
+- branch: `d/workload-contract`
+- current unit: `committed workloads/base.py and fixed_compute.py; starting zstd clean-build scaffold`
+- next action: `implement workloads/clean_build.py (zstd clean-build workload) per PLAN §4/§8`
+- notes for others: `workloads/base.py Workload interface is frozen. Unblocks Agent B runner and workloads integration.`

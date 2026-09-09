@@ -73,8 +73,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c` + `Makefile` + `build.sh` + `README.md` committed and tested (`tests/unit/test_compute_kernel.py` passes, verified checksum invariance across workers 1, 2, 4).
-- **In flight:** Implementing `workloads/base.py` plugin contract per PLAN §8.
-- **Resume here:** `python -m unittest tests/unit/test_compute_kernel.py`
-- **Gotchas:** `fixed_compute` needs `-pthread` on Linux. Checksum for default parameters is `0x3a762069507139ac`.
-- **Handoffs owed / waiting on:** Unblocked Agent A with compute kernel for calibration (C1 and C2).
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c` (pushed to main), workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, unit tests `tests/unit/test_workloads_base.py` and `tests/unit/test_compute_kernel.py` all green.
+- **In flight:** `d/workload-contract`, building `workloads/clean_build.py` (Workload A: zstd pinned clean-build scaffold).
+- **Resume here:** `python -m unittest tests/unit/test_workloads_base.py`
+- **Gotchas:** `Workload` methods expect argument list (`list[str]`), not shell string. `prepare()` and `verify()` run outside measurement window.
+- **Handoffs owed / waiting on:** Unblocked Agent B with `Workload` interface for runner integration.

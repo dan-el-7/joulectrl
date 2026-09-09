@@ -283,6 +283,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (hour 0) onboarded.
 - (hour 1) [contract] AFFECTS(a,b) compute kernel committed in workloads/kernel/ (fixed_compute.c, Makefile, build.sh). Fixed work per chunk, pthread partitioning, invariant checksum across workers (default 4096 chunks, 100k iters -> 0x3a762069507139ac; smoke 1024 chunks, 50k iters -> 0x23e23165be5ef4b6). Ready for Agent A calibration (C1 stock single-core baseline and C2 dense sweep).
+- (hour 1) [contract] AFFECTS(a,b) workloads/base.py Workload plugin contract committed per PLAN §8 (prepare, command, environment, verify, fingerprint). Includes workloads/fixed_compute.py reference plugin and unit tests.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
