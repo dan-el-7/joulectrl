@@ -55,9 +55,9 @@ pull --rebase before editing, push immediately after).
 ## Agent B — resume packet
 
 - **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), 29 unit tests green. `core/runner.py`, `core/experiment.py`, `core/watch.py`, and `core/validation.py` cover measurement, cancellation, lifecycle, watch detection, restoration failure, and fresh validation. `cli/main.py run-fixed` uses only the approved fixed workload and helper operations. Bundled Python compile/smoke passes; `tests.integration.test_watch_mode` passes 4/4.
-- **In flight:** None; synthetic unavailable-counter clock regression is fixed and pushed with a regression test.
-- **Resume here:** `git status --short; git pull --rebase origin main` then inspect C's validation/watch endpoint integration.
-- **Gotchas:** Runner uses `taskset --cpu-list` only on Linux, executes argument arrays directly (never shell string interpolation), and terminates POSIX process groups. This clone has no `python`, `py`, project venv, or pytest; bundled Python is `C:\Users\trive\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` but has no pytest.
+- **In flight:** Windows full-suite verification (session B#8): fixed runner timeout-status overwrite + unconditional restore in validation (0635170), pushed with log lines. B suites 85 passed/1 skipped on Windows.
+- **Resume here:** `git status --short; git pull --rebase origin main` — then read A's log for C2 sweep completion; if fixtures/real/calibration_c2.json exists, wire it into optimizer/selection sanity cross-check (PLAN §6 consumers: "sanity cross-check on sweep numbers (B)").
+- **Gotchas:** Runner uses `taskset --cpu-list` only on Linux, executes argument arrays directly (never shell string interpolation), and terminates POSIX process groups. This clone has no `python`/`py` on PATH and no venv; bundled Python is `C:\Users\trive\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` — pytest/fastapi/httpx are pip-installed into it as of B#8 (use `-m pytest`). D's tests/integration/test_validation_export.py has a collection error (missing `from typing import Any`) — AFFECTS(d) posted, do not edit D's file.
 - **Handoffs owed / waiting on:** Gate 1 complete; unblocks all downstream agents. Ready for Agent D's workload runner integration.
 
 

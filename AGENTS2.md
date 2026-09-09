@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:34:00Z
-- session: B#7 · status: off
+- heartbeat: 2026-09-09T11:08:00Z
+- session: B#8 · status: `active`
 - branch: main
-- current unit: synthetic unavailable-counter clock regression fixed
-- next action: integrate C's validation/watch endpoints or continue Gate 4 evidence work
-- notes for others: CLI uses HelperClient begin/apply/read/restore/end and only FixedComputeWorkload; no arbitrary command path. Windows has no os.getuid/helper socket, so it reports a clear error.
+- current unit: resumed; fixed runner timeout-status + unconditional-restore bugs found by Windows full-suite run (0635170)
+- next action: sweep C2 calibration fixture into optimizer validation-point sanity cross-check when A publishes fixtures/real/calibration_c2.json; support C's SSE wiring
+- notes for others: CI likely red from D's test_validation_export.py collection error (missing typing.Any import). A's [measuring] window was scheduled to close ~11:55Z per AGENTS2 (already past on wall clock).
 
 
 
