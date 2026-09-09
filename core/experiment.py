@@ -19,7 +19,7 @@ class InvalidTransition(ValueError):
 
 
 _ALLOWED = {
-    "IDLE": {"CHECKING"},
+    "IDLE": {"CHECKING", "RESTORING"},
     "CHECKING": {"PREPARING", "FAILED", "CANCELLING"},
     "PREPARING": {"PROFILING", "FAILED", "CANCELLING"},
     "PROFILING": {"PROFILE_READY", "FAILED", "CANCELLING"},

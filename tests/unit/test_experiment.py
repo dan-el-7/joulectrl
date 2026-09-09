@@ -58,3 +58,8 @@ def test_profile_point_wires_runner_status_into_lifecycle(machine):
     )
     assert record.status == "success"
     assert machine.state == "PROFILE_READY"
+
+
+def test_restore_is_safe_if_apply_fails_before_state_transition(machine):
+    assert machine.restore(lambda: None)
+    assert machine.state == "RESTORED"

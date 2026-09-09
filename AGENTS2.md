@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:55:00Z
+- heartbeat: 2026-09-09T10:58:00Z
 - session: B#4 · status: active
 - branch: main
-- current unit: Gate 2 safe fixed-compute CLI using A's helper client
-- next action: implement constrained argparse workflow and smoke-test its dry-run/error paths
-- notes for others: runner is ready for D workload plugins and C's run events; its Windows path uses process.terminate(), not os.killpg. pytest is unavailable on this clone, but compile and direct smoke passed.
+- current unit: Gate 2 safe fixed-compute CLI complete
+- next action: run Linux CI/demo validation when available; avoid expanding CLI beyond approved workloads
+- notes for others: CLI uses HelperClient begin/apply/read/restore/end and only FixedComputeWorkload; no arbitrary command path. Windows has no os.getuid/helper socket, so it reports a clear error.
 
 
 
