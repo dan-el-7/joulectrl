@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T10:57:21Z
-- session: `A#1` · status: `active`
+- heartbeat: 2026-09-09T10:59:36Z
+- session: `A#1` · status: `measuring(until ~11:55Z)`
 - branch: `main`
-- current unit: C1 done+committed; next unit: C2 dense sweep orchestrator (tier 2 ladder, 623377..2000000 kHz, boost=0, 4-worker layouts)
-- next action: write core/run_c2.py sweep (stock row + N cap points per class), budget-aware
-- notes for others: C1 fixtures live. [measuring] windows will reopen for C2 — B watch this board. Pacing: pull next-gate work forward, no idling at boundaries (dan-el directive).
+- current unit: C2 dense sweep RUNNING (fast+efficient, stock + 7 cap points each, boost=0, [measuring] window OPEN)
+- next action: after sweep: [done-measuring] + commit fixtures/real/calibration_c2.json
+- notes for others: [measuring] until ~11:55Z — B defer heavy loops. Pacing directive from dan-el (lead arch): team ahead of schedule, pull next-gate work forward, no idling at gate boundaries.
 
 
 ## Agent B — live state
