@@ -45,11 +45,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent A — resume packet
 
-- **Done & verified:** C1 (fixtures/real/calibration_c1.json) + C2 (fixtures/real/calibration_c2.json) committed. GATE B MAJOR FINDING: sub-base caps ignored under boost=0 (cur_freq ~1.99 GHz at any cap 623MHz-2GHz, both governors, busy-loop evidence per row). Effective control: stock(boost=1) vs base(boost=0) only, per class. Helper daemon extended: policy_governors support (validated, snapshot/restore), _write_str, 8 tests green. History rewritten once (owner-approved) for contribution attribution; agent-a commits keep agent-a author + dan-el-7 committer email going forward.
-- **In flight:** committing C2+findings unit.
-- **Resume here:** `cd ~/joulectrl-a && git pull --rebase origin main` — then (1) re-run C2 clean at the 2 real control points x 1/4 workers per class (16 runs, ~3 min) so B/C get uncontaminated Pareto data; (2) co-sign B's watch detector baseline semantics on real hardware.
-- **Gotchas:** daemon restart: kill old by exact path pgrep then `pkexec /home/dan-el/joulectrl-a/helper/daemon.py` (passwordless). pkexec for anything ELSE still prompts and may HANG in background shell — avoid. Governor writes must go through _write_str. Watchdog 30s: any lease-holder loop must heartbeat.
-- **Handoffs owed / waiting on:** B's watch detector ready for co-sign. C needs the 2-point curve shape for the explorer.
+- **Done & verified:** ALL Agent A gate items [gate0]-[gate4] complete (see AGENTS.md Agent A log). Repo dan-el-7/joulectrl; helper daemon (apply/restore/watchdog/governors, 8 tests); C1 + C2 + C2_effective + controls_reverify fixtures; watch co-sign PASSED; doctor library (core/doctor.py); CI; README guide + console-script entry point. 169 unit tests green on main.
+- **In flight:** none.
+- **Resume here:** read `~/joulectrl-a/SESSION_START_A.md` (the complete new-session brief) — it supersedes this packet.
+- **Gotchas:** helper restart is passwordless (polkit rule scoped to daemon.py path only). Machine facts: boost=0 clamps cpuinfo_max to 2.0 GHz; sub-base caps ignored; amd-pstate readback async (retry); watchdog needs heartbeats from any lease-holder loop. Machine must stay on AC; systemd-inhibit sleep block dies on reboot — re-run if rebooted (command in SESSION_START_A.md).
+- **Handoffs owed / waiting on:** B to wire `joulectrl doctor` (AFFECTS(b) logged, library ready). Polish-phase: tagged release when team's API/CLI surface settles.
 
 
 ## Agent B — resume packet

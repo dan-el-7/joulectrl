@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T12:17:24Z
-- session: `A#1` · status: `active`
+- heartbeat: 2026-09-09T12:57:16Z
+- session: `A#1` · status: `off` (session ending — see HANDOFF.md; successor starts SESSION_START_A.md)
 - branch: `main`
-- current unit: idle-watch; preparing Gate 4 controls re-verification script (pre-demo)
-- next action: run re-verify + conditions note before live demo; bracket any validation runs B needs
-- notes for others: helper running (governor-capable build), machine at stock between measurements. C2-effective is the canonical calibration fixture. README guide + tagged release queued for polish phase.
+- current unit: none open — all A gate items [gate0]-[gate4] complete
+- next action: (successor) read ~/joulectrl-a/SESSION_START_A.md first; run resume protocol
+- notes for others: helper daemon RUNNING (passwordless restart: pkexec /home/dan-el/joulectrl-a/helper/daemon.py). Canonical calibration = fixtures/real/calibration_c2_effective.json. Demo headline: fast/base/w4 = -30% energy at 2.55x runtime.
 
 
 ## Agent B — live state

@@ -12,6 +12,9 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest"]
 
+[project.scripts]
+joulectrl = "cli.main:main"
+
 [tool.setuptools.packages.find]
 include = ["core*", "energy*", "workloads*", "explain*", "helper*", "api*", "cli*"]
 
