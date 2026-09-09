@@ -98,5 +98,6 @@
       "iters": 200000,
       "single_core_runtime_s": 8.4752
     }
-  }
+  },
+  "pstate_mode_note": "EXPERIMENTAL (verified Sep 9 2026, live measurements): amd_pstate mode is runtime-switchable (active/guided/passive via /sys/devices/system/cpu/amd_pstate/status). In PASSIVE mode, frequency caps bind WITH boost on (measured 3.47 GHz under a 3.5 GHz cap). Measured tradeoff is poor on this machine: cap4.0G = 96% energy at 127% runtime vs stock; cap3.5G = 109% energy (WORSE than stock); passive base = 171% energy at 252% runtime. Active-mode stock/base remains the best real control space; the committed calibration fixtures assume active mode. Supported as a dev option: JOLECTRL_PASSIVE_CAPS=1 env flag (helper control key 'pstate_mode')."
 }

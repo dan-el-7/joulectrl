@@ -38,6 +38,16 @@ logger = logging.getLogger(__name__)
 
 WRAP_UJ = 65_532_610_987  # demo-laptop powercap wrap range (machine fact, fixture-cited)
 _REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+# EXPERIMENTAL DEV OPTION (default OFF): JOLECTRL_PASSIVE_CAPS=1 switches
+# amd_pstate to passive mode during experiments so frequency caps bind WITH
+# boost on (measured: 3.47 GHz under a 3.5 GHz cap). Measured tradeoff is poor
+# (4% energy saved for 27% runtime at 4.0 GHz; 3.5 GHz is WORSE than stock;
+# passive base is 171% energy) and it invalidates the active-mode calibration
+# fixtures — hence dev-flag-only. The helper restores the original pstate mode
+# with everything else.
+import os as _os
+_PASSIVE_CAPS = _os.environ.get("JOLECTRL_PASSIVE_CAPS") == "1"
+_EXPERIMENTAL_CAP_LADDER = [4000000, 3500000, 3000000, 2500000, 2000000]
 
 
 class LiveEngine:
@@ -132,6 +142,10 @@ class LiveEngine:
             return
         workload_id = request.get("workload_id", "fixed_compute")
         objective = request.get("objective", "deadline")
+        # EXPERIMENTAL dev option: amd_pstate passive mode, where frequency
+        # caps bind WITH boost on (measured: marginal gains, demo-laptop note
+        # in capability report). Restored with everything else.
+        passive = bool(request.get("experimental_passive_caps"))
         budget = request.get("runtime_budget_s") or 45.0
         preference = request.get("preference") or {}
 
@@ -144,8 +158,12 @@ class LiveEngine:
             cal = self._calibration_lookup(helper)
 
             # Build candidate configurations: B's layouts at stock + base
-            # (the machine's verified effective control points).
+            # (the machine's verified effective control points), plus — when
+            # the EXPERIMENTAL passive-caps option is on — intermediate capped
+            # points that only bind in passive mode.
             configs = self._candidate_configs(cls_map)
+            if passive:
+                configs = configs + self._passive_cap_configs(cls_map)
             runs: list[RunRecord] = []
             profile_rows: list[dict[str, Any]] = []
             measured_keys: set[tuple] = set()
@@ -170,7 +188,7 @@ class LiveEngine:
                     "config_id": cfg.id, "repetition": 1, "status": "running",
                     "run_index": i + 1, "total_runs": total, "description": desc,
                 })
-                rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg)
+                rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg, passive=passive)
                 runs.append(rec)
                 self._emit(exp_id, "run_complete", {
                     "experiment_id": exp_id, "phase": "profiling",
@@ -220,17 +238,45 @@ class LiveEngine:
         for name, cpus, workers in layouts:
             for boost in (True, False):
                 cid = f"cfg_{name}_{'stock' if boost else 'base'}"
-                if cid in seen:
-                    continue
-                seen.add(cid)
-                out.append((
-                    Configuration(id=cid, layout=name.upper()[:1], worker_count=workers,
-                                  cpu_affinity=list(cpus), freq_cap_khz=None, boost=boost),
-                    f"{name} {'stock' if boost else 'base'} ({workers}w)",
-                ))
+                if cid not in seen:
+                    seen.add(cid)
+                    out.append((
+                        Configuration(id=cid, layout=name.upper()[:1], worker_count=workers,
+                                      cpu_affinity=list(cpus), freq_cap_khz=None, boost=boost),
+                        f"{name} {'stock' if boost else 'base'} ({workers}w)",
+                    ))
+            # EXPERIMENTAL: with passive-caps dev flag, caps bind with boost on —
+            # add a capped ladder on the all-physical layout for those runs.
+            if _PASSIVE_CAPS and name == "all_physical":
+                for cap in _EXPERIMENTAL_CAP_LADDER:
+                    cid = f"cfg_{name}_cap{cap // 100000}e5"
+                    cid = f"cfg_{name}_cap{(cap // 100000) / 10:.1f}g"
+                    if cid not in seen:
+                        seen.add(cid)
+                        out.append((
+                            Configuration(id=cid, layout=name.upper()[:1], worker_count=workers,
+                                          cpu_affinity=list(cpus), freq_cap_khz=cap, boost=True),
+                            f"{name} cap {cap/1e6:.1f} GHz boost-on ({workers}w) [experimental]",
+                        ))
         return out
 
-    def _run_one(self, helper, runner: Any, workload_id: str, exp_id: str, cfg: Configuration) -> RunRecord:
+    def _passive_cap_configs(self, cls_map: dict[str, Any]) -> list[tuple[Configuration, str]]:
+        """EXPERIMENTAL: intermediate cap points (bind only under amd_pstate
+        passive mode). Fast-class physical cores at 3.0/3.5/4.0/4.5 GHz caps,
+        boost ON. Labeled so the UI can mark them experimental."""
+        fast = (cls_map.get("fast") or {}).get("cpus") or [0, 2, 4, 6]
+        fast_phys = sorted(set(fast))[:4]
+        out = []
+        for ghz in (3000000, 3500000, 4000000, 4500000):
+            out.append((
+                Configuration(id=f"cfg_fastcap_{ghz//100000}w{len(fast_phys)}",
+                              layout="A", worker_count=len(fast_phys),
+                              cpu_affinity=fast_phys, freq_cap_khz=ghz, boost=True),
+                f"fast class boost-on cap {ghz/1e6:.1f} GHz (passive, EXPERIMENTAL)",
+            ))
+        return out
+
+    def _run_one(self, helper, runner: Any, workload_id: str, exp_id: str, cfg: Configuration, passive: bool = False) -> RunRecord:
         """Apply config via helper, run workload bracketed, restore, return record."""
         from workloads.registry import get_workload
 
@@ -242,8 +288,17 @@ class LiveEngine:
             wl = get_workload(workload_id, chunks=8192 * cfg.worker_count, iters=200000)
         except (KeyError, TypeError):
             wl = get_workload("fixed_compute", chunks=8192 * cfg.worker_count, iters=200000)
-        # apply
-        r = helper.apply_configuration({"boost": cfg.boost})
+        # apply (pstate_mode first when the experimental option is on, so caps
+        # bind under passive; restore returns the original mode)
+        control = {"boost": cfg.boost}
+        if cfg.freq_cap_khz:
+            # per-CPU policies (policyN == cpuN on per-policy machines)
+            control["policy_freq_caps_khz"] = {
+                f"policy{cpu}": cfg.freq_cap_khz for cpu in (cfg.cpu_affinity or [])
+            }
+        if passive:
+            control["pstate_mode"] = "passive"
+        r = helper.apply_configuration(control)
         if not r.get("ok"):
             return self._failed_record(exp_id, cfg, f"apply failed: {r.get('error')}")
         helper.heartbeat()

@@ -37,6 +37,7 @@ OP_SET = ["begin_session", "read_energy", "apply_configuration",
 BASE = "/sys/devices/system/cpu/cpufreq"
 ENERGY_PATH = "/sys/class/powercap/intel-rapl:0/energy_uj"
 ENERGY_RANGE_PATH = "/sys/class/powercap/intel-rapl:0/max_energy_range_uj"
+PSTATE_STATUS_PATH = "/sys/devices/system/cpu/amd_pstate/status"
 
 _orig_state: Dict[str, Any] = {}
 _session: Dict[str, Any] = {"active": False, "uid": None, "pid": None,
@@ -79,6 +80,10 @@ def snapshot_state() -> Dict[str, Any]:
     boost = Path(f"{BASE}/boost")
     if boost.exists():
         snap["boost"] = _read_int(str(boost))
+    # amd_pstate mode (active|guided|passive) — EXPERIMENTAL dev knob; restored
+    # with everything else. Only present on AMD pstate systems.
+    if Path(PSTATE_STATUS_PATH).exists():
+        snap["pstate_mode"] = _read_str(PSTATE_STATUS_PATH)
     return snap
 
 
@@ -119,6 +124,9 @@ def apply_snapshot(snap: Dict[str, Any]) -> Dict[str, Any]:
     """Restore a snapshot. Order matters: boost FIRST (re-enabling boost raises
     cpuinfo_max before high caps are written; boost=0 clamps cpuinfo_max to
     ~2 GHz on this machine and would silently clamp the restore)."""
+    if snap.get("pstate_mode"):
+        _write_str(PSTATE_STATUS_PATH, snap["pstate_mode"])
+        time.sleep(0.3)  # mode switch re-inits policy attributes; let them settle
     if snap.get("boost") is not None:
         _write_int(f"{BASE}/boost", snap["boost"])
         _read_int_retry(f"{BASE}/boost", snap["boost"])
@@ -176,6 +184,15 @@ def op_apply_configuration(args: Dict[str, Any]) -> Dict[str, Any]:
             os.chmod(RECOVERY_FILE, 0o600)
         requested = args.get("control", {})
         applied = {}
+        # EXPERIMENTAL dev option: switch amd_pstate mode (e.g. passive, where
+        # frequency caps bind WITH boost on). Written first so subsequent cap
+        # writes take effect under the new mode. Restore puts the original mode
+        # back. Off by default; only honored when explicitly requested.
+        pstate_mode = requested.get("pstate_mode")
+        if pstate_mode in ("active", "guided", "passive"):
+            if Path(PSTATE_STATUS_PATH).exists():
+                _write_str(PSTATE_STATUS_PATH, pstate_mode)
+                applied["pstate_mode"] = _read_str(PSTATE_STATUS_PATH)
         # Order matters: boost first, then per-policy caps.
         # NOTE machine fact (demo laptop): boost=0 clamps cpuinfo_max to ~2 GHz,
         # so caps are validated AFTER the boost write against post-toggle bounds.

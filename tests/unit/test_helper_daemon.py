@@ -16,11 +16,18 @@ import pytest
 @pytest.fixture()
 def daemon_ns(monkeypatch, tmp_path):
     sysfs_root = tmp_path / "cpufreq"
+    # amd_pstate status knob (experimental pstate_mode control) — created BEFORE
+    # exec so the redirected PSTATE_STATUS_PATH exists
+    pstate_dir = tmp_path / "amd_pstate"
+    pstate_dir.mkdir(exist_ok=True)
+    (pstate_dir / "status").write_text("active")
     src = open("helper/daemon.py").read()
     src = src.replace('SOCKET_PATH = "/run/joulectrl-helper.sock"', f'SOCKET_PATH = "{tmp_path}/h.sock"')
     src = src.replace('RECOVERY_FILE = Path("/run/joulectrl-helper-recovery.json")',
                       f'RECOVERY_FILE = Path("{tmp_path}/rec.json")')
     src = src.replace('BASE = "/sys/devices/system/cpu/cpufreq"', f'BASE = "{sysfs_root}"')
+    src = src.replace('PSTATE_STATUS_PATH = "/sys/devices/system/cpu/amd_pstate/status"',
+                      f'PSTATE_STATUS_PATH = "{pstate_dir}/status"')
     src = src.replace('ENERGY_PATH = "/sys/class/powercap/intel-rapl:0/energy_uj"',
                       f'ENERGY_PATH = "{tmp_path}/energy_uj"')
     src = src.replace('ENERGY_RANGE_PATH = "/sys/class/powercap/intel-rapl:0/max_energy_range_uj"',
@@ -135,3 +142,27 @@ def test_read_energy_unavailable(daemon_ns):
     # ENERGY_PATH (redirected into tmp_path) does not exist -> counter unreadable
     r = ns["op_read_energy"]({})
     assert not r["ok"] and r["error"] == "energy_unavailable"
+
+
+def test_pstate_mode_experimental_knob(daemon_ns):
+    """EXPERIMENTAL pstate_mode control: apply switches amd_pstate mode (written
+    before caps), snapshot captures the original, restore puts it back."""
+    import json as _json
+    ns = daemon_ns
+    pstate_path = ns["PSTATE_STATUS_PATH"]
+    assert open(pstate_path).read().strip() == "active"
+    ns["op_begin_session"]({"uid": 1000, "pid": 1})
+    r = ns["op_apply_configuration"]({"control": {
+        "boost": True, "pstate_mode": "passive",
+        "policy_freq_caps_khz": {"policy0": 3500000}}})
+    assert r["ok"], r
+    assert r["applied"]["pstate_mode"] == "passive"
+    assert open(pstate_path).read().strip() == "passive"
+    # snapshot (taken before the change) holds the ORIGINAL mode
+    snap = _json.loads(ns["RECOVERY_FILE"].read_text())
+    assert snap["snapshot"]["pstate_mode"] == "active"
+    # restore returns the original mode
+    r2 = ns["op_restore"]({})
+    assert r2["ok"], r2.get("mismatches")
+    assert open(pstate_path).read().strip() == "active"
+    ns["op_end_session"]({})
