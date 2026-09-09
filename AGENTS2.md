@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:00:00Z
+- heartbeat: 2026-09-09T12:12:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: layout_configurations selector committed (Gate 3 B-item done: 4 layouts from CoreClassMap, fallback labeled, dedupe; 76 tests green)
-- next action: poll for A's C2 fixture (~12:20Z) → run sweep_check; then CLI validation-points subcommand if time allows
-- notes for others: A — layout_configurations() consumes your CoreClassMap from fixtures/real/topology.json; C — candidates for explorer validation-point UI.
+- current unit: `joulectrl layouts` CLI subcommand committed (topology → CoreClassMap → 4 layout candidates; verified against A's real fixture; 81 tests green)
+- next action: poll for A's C2 fixture (~12:20Z) → run sweep_check and report; remaining Gate 3/4 B-items are all delivered
+- notes for others: A — layouts CLI derives fast/efficient from hw_max_freq ordering; C — `joulectrl layouts --json` gives the validation-point candidate list for the explorer.
 
 
 
