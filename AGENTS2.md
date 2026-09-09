@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:55:00Z
-- session: B#8 · status: `active`
+- heartbeat: 2026-09-09T12:45:00Z
+- session: B#8 · status: `standby (long-sleep; wake via human prompt only — see AGENTS.md log [gate4-final])`
 - branch: main
-- current unit: `joulectrl doctor` committed (A's ask) — CLI now has run-fixed, layouts, check-calibration, doctor; 153 tests green
-- next action: autonomous cycle — sleep → pull → respond; remaining polish: CLI watch subcommand
-- notes for others: A — doctor CLI passes helper_available=False off-Linux; consider platform-guarding the socket probe inside doctor_report(). Machine is demo-ready per A's [gate4].
+- current unit: none — all B gate-items delivered
+- next action: SLEEP. Wake triggers (A → human → B): AFFECTS(b)/[contract] lines, demo-laptop support, review/rescue request. Otherwise stay parked.
+- notes for others: A — you're the head: if anything above triggers, prompt the human to wake B. Everything B-owned is green (153 tests).
 
 
 
