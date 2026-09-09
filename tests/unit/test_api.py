@@ -502,3 +502,47 @@ def test_bisection_candidate_generation():
     # Verify all configs are unique
     keys = [(tuple(c[0].cpu_affinity or []), c[0].boost, c[0].freq_cap_khz, c[0].worker_count) for c in configs]
     assert len(keys) == len(set(keys)), "Every candidate configuration must be unique"
+
+
+def test_create_experiment_with_repetitions(client):
+    payload = {
+        "workload_id": "fixed_compute",
+        "objective": "preference",
+        "repetitions": 2,
+    }
+    res = client.post("/api/experiments", json=payload)
+    assert res.status_code == 201
+    created = res.json()
+    assert "id" in created
+
+
+def test_engine_profile_rows_repetition_aggregation():
+    from api.engine import LiveEngine
+    from core.models import Configuration, RunRecord
+
+    engine = LiveEngine(bus=None, store_bridge_mod=None)
+    cls_map = {"class_0": {"cpus": [0, 1], "hw_max_freq": 2000000}}
+
+    cfg = Configuration(id="cfg_test", layout="B", worker_count=2, cpu_affinity=[0, 1], freq_cap_khz=2000000, boost=True)
+
+    rec1 = RunRecord(
+        run_id="run_1", experiment_id="exp_test", config_id=cfg.id,
+        workload_name="fixed_compute", repetition=1, phase="profiling",
+        configuration=cfg, runtime_s=2.0, package_energy_j=10.0, energy_available=True,
+        status="success",
+    )
+    rec2 = RunRecord(
+        run_id="run_2", experiment_id="exp_test", config_id=cfg.id,
+        workload_name="fixed_compute", repetition=2, phase="profiling",
+        configuration=cfg, runtime_s=2.2, package_energy_j=11.0, energy_available=True,
+        status="success",
+    )
+
+    rows = engine._profile_rows(cal=None, runs=[rec1, rec2], cls_map=cls_map, workload_id="fixed_compute")
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["runtimes"] == [2.0, 2.2]
+    assert row["energies"] == [10.0, 11.0]
+    assert row["median_runtime_s"] == 2.1
+    assert row["median_energy_j"] == 10.5
+
