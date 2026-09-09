@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T13:00:00Z`
+- heartbeat: `2026-09-09T13:16:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). SESSION_START_D.md onboarding brief committed; 39 tests green.`
-- next action: `stand by for live hackathon presentation`
-- notes for others: `SESSION_START_D.md added mirroring SESSION_START_A.md. All 39 tests passing.`
+- current unit: `Polling loop — 39/39 tests green. Pulled C#4 calibration view + design system (dc7efc4). No new AFFECTS(d).`
+- next action: `continue autonomous poll every 60s; push heartbeat if stale`
+- notes for others: `SESSION_START_D.md up. All 39 tests passing. C's CalibrationView + design.ts merged cleanly.`
