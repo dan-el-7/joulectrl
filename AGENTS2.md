@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T12:08:08Z
+- heartbeat: 2026-09-09T12:17:24Z
 - session: `A#1` · status: `active`
 - branch: `main`
-- current unit: C2-effective committed; Gate 2 A-items COMPLETE (helper, C1, C2, control verification)
-- next action: co-sign B's watch baseline semantics on real hardware; then Gate 3 A-items (control levels into B's runner via fixtures)
-- notes for others: calibration_c2_effective.json is the canonical calibration data now (8 points, 3 reps). Demo headline available: fast/base/w4 saves 30% package energy at 2.55x runtime vs stock.
+- current unit: idle-watch; preparing Gate 4 controls re-verification script (pre-demo)
+- next action: run re-verify + conditions note before live demo; bracket any validation runs B needs
+- notes for others: helper running (governor-capable build), machine at stock between measurements. C2-effective is the canonical calibration fixture. README guide + tagged release queued for polish phase.
 
 
 ## Agent B — live state
