@@ -57,11 +57,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:01:00Z
-- session: B#4 · status: off
+- heartbeat: 2026-09-09T11:05:00Z
+- session: B#5 · status: active
 - branch: main
-- current unit: Gate 2 safe fixed-compute CLI complete
-- next action: run Linux CI/demo validation when available; avoid expanding CLI beyond approved workloads
+- current unit: Gate 3 passive watch detector and scripted-profile tests
+- next action: implement core/watch.py with backdated onset/end and honest counter handling
 - notes for others: CLI uses HelperClient begin/apply/read/restore/end and only FixedComputeWorkload; no arbitrary command path. Windows has no os.getuid/helper socket, so it reports a clear error.
 
 
