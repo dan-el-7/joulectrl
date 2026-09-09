@@ -368,6 +368,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09 12:22 UTC) demo/run_demo.py updated: phase 1 detects and surfaces Agent A's pre-demo controls re-verification pass (fixtures/real/controls_reverify.json). All 39 tests green.
 - (2026-09-09 12:24 UTC) demo/README.md updated: documented real C1/C2 calibration data, 8-point effective control space (-30% energy reduction headline), and pre-demo controls re-verification pass. 39 tests green.
 - (2026-09-09 13:00 UTC) SESSION_START_D.md committed: comprehensive onboarding brief for Agent D successor sessions mirroring SESSION_START_A.md (ownership, test suites, kernel checksum table, demo commands, gotchas). 39 tests green.
+- (2026-09-09 13:38 UTC) D: clean shutdown per A conclusion plan (a2cdcd1). All gate deliverables complete and merged ([gate4]). 39/39 tests green. Board quiet. SESSION_START_D.md has full resume packet. Demo-ready.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 

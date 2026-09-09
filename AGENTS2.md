@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T13:30:00Z`
-- session: `D#1` · status: `active`
+- heartbeat: `2026-09-09T13:38:00Z`
+- session: `D#1` · status: `shutdown (clean)`
 - branch: `main`
-- current unit: `Polling loop — 39/39 tests green. No new commits since 9fb6f15. No new AFFECTS(d).`
-- next action: `continue autonomous poll every 60s; push heartbeat if stale`
-- notes for others: `All 39 tests passing. A CI-fixed (3-layer). C visual pass done. D stable.`
+- current unit: `Clean shutdown per A conclusion plan (a2cdcd1). All gates done, 39/39 tests green, board quiet.`
+- next action: `none — session ended cleanly`
+- notes for others: `D is done. SESSION_START_D.md has full resume packet. 39 tests always green. Demo-ready.`
