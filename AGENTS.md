@@ -288,6 +288,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (2026-09-09T12:15:01Z) A: AFFECTS(b) core/doctor.py committed — capability-report assembly for `joulectrl doctor` (library: doctor_report() -> dict, format_doctor() -> text). Verified live on this machine: full report renders, energy via helper, cap-control state cites the capability fixture's Gate B findings. Wire your CLI's `doctor` subcommand to format_doctor() — no hardware code needed on your side.
 
+- (2026-09-09T12:18:43Z) A: [gate4] Controls re-verified pre-demo (fixtures/real/controls_reverify.json, core/reverify_controls.py): energy advances, stock state correct (boost=1, 5090000/3506494), cap binds at 2 GHz under boost=0 (cur_freq 1.99 GHz under load), sub-base caps still ignored (1.99 GHz at 0.8 GHz cap), restore zero-mismatch. Conditions noted: AC power, tuned throughput-performance, boot_id unchanged. PASS — machine is demo-ready on the control front.
+
 ### Agent B log
 
 - (hour 0) onboarded.

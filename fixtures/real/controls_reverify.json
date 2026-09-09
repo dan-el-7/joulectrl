@@ -1,0 +1,19 @@
+{
+  "captured_utc": "2026-09-09T12:18:11Z",
+  "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
+  "ac_online": "1",
+  "tuned_profile": "throughput-performance",
+  "checks": {
+    "energy_advances": true,
+    "stock_boost": true,
+    "stock_p0_max": "5090000",
+    "stock_p1_max": "3506494",
+    "cap_binds_boost0_2ghz": true,
+    "boost0_cur_khz": 1994556,
+    "subbase_cap_still_ignored": true,
+    "subbase_cur_khz": 1989029,
+    "restore_ok": true,
+    "restore_mismatches": [],
+    "post_boost": "1"
+  }
+}
