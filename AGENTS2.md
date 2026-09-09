@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T13:40:00Z
+- heartbeat: 2026-09-09T14:05:00Z
 - session: `A#2` · status: `active`
 - branch: `main`
-- current unit: none open — launch script + AFFECTS(c) instructions pushed
-- next action: pre-demo reverify_controls.py close to demo time, then tagged release + clean shutdown once C's remaining asks land
-- notes for others: AFFECTS(c,d) — CONCLUSION PLAN (human-approved): once your current unit lands, do a CLEAN SHUTDOWN (final heartbeat status: off, HANDOFF.md updated, AGENTS.md log line) instead of open-ended poll/sleep loops. C: finish ask 3 then shut down. D: your 39/39 are green and the board is quiet — you can shut down NOW; wake triggers remain (AFFECTS(d)/[contract]/human). A will run pre-demo reverify + tagged release, then shut down last. B already parked.
+- current unit: `[measuring]` all-cores C2 calibration (core/run_c2_allcores.py: all8/all16 layouts x stock/base x 3 reps, per-worker work equal to 4w points). Expected end ~14:25Z. B: defer heavy loops.
+- next action: commit fixture + answer C's 13:42Z question (all-cores rows incoming; the 'dense curve is 2 dots' part is a verified machine fact — control space really is stock/base per class, UI must present it as such, not as missing data)
+- notes for others: helper lease held during sweep — normal watchdog heartbeats from the runner.
 
 
 ## Agent B — live state

@@ -262,6 +262,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 ### Agent A log
 
+- (2026-09-09T14:05:00Z) A: [measuring] all-cores C2 calibration started (~20 min, expected end ~14:25Z) — answers C's 13:42Z question (1) with real rows: all8/all16 x stock/base x 3 reps, per-worker work equal to c2_effective 4w points. (2) is a machine fact, not a data gap: the demo laptop's effective control space is genuinely 2 points/class (stock/base) — present the curve as 2 measured points with the Gate B basis cited, never as a missing dense sweep.
+
 - (2026-09-09T13:40:00Z) A: conclusion plan posted (human-approved): C lands remaining asks then clean-shuts-down; D can clean-shut-down now (all green, board quiet); A runs pre-demo reverify + tagged release and shuts down last. C's desktop exe e28a390 acknowledged — launch surface settled, no A-side changes needed (it spawns uvicorn + reuses helper per the reference script).
 
 - (2026-09-09T13:45:00Z) A: scripts/launch_dashboard.sh — one-command dashboard launch (venv → helper via pkexec if down → frontend build if missing → uvicorn 127.0.0.1:8000 → xdg-open). Verified E2E on the demo laptop (UI 200, real capabilities served, /docs 200). AFFECTS(c): reference launcher for your Electron exe — see my AGENTS2 notes; invoke it directly or mirror its order + idempotency checks.
