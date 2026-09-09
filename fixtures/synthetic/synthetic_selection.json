@@ -1,0 +1,47 @@
+{
+  "experiment_id": "exp_synthetic_clean_build_001",
+  "objective_mode": "deadline",
+  "status": "selected",
+  "status_message": "Lowest-energy measured configuration meeting your 48.0s runtime rule.",
+  "selected_config_id": "cfg_zen5c_4c_3000",
+  "selected_configuration": {
+    "id": "cfg_zen5c_4c_3000",
+    "layout": "C",
+    "worker_count": 4,
+    "cpu_affinity": [
+      1,
+      3,
+      5,
+      7
+    ],
+    "freq_cap_khz": 3000000,
+    "policy_freq_caps_khz": {},
+    "boost": false,
+    "epp": null,
+    "metadata": {}
+  },
+  "selected_median_energy_j": 875.2,
+  "selected_guarded_runtime_s": 46.94,
+  "selected_median_runtime_s": 44.3,
+  "baseline_config_id": "cfg_stock_all",
+  "baseline_median_energy_j": 1580.0,
+  "baseline_median_runtime_s": 28.5,
+  "energy_reduction_pct": 44.6,
+  "runtime_increase_pct": 55.4,
+  "deadline_s": 48.0,
+  "margin": 0.05,
+  "energy_target_pct": 70.0,
+  "perf_floor_pct": 60.0,
+  "preference_outcome_state": "both_met",
+  "perf_floor_miss_pct": null,
+  "energy_target_miss_pct": null,
+  "frontier_config_ids": [
+    "cfg_stock_all",
+    "cfg_zen5_8t_stock",
+    "cfg_zen5_4c_4000",
+    "cfg_zen5c_4c_3000",
+    "cfg_zen5c_4c_2000"
+  ],
+  "candidate_summaries": [],
+  "created_at_iso": "2026-09-09T10:27:26.803725+00:00"
+}

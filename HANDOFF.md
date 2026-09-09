@@ -75,8 +75,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c` (pushed to main), workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, unit tests `tests/unit/test_clean_build.py`, `tests/unit/test_workloads_base.py`, and `tests/unit/test_compute_kernel.py` all green (12/12 passing).
-- **In flight:** Preparing synthetic experiment fixtures in `fixtures/synthetic/` and deterministic explanation templates in `explain/`.
-- **Resume here:** `python -m unittest discover -s tests/unit -p "test_*.py"`
-- **Gotchas:** `clean_build.py` enforces clean output state and disables caching (`CCACHE_DISABLE=1`, `SCCACHE_DISABLE=1`). Pre-warms filesystem cache during `prepare()`.
-- **Handoffs owed / waiting on:** All First-90-minutes deliverables completed and pushed.
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/` (facts, templates, providers). All unit tests passing (17/17 green).
+- **In flight:** `d/explain-and-synthetic`, starting integration tests in `tests/integration/` and demo assets in `demo/`.
+- **Resume here:** `python -m unittest tests/unit/test_explain.py`
+- **Gotchas:** `explain` uses `BasicProvider` as default guaranteed fallback if local/cloud LLM times out or is unreachable. Grounding rules strictly followed.
+- **Handoffs owed / waiting on:** Gate 1 complete for Agent D (`[gate1]` posted). Waiting for Agent B runner to implement end-to-end integration tests.

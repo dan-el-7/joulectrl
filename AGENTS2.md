@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T10:25:00Z`
+- heartbeat: `2026-09-09T10:30:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/zstd-scaffold`
-- current unit: `committed workloads/clean_build.py; starting synthetic fixtures and explanation scaffold`
-- next action: `prepare fixtures/synthetic/ test datasets and explanation templates per PLAN §10`
-- notes for others: `Gate 1 deliverables complete: compute kernel, workload plugin contract, fixed_compute plugin, clean_build scaffold.`
+- branch: `d/explain-and-synthetic`
+- current unit: `committed explain/ layer and fixtures/synthetic/; preparing Gate 2 integration tests`
+- next action: `build tests/integration/ test suite and demo/ assets per PLAN §8/§13`
+- notes for others: `Gate 1 exited cleanly. explain/ and fixtures/synthetic/ ready for Agent C and Agent B.`

@@ -1,0 +1,128 @@
+[
+  {
+    "calibration_id": "calib_c1_zen5",
+    "core_class": "fast",
+    "layout": "C1",
+    "cpus": [
+      0
+    ],
+    "requested_control": {
+      "boost": true,
+      "cap_khz": null
+    },
+    "accepted_control": {
+      "boost": true,
+      "cap_khz": null,
+      "cur_freq_khz": 5040000
+    },
+    "phase": "calibration",
+    "repetition": 1,
+    "runtime_s": 1.29,
+    "package_energy_j": 32.4,
+    "energy_available": true,
+    "avg_power_w": 25.11627906976744,
+    "work_units": 409600000,
+    "throughput": 317519379.8449612,
+    "scaling_efficiency": null,
+    "kernel_checksum": "0x3a762069507139ac",
+    "machine_fingerprint": "synthetic-ryzen-ai-7-350",
+    "timestamp_iso": "2026-09-09T10:27:26.805164+00:00",
+    "metadata": {}
+  },
+  {
+    "calibration_id": "calib_c1_zen5c",
+    "core_class": "efficient",
+    "layout": "C1",
+    "cpus": [
+      1
+    ],
+    "requested_control": {
+      "boost": true,
+      "cap_khz": null
+    },
+    "accepted_control": {
+      "boost": true,
+      "cap_khz": null,
+      "cur_freq_khz": 3480000
+    },
+    "phase": "calibration",
+    "repetition": 1,
+    "runtime_s": 1.85,
+    "package_energy_j": 24.1,
+    "energy_available": true,
+    "avg_power_w": 13.027027027027026,
+    "work_units": 409600000,
+    "throughput": 221405405.4054054,
+    "scaling_efficiency": null,
+    "kernel_checksum": "0x3a762069507139ac",
+    "machine_fingerprint": "synthetic-ryzen-ai-7-350",
+    "timestamp_iso": "2026-09-09T10:27:26.805193+00:00",
+    "metadata": {}
+  },
+  {
+    "calibration_id": "calib_c2_zen5_stock",
+    "core_class": "fast",
+    "layout": "C2",
+    "cpus": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "requested_control": {
+      "boost": true,
+      "cap_khz": null
+    },
+    "accepted_control": {
+      "boost": true,
+      "cap_khz": null,
+      "cur_freq_khz": 4900000
+    },
+    "phase": "calibration",
+    "repetition": 1,
+    "runtime_s": 0.34,
+    "package_energy_j": 34.2,
+    "energy_available": true,
+    "avg_power_w": 100.58823529411765,
+    "work_units": 409600000,
+    "throughput": 1204705882.352941,
+    "scaling_efficiency": 0.95,
+    "kernel_checksum": "0x3a762069507139ac",
+    "machine_fingerprint": "synthetic-ryzen-ai-7-350",
+    "timestamp_iso": "2026-09-09T10:27:26.805211+00:00",
+    "metadata": {}
+  },
+  {
+    "calibration_id": "calib_c2_zen5c_stock",
+    "core_class": "efficient",
+    "layout": "C2",
+    "cpus": [
+      1,
+      3,
+      5,
+      7
+    ],
+    "requested_control": {
+      "boost": true,
+      "cap_khz": null
+    },
+    "accepted_control": {
+      "boost": true,
+      "cap_khz": null,
+      "cur_freq_khz": 3400000
+    },
+    "phase": "calibration",
+    "repetition": 1,
+    "runtime_s": 0.49,
+    "package_energy_j": 25.8,
+    "energy_available": true,
+    "avg_power_w": 52.6530612244898,
+    "work_units": 409600000,
+    "throughput": 835918367.3469388,
+    "scaling_efficiency": 0.94,
+    "kernel_checksum": "0x3a762069507139ac",
+    "machine_fingerprint": "synthetic-ryzen-ai-7-350",
+    "timestamp_iso": "2026-09-09T10:27:26.805225+00:00",
+    "metadata": {}
+  }
+]
