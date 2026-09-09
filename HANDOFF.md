@@ -75,8 +75,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/`, integration tests `tests/integration/test_workload_lifecycle.py`, and demo script `demo/run_demo.py`. 19 tests passing.
-- **In flight:** None (Gate 1 and Gate 2 prerequisites all completed and pushed).
-- **Resume here:** `python demo/run_demo.py`
-- **Gotchas:** `demo/run_demo.py` runs standalone and uses synthetic fixtures plus live compute kernel. All tests pass with zero external dependencies.
-- **Handoffs owed / waiting on:** Gate 1 complete; waiting on Agent B's runner to implement plugin contract execution against the state machine.
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/`, integration tests `tests/integration/test_workload_lifecycle.py`, demo script `demo/run_demo.py`, and runner workload integration `tests/integration/test_runner_workload.py`. 23 tests passing.
+- **In flight:** Gate 3 preparation: contrast workload variations and preference-mode template extensions.
+- **Resume here:** `python -m unittest tests/integration/test_runner_workload.py`
+- **Gotchas:** `WorkloadRunner` requires `RunContext` initialized and `workload.prepare()` invoked outside measurement window.
+- **Handoffs owed / waiting on:** Gate 2 exit met for Agent D (`[gate2]` posted). Unblocked cross-cutting validation.
