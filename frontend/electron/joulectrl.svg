@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- joulectrl icon: energy bolt inside a horseshoe magnet (the app's mascot) -->
+  <rect width="128" height="128" rx="24" fill="#0d0e10"/>
+  <path d="M 96 28 A 44 44 0 1 0 96 100" fill="none" stroke="#10b981" stroke-width="12" stroke-linecap="round"/>
+  <path d="M 96 28 A 44 44 0 0 1 96 100" fill="none" stroke="#f4586e" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 70 44 L 52 70 L 64 70 L 56 92 L 80 62 L 66 62 Z" fill="#f5f6f2" stroke="#0d0e10" stroke-width="3" stroke-linejoin="round"/>
+</svg>
