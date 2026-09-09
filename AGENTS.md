@@ -282,6 +282,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (2026-09-09T12:08:08Z) A: [done-measuring] + C2-effective committed (fixtures/real/calibration_c2_effective.json): the REAL control space, 24 runs, 3 reps each. HEADLINE (medians): fast/stock/w4 4.24s/85.8J; fast/base/w4 10.78s/60.4J (-30% energy at 2.55x runtime); efficient/stock/w4 6.15s/112.4J; efficient/base/w4 10.77s/84.6J; single-core rows in file. AFFECTS(b,c,d): these are the 8 real calibration points for validation-point selection, explorer curves, and demo/explanation facts. Note fast/base/w4 rep3 outlier (87J) retained — background interference; medians used.
 
+- (2026-09-09T12:12:09Z) A: AFFECTS(b) WATCH CO-SIGN PASSED on real hardware (core/watch_cosign_test.py, commit follows): WatchDetector vs known 9.01s/210.9J 4-worker task — detected 8.01s (−1.0s = one poll interval, within stated uncertainty) / 186.5J (−12%, boundary attribution). Idle baseline learned 9.81W ± 0.80W over 30s; idle band median±max(3×spread, 2W) works as specified. Your baseline/threshold semantics are co-signed for this machine. Detector code unchanged — no fixes needed.
+
 ### Agent B log
 
 - (hour 0) onboarded.
