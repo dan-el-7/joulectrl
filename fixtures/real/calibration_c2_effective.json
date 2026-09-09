@@ -1,0 +1,451 @@
+{
+  "schema": "joulectrl.calibration_c2_effective/1",
+  "captured_utc": "2026-09-09T12:07:31Z",
+  "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
+  "kernel": "workloads/kernel/fixed_compute, iters=200000, chunks 16384(1w)/32768(4w)",
+  "basis": "Gate B finding: only 2 binding control points per class on this machine (stock/base); see calibration_c2.json gate_b_findings",
+  "rows": [
+    {
+      "class": "fast",
+      "control": "stock",
+      "boost": 1,
+      "workers": 1,
+      "cpus": [
+        0
+      ],
+      "chunks": 16384,
+      "rep": 1,
+      "runtime_s": 8.4687,
+      "package_energy_j": 77.1664,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "stock",
+      "boost": 1,
+      "workers": 1,
+      "cpus": [
+        0
+      ],
+      "chunks": 16384,
+      "rep": 2,
+      "runtime_s": 8.4684,
+      "package_energy_j": 76.5047,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "stock",
+      "boost": 1,
+      "workers": 1,
+      "cpus": [
+        0
+      ],
+      "chunks": 16384,
+      "rep": 3,
+      "runtime_s": 8.4682,
+      "package_energy_j": 79.4069,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "stock",
+      "boost": 1,
+      "workers": 4,
+      "cpus": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "chunks": 32768,
+      "rep": 1,
+      "runtime_s": 4.2357,
+      "package_energy_j": 87.7561,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "stock",
+      "boost": 1,
+      "workers": 4,
+      "cpus": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "chunks": 32768,
+      "rep": 2,
+      "runtime_s": 4.2366,
+      "package_energy_j": 85.6838,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "stock",
+      "boost": 1,
+      "workers": 4,
+      "cpus": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "chunks": 32768,
+      "rep": 3,
+      "runtime_s": 4.2366,
+      "package_energy_j": 85.7553,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "base",
+      "boost": 0,
+      "workers": 1,
+      "cpus": [
+        0
+      ],
+      "chunks": 16384,
+      "rep": 1,
+      "runtime_s": 21.4793,
+      "package_energy_j": 103.5831,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "base",
+      "boost": 0,
+      "workers": 1,
+      "cpus": [
+        0
+      ],
+      "chunks": 16384,
+      "rep": 2,
+      "runtime_s": 21.5441,
+      "package_energy_j": 104.5611,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "base",
+      "boost": 0,
+      "workers": 1,
+      "cpus": [
+        0
+      ],
+      "chunks": 16384,
+      "rep": 3,
+      "runtime_s": 21.563,
+      "package_energy_j": 103.4731,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "base",
+      "boost": 0,
+      "workers": 4,
+      "cpus": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "chunks": 32768,
+      "rep": 1,
+      "runtime_s": 10.7833,
+      "package_energy_j": 52.031,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "base",
+      "boost": 0,
+      "workers": 4,
+      "cpus": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "chunks": 32768,
+      "rep": 2,
+      "runtime_s": 10.7826,
+      "package_energy_j": 60.3932,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "fast",
+      "control": "base",
+      "boost": 0,
+      "workers": 4,
+      "cpus": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "chunks": 32768,
+      "rep": 3,
+      "runtime_s": 10.8968,
+      "package_energy_j": 86.0291,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "stock",
+      "boost": 1,
+      "workers": 1,
+      "cpus": [
+        1
+      ],
+      "chunks": 16384,
+      "rep": 1,
+      "runtime_s": 12.2921,
+      "package_energy_j": 136.0891,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "stock",
+      "boost": 1,
+      "workers": 1,
+      "cpus": [
+        1
+      ],
+      "chunks": 16384,
+      "rep": 2,
+      "runtime_s": 12.2841,
+      "package_energy_j": 135.8678,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "stock",
+      "boost": 1,
+      "workers": 1,
+      "cpus": [
+        1
+      ],
+      "chunks": 16384,
+      "rep": 3,
+      "runtime_s": 12.2822,
+      "package_energy_j": 131.5317,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "stock",
+      "boost": 1,
+      "workers": 4,
+      "cpus": [
+        1,
+        3,
+        5,
+        7
+      ],
+      "chunks": 32768,
+      "rep": 1,
+      "runtime_s": 6.1486,
+      "package_energy_j": 113.4704,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "stock",
+      "boost": 1,
+      "workers": 4,
+      "cpus": [
+        1,
+        3,
+        5,
+        7
+      ],
+      "chunks": 32768,
+      "rep": 2,
+      "runtime_s": 6.1479,
+      "package_energy_j": 112.4169,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "stock",
+      "boost": 1,
+      "workers": 4,
+      "cpus": [
+        1,
+        3,
+        5,
+        7
+      ],
+      "chunks": 32768,
+      "rep": 3,
+      "runtime_s": 6.1499,
+      "package_energy_j": 109.8464,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "base",
+      "boost": 0,
+      "workers": 1,
+      "cpus": [
+        1
+      ],
+      "chunks": 16384,
+      "rep": 1,
+      "runtime_s": 21.5541,
+      "package_energy_j": 143.145,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "base",
+      "boost": 0,
+      "workers": 1,
+      "cpus": [
+        1
+      ],
+      "chunks": 16384,
+      "rep": 2,
+      "runtime_s": 21.5695,
+      "package_energy_j": 144.5279,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "base",
+      "boost": 0,
+      "workers": 1,
+      "cpus": [
+        1
+      ],
+      "chunks": 16384,
+      "rep": 3,
+      "runtime_s": 21.546,
+      "package_energy_j": 143.2044,
+      "kernel_checksum": "0xc2493c07d6b29c85",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "base",
+      "boost": 0,
+      "workers": 4,
+      "cpus": [
+        1,
+        3,
+        5,
+        7
+      ],
+      "chunks": 32768,
+      "rep": 1,
+      "runtime_s": 10.7844,
+      "package_energy_j": 84.5714,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "base",
+      "boost": 0,
+      "workers": 4,
+      "cpus": [
+        1,
+        3,
+        5,
+        7
+      ],
+      "chunks": 32768,
+      "rep": 2,
+      "runtime_s": 10.7743,
+      "package_energy_j": 82.8757,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    },
+    {
+      "class": "efficient",
+      "control": "base",
+      "boost": 0,
+      "workers": 4,
+      "cpus": [
+        1,
+        3,
+        5,
+        7
+      ],
+      "chunks": 32768,
+      "rep": 3,
+      "runtime_s": 10.7666,
+      "package_energy_j": 92.5559,
+      "kernel_checksum": "0x4f59b8763583e750",
+      "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2"
+    }
+  ],
+  "summary": {
+    "fast": {
+      "stock_w1": {
+        "median_runtime_s": 8.4684,
+        "median_energy_j": 77.1664,
+        "n": 3
+      },
+      "stock_w4": {
+        "median_runtime_s": 4.2366,
+        "median_energy_j": 85.7553,
+        "n": 3
+      },
+      "base_w1": {
+        "median_runtime_s": 21.5441,
+        "median_energy_j": 103.5831,
+        "n": 3
+      },
+      "base_w4": {
+        "median_runtime_s": 10.7833,
+        "median_energy_j": 60.3932,
+        "n": 3
+      }
+    },
+    "efficient": {
+      "stock_w1": {
+        "median_runtime_s": 12.2841,
+        "median_energy_j": 135.8678,
+        "n": 3
+      },
+      "stock_w4": {
+        "median_runtime_s": 6.1486,
+        "median_energy_j": 112.4169,
+        "n": 3
+      },
+      "base_w1": {
+        "median_runtime_s": 21.5541,
+        "median_energy_j": 143.2044,
+        "n": 3
+      },
+      "base_w4": {
+        "median_runtime_s": 10.7743,
+        "median_energy_j": 84.5714,
+        "n": 3
+      }
+    }
+  }
+}

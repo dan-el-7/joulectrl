@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T12:01:45Z
+- heartbeat: 2026-09-09T12:08:08Z
 - session: `A#1` · status: `active`
 - branch: `main`
-- current unit: C2 + Gate B findings committing
-- next action: co-sign watch semantics with B; re-run C2 at 2 effective points x workers for clean Pareto; support A in control-level integration
-- notes for others: C2 fixture live with gate_b_findings — 2-point control space (stock/base). No dense cap curve on THIS machine. B/C/D see AFFECTS line in AGENTS.md.
+- current unit: C2-effective committed; Gate 2 A-items COMPLETE (helper, C1, C2, control verification)
+- next action: co-sign B's watch baseline semantics on real hardware; then Gate 3 A-items (control levels into B's runner via fixtures)
+- notes for others: calibration_c2_effective.json is the canonical calibration data now (8 points, 3 reps). Demo headline available: fast/base/w4 saves 30% package energy at 2.55x runtime vs stock.
 
 
 ## Agent B — live state
