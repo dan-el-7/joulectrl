@@ -169,8 +169,8 @@ export interface Experiment {
   validation: {
     status: string;
     pairs: ValidationPair[];
-    verified_savings_pct: number;
-    verified_runtime_delta_s: number;
+    verified_savings_pct: number | null;
+    verified_runtime_delta_s: number | null;
   };
   restoration_status: string;
 }

@@ -166,3 +166,111 @@ def test_root_serves_frontend_or_fallback(client):
         assert "joulectrl" in res.text
     else:
         assert res.json().get("name") == "joulectrl API"
+
+
+# ---------------------------------------------------------------------------
+# Store-backed integration (Agent B's Store + Agent D's synthetic fixtures)
+# ---------------------------------------------------------------------------
+
+SYNTHETIC_ID = "exp_synthetic_clean_build_001"
+
+
+def test_store_seeded_experiments_listed(client):
+    res = client.get("/api/experiments")
+    assert res.status_code == 200
+    ids = [e["id"] for e in res.json()]
+    assert "exp_demo_clean_build" in ids
+    assert SYNTHETIC_ID in ids
+
+
+def test_synthetic_experiment_served_end_to_end(client):
+    res = client.get(f"/api/experiments/{SYNTHETIC_ID}")
+    assert res.status_code == 200
+    exp = res.json()
+    assert exp["state"] == "COMPLETE"
+    assert len(exp["profile"]["configurations"]) >= 1
+    assert exp["profile"]["runs"], "profiling runs must come from the persisted store"
+    sel = exp["selection"]
+    assert sel["config_id"] == sel["selected_config_id"]
+    assert sel["objective"] == "deadline"
+    assert "metrics" in sel
+    assert exp["validation"]["status"] == "verified"
+    assert exp["validation"]["verified_savings_pct"] is not None
+    assert exp["restoration_status"] in {"restored", "not_required"}
+    assert exp["state_transitions"], "state-machine history must be visible"
+
+
+def test_select_uses_optimizer_and_persists(client):
+    res = client.post(
+        f"/api/experiments/{SYNTHETIC_ID}/select",
+        json={"objective": "deadline", "runtime_budget_s": 45.0, "headroom_pct": 5.0},
+    )
+    assert res.status_code == 200
+    sel = res.json()
+    assert sel["objective"] == "deadline"
+    assert sel["config_id"]
+    # Persisted: a re-read of the experiment reflects the same selection
+    exp = client.get(f"/api/experiments/{SYNTHETIC_ID}").json()
+    assert exp["selection"]["config_id"] == sel["config_id"]
+
+
+def test_select_preference_requires_targets(client):
+    res = client.post(
+        f"/api/experiments/{SYNTHETIC_ID}/select",
+        json={"objective": "preference"},
+    )
+    assert res.status_code == 400
+
+
+def test_explain_uses_deterministic_templates(client):
+    res = client.post(
+        "/api/explain",
+        json={"experiment_id": SYNTHETIC_ID, "provider": "template"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["provider_effective"] == "template"
+    assert data["fallback"] is False
+    # Deterministic template output quotes measured numbers, not hardcoded strings
+    assert "median package energy" in data["text"]
+    assert len(data["grounding_facts"]) >= 3
+
+
+def test_explain_llm_provider_degrades_to_basic(client):
+    res = client.post(
+        "/api/explain",
+        json={"experiment_id": SYNTHETIC_ID, "provider": "local_llm"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["provider"] == "local_llm"
+    assert data["provider_effective"] == "template"
+    assert data["fallback"] is True
+    assert "median package energy" in data["text"]
+
+
+def test_restore_records_persisted_status(client):
+    res = client.post("/api/restore", json={"experiment_id": SYNTHETIC_ID})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "restored"
+    assert data["verified"] is True
+    exp = client.get(f"/api/experiments/{SYNTHETIC_ID}").json()
+    assert exp["restoration_status"] == "restored"
+
+
+def test_cancel_records_restoration(client):
+    res = client.post(f"/api/experiments/{SYNTHETIC_ID}/cancel")
+    assert res.status_code == 200
+    assert res.json()["status"] == "cancelling"
+    exp = client.get(f"/api/experiments/{SYNTHETIC_ID}").json()
+    assert exp["state"] == "RESTORED"
+    assert exp["restoration_status"] == "restored"
+
+
+def test_export_from_store(client):
+    res = client.get(f"/api/experiments/{SYNTHETIC_ID}/export")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["id"] == SYNTHETIC_ID
+    assert data["runs"], "export must include raw run records for auditability"

@@ -67,11 +67,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent C — resume packet
 
-- **Done & verified:** `docs/API.md` v1 frozen contract; FastAPI backend in `api/app.py` implementing all endpoints per PLAN §8, §6b, §6c; 13 unit tests in `tests/unit/test_api.py` green; Vite React frontend in `frontend/` (TypeScript, ParetoChart, SetupView, ExplorerView, ValidationView, WatchPanel) building cleanly to `frontend/dist`. Re-verified after pull 8b5b999: `npm --prefix frontend run build` green, 13/13 api tests green.
-- **In flight:** Gate 2: serve B's `core/store.py` + D's synthetic fixtures (`fixtures/synthetic/*.json`) through the API; render D's `explain/` templates + restore status in ValidationView.
-- **Resume here:** Read `api/app.py` + `explain/templates.py`, then extend the API to serve `fixtures/synthetic/` data end-to-end.
-- **Gotchas:** Dev machine only; single origin at 127.0.0.1:8000; Windows: `python`/`py` are NOT on PATH — use `"$APPDATA/uv/python/cpython-3.14-windows-x86_64-none/python.exe"` (Roaming, not Local AppData). Store methods are `create_experiment, record_run, save_profile, save_selection, record_calibration`.
-- **Handoffs owed / waiting on:** Waiting on B's runner + SSE event wiring for live experiment events; A's helper restore path for restore-status endpoint.
+- **Done & verified:** Gate 1 ([gate1], commit 9a610b3): `docs/API.md` frozen contract; FastAPI + Vite React dashboard. Gate 2 C-unit (11:00 UTC): `api/store_bridge.py` persists fixture experiments into B's `Store` (run ids namespaced `<exp_id>:<run_id>` — see AFFECTS(b) note); `api/app.py` routes `/select` through `core/optimizer.select_deadline/select_preference`, `/explain` through `explain/facts+templates` (LLM providers degrade to Basic with `fallback: true`), cancel/restore through `core/experiment.ExperimentStateMachine` (terminal states go straight to RESTORING, not CANCELLING). ValidationView renders persisted restoration status + API-driven explanations; nullable validation fields handled. Verified: 22/22 `tests/unit/test_api.py`, `npm --prefix frontend run build`, live uvicorn smoke (list/get/explain/export/select edge states baseline_already_optimal + no_feasible_point).
+- **In flight:** none — unit complete, pushing with this commit.
+- **Resume here:** `git pull --rebase origin main` then check AGENTS.md for new AFFECTS(c) lines; next unit is Gate 3 C-items (explorer selection modes, preference-slider objective UI, watch endpoints once B's detector lands).
+- **Gotchas:** Windows: use `"$APPDATA/uv/python/cpython-3.14-windows-x86_64-none/python.exe"` (python/py NOT on PATH; Roaming not Local). Overlay dict `_OVERLAY` in app.py holds POST-created experiments until B's runner wires live state. Pre-existing non-C failures on Windows: test_powercap_backend_reads (Linux-only), test_runner POSIX tests, test_compute_kernel/test_workloads_base (need kernel binary). frontend/dist is gitignored — rebuild after pulls before serving.
+- **Handoffs owed / waiting on:** B's runner SSE event wiring (run_progress/run_complete) for live experiment view; A's helper restore path for real /api/restore; B's watch detector for live watch endpoints.
 
 ## Agent D — resume packet
 

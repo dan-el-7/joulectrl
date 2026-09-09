@@ -71,12 +71,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T10:40:00Z`
+- heartbeat: `2026-09-09T11:00:00Z`
 - session: `C#2` · status: `active`
 - branch: `main`
-- current unit: `resumed (C#2): pulled B store.py + D explain/ + fixtures; verifying Gate 1 build/tests`
-- next action: `run npm build + api unit tests, then Gate 2: serve D's synthetic fixtures via store-backed API + explanation rendering in Validation view`
-- notes for others: `Gate 1 dashboard committed (9a610b3); adapting Validation view to render explain/ templates next`
+- current unit: `committed store-backed API + explain integration (22 tests green, live smoke verified)`
+- next action: `Gate 3 C-items: explorer point/range selection from calibration curve, objective selector UI with preference sliders, watch endpoints on B's detector when it lands`
+- notes for others: `API now serves Store-persisted experiments (exp_demo_clean_build + exp_synthetic_clean_build_001); /select = B's optimizer, /explain = D's templates; posted AFFECTS(b) on store run_id collision`
 
 ## Agent D — live state
 

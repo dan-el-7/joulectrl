@@ -6,6 +6,9 @@ Invariants:
 - Single origin (serves frontend/dist when present)
 - Exposes complete route table per PLAN §8, §6b, §6c
 - Emits standard SSE events
+- Selection is Agent B's deterministic optimizer (core/optimizer.py) — never reimplemented here
+- Explanations come from Agent D's deterministic layer (explain/) — LLM providers degrade to Basic
+- Experiments persist through Agent B's Store (core/store.py); restoration status always visible
 """
 
 from __future__ import annotations
@@ -16,25 +19,31 @@ import logging
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from api import store_bridge
 from api.fixtures import (
     build_fixture_experiment,
     get_fixture_capabilities,
     get_fixture_workloads,
 )
-from core.models import Selection, utc_now_iso
+from core.experiment import ExperimentStateMachine
+from core.models import ConfigSummary, Profile, Selection, ValidationPair, utc_now_iso
+from core.optimizer import select_deadline, select_preference
+from core.store import Store
+from explain.facts import extract_explanation_facts
+from explain.templates import generate_explanation
 
 logger = logging.getLogger("joulectrl.api")
 
 app = FastAPI(
     title="joulectrl API",
     description="Local CPU-package energy profiling and optimization API",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # Allow local dev frontend (e.g. Vite on 5173) to communicate with API on 8000
@@ -46,12 +55,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory store for experiments
-_EXPERIMENTS: dict[str, dict[str, Any]] = {}
+# ---------------------------------------------------------------------------
+# Persistence (Agent B's Store) seeded with fixture-backed experiments.
+# On the demo machine this becomes the same Store the CLI/runner writes to.
+# ---------------------------------------------------------------------------
+_STORE: Store = Store(":memory:")
+store_bridge.seed_store(_STORE)
 
-# Initialize default fixture experiment
-_default_exp = build_fixture_experiment("exp_demo_clean_build")
-_EXPERIMENTS[_default_exp["id"]] = _default_exp
+# Runtime overlay for fixture experiments created via POST /api/experiments
+# (no runner on the dev machine; replaced by live runner state in Gate 3).
+_OVERLAY: dict[str, dict[str, Any]] = {}
+
+
+def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
+    """Return the API-shaped experiment dict, overlay first then Store."""
+    if experiment_id in _OVERLAY:
+        return _OVERLAY[experiment_id]
+    row = _STORE.get_experiment(experiment_id)
+    if row is None:
+        return None
+    return store_bridge.experiment_to_api(row)
+
+
+def _resolve_selection_model(experiment_id: str) -> Optional[dict[str, Any]]:
+    """Return the canonical model-shaped Selection dict (needed for explanations)."""
+    if experiment_id in _OVERLAY:
+        return _OVERLAY[experiment_id].get("_selection_model")
+    row = _STORE.get_experiment(experiment_id)
+    if row is None:
+        return None
+    return row.get("selection")
+
 
 # Watch mode state
 _WATCH_STATE: dict[str, Any] = {
@@ -99,6 +133,10 @@ class ExplainRequest(BaseModel):
     provider: str = "template"  # "template" | "local_llm" | "cloud_llm"
 
 
+class RestoreRequest(BaseModel):
+    experiment_id: Optional[str] = None
+
+
 class WatchStartRequest(BaseModel):
     poll_hz: float = 1.0
     onset_consecutive_s: int = 3
@@ -123,19 +161,25 @@ def list_workloads() -> list[dict[str, Any]]:
 
 @app.post("/api/experiments", status_code=status.HTTP_201_CREATED)
 def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
-    """Create and start a new experiment session."""
+    """Create and start a new experiment session.
+
+    Dev-machine mode: seeded with the fixture profile/selection/validation pipeline
+    so the full flow is renderable end-to-end; replaced by live runner state (Gate 3).
+    """
     exp_id = f"exp_{utc_now_iso().replace(':', '').replace('-', '')[:15]}_{req.workload_id}"
-    exp_data = build_fixture_experiment(exp_id)
-    exp_data["workload_id"] = req.workload_id
-    exp_data["objective"] = req.objective
-    exp_data["runtime_budget_s"] = req.runtime_budget_s
+    exp = build_fixture_experiment(exp_id)
+    exp["workload_id"] = req.workload_id
+    exp["objective"] = req.objective
+    exp["runtime_budget_s"] = req.runtime_budget_s
     if req.preference:
-        exp_data["preference"] = req.preference.model_dump()
-    _EXPERIMENTS[exp_id] = exp_data
+        exp["preference"] = req.preference.model_dump()
+    row = store_bridge.persist_experiment_dict(_STORE, exp)
+    _OVERLAY[exp_id] = store_bridge.experiment_to_api(row)
+    _OVERLAY[exp_id]["_selection_model"] = row.get("selection")
     return {
         "id": exp_id,
-        "state": "COMPLETE",
-        "created_at": exp_data["created_at"],
+        "state": _OVERLAY[exp_id]["state"],
+        "created_at": _OVERLAY[exp_id]["created_at"],
         "workload_id": req.workload_id,
         "objective": req.objective,
         "runtime_budget_s": req.runtime_budget_s,
@@ -146,61 +190,62 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
 def list_experiments() -> list[dict[str, Any]]:
     """List summary of persisted experiments for history/dashboard."""
     summaries = []
-    for eid, exp in _EXPERIMENTS.items():
-        sel = exp.get("selection", {})
-        baseline_id = sel.get("baseline_config_id", "cfg_stock_all")
-        selected_id = sel.get("selected_config_id", "")
-        configs = exp.get("profile", {}).get("configurations", {})
-
-        base_cfg = configs.get(baseline_id, {})
-        sel_cfg = configs.get(selected_id, {})
-
-        summaries.append({
-            "id": eid,
-            "workload_id": exp.get("workload_id", "clean_build"),
-            "state": exp.get("state", "COMPLETE"),
-            "created_at": exp.get("created_at", utc_now_iso()),
-            "selected_config_id": selected_id,
-            "baseline_energy_j": base_cfg.get("median_energy_j", 1580.0),
-            "baseline_runtime_s": base_cfg.get("median_runtime_s", 28.5),
-            "selected_energy_j": sel_cfg.get("median_energy_j", 875.2),
-            "selected_runtime_s": sel_cfg.get("median_runtime_s", 44.3),
-            "energy_saved_pct": sel.get("energy_reduction_pct", 44.6),
-        })
+    for row in _STORE.list_experiments():
+        full = _STORE.get_experiment(row["id"])
+        if full:
+            summaries.append(store_bridge.experiment_summary_to_api(full))
+    for eid, exp in _OVERLAY.items():
+        if _STORE.get_experiment(eid) is None:
+            summaries.append(store_bridge.experiment_summary_to_api(
+                {
+                    "id": eid,
+                    "workload_name": exp.get("workload_id", "clean_build"),
+                    "state": exp.get("state", "COMPLETE"),
+                    "created_at": exp.get("created_at", utc_now_iso()),
+                    "selection": exp.get("_selection_model"),
+                }
+            ))
     return summaries
 
 
 @app.get("/api/experiments/{id}")
 def get_experiment(id: str) -> dict[str, Any]:
     """Get full experiment record including configurations, profile, selection, validation."""
-    if id not in _EXPERIMENTS:
+    exp = _resolve_experiment(id)
+    if exp is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
-    return _EXPERIMENTS[id]
+    return exp
 
 
 @app.get("/api/experiments/{id}/events")
 async def get_experiment_events(id: str) -> StreamingResponse:
     """Server-Sent Events stream for experiment progress and state transitions."""
-    if id not in _EXPERIMENTS:
+    exp = _resolve_experiment(id)
+    if exp is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        exp = _EXPERIMENTS[id]
+        current = _resolve_experiment(id) or {}
         # Emit current state
-        yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'state': exp.get('state', 'COMPLETE'), 'message': 'Experiment loaded'})}\n\n"
+        yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'state': current.get('state', 'COMPLETE'), 'message': 'Experiment loaded'})}\n\n"
+        await asyncio.sleep(0.05)
+
+        # Emit persisted state transitions
+        for t in current.get("state_transitions", []):
+            yield f"event: experiment_state\ndata: {json.dumps({'experiment_id': id, 'previous_state': t.get('from_state'), 'state': t.get('to_state'), 'timestamp': t.get('timestamp_iso'), 'message': t.get('reason', '')})}\n\n"
         await asyncio.sleep(0.05)
 
         # Emit profile_ready
-        profile = exp.get("profile", {})
+        profile = current.get("profile", {})
         yield f"event: profile_ready\ndata: {json.dumps({'experiment_id': id, 'configurations_count': len(profile.get('configurations', {})), 'baseline_config_id': profile.get('baseline_config_id')})}\n\n"
         await asyncio.sleep(0.05)
 
         # Emit selection_updated
-        yield f"event: selection_updated\ndata: {json.dumps({'experiment_id': id, 'selection': exp.get('selection', {})})}\n\n"
+        yield f"event: selection_updated\ndata: {json.dumps({'experiment_id': id, 'selection': current.get('selection', {})})}\n\n"
         await asyncio.sleep(0.05)
 
-        # Emit restore_status
-        yield f"event: restore_status\ndata: {json.dumps({'status': exp.get('restoration_status', 'restored'), 'verified': True})}\n\n"
+        # Emit restore_status from the persisted restoration state — never guessed
+        yield f"event: restore_status\ndata: {json.dumps({'status': current.get('restoration_status', 'not_required'), 'verified': current.get('restoration_status') == 'restored', 'timestamp': utc_now_iso()})}\n\n"
 
         # Heartbeat loop
         for _ in range(2):
@@ -212,103 +257,51 @@ async def get_experiment_events(id: str) -> StreamingResponse:
 
 @app.post("/api/experiments/{id}/select")
 def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
-    """Re-evaluates deterministic selection under a new budget or preference targets."""
-    if id not in _EXPERIMENTS:
+    """Re-evaluates deterministic selection (Agent B's optimizer) under a new budget
+    or preference targets. Never re-runs the workload; persists the new Selection."""
+    exp = _resolve_experiment(id)
+    if exp is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
 
-    exp = _EXPERIMENTS[id]
-    profile = exp.get("profile", {})
-    configs: dict[str, Any] = profile.get("configurations", {})
-    baseline_id = profile.get("baseline_config_id", "cfg_stock_all")
-    base_cfg = configs.get(baseline_id)
-
-    if not base_cfg:
-        raise HTTPException(status_code=400, detail="Profile missing baseline configuration")
-
-    base_energy = base_cfg["median_energy_j"]
-    base_runtime = base_cfg["median_runtime_s"]
+    profile = exp.get("profile") or {}
+    configs_raw = profile.get("configurations") or {}
+    configs = [ConfigSummary.from_dict(v) for v in configs_raw.values()]
+    if not configs:
+        raise HTTPException(status_code=400, detail="Profile has no measured configurations")
+    baseline_id = profile.get("baseline_config_id", "")
     margin = req.headroom_pct / 100.0
 
-    selected_cid: Optional[str] = None
-    outcome_status = "selected"
-    status_msg = "Lowest-energy measured configuration meeting empirical runtime rule"
-
-    if req.objective in ("preference", "explore") and req.preference:
-        # Preference mode (§6c)
-        e_target_max = (req.preference.energy_target_pct / 100.0) * base_energy if req.preference.energy_target_pct else base_energy
-        perf_floor_min_speed = req.preference.perf_floor_pct / 100.0 if req.preference.perf_floor_pct else 0.9
-        max_runtime_allowed = base_runtime / perf_floor_min_speed
-
-        eligible = []
-        for cid, c in configs.items():
-            guarded_t = c["guarded_runtime_s"]
-            med_e = c["median_energy_j"]
-            if guarded_t <= max_runtime_allowed and med_e <= e_target_max:
-                eligible.append((med_e, guarded_t, cid))
-
-        if eligible:
-            eligible.sort()
-            selected_cid = eligible[0][2]
-            pref_state = "both_met"
-        else:
-            # Fallback closest
-            selected_cid = "cfg_zen5c_4c_3000"
-            pref_state = "closest_energy_target"
-            outcome_status = "closest_outcome"
-            status_msg = "Preference targets partially met (closest candidate selected)"
+    if req.objective == "preference":
+        if not req.preference or req.preference.energy_target_pct is None or req.preference.perf_floor_pct is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Preference objective requires energy_target_pct and perf_floor_pct",
+            )
+        sel = select_preference(
+            configs,
+            req.preference.energy_target_pct,
+            req.preference.perf_floor_pct,
+            baseline_id,
+            margin=margin,
+            experiment_id=id,
+        )
     else:
-        # Deadline mode
         budget = req.runtime_budget_s if req.runtime_budget_s is not None else 45.0
-        eligible = []
-        for cid, c in configs.items():
-            guarded_t = c["guarded_runtime_s"]
-            med_e = c["median_energy_j"]
-            if guarded_t <= budget:
-                eligible.append((med_e, guarded_t, cid))
+        sel = select_deadline(configs, budget, baseline_id, margin=margin, experiment_id=id)
 
-        if eligible:
-            eligible.sort()
-            selected_cid = eligible[0][2]
-        else:
-            selected_cid = baseline_id
-            outcome_status = "no_feasible_point"
-            status_msg = "No configuration met the runtime deadline; reverting to baseline"
+    # Persist the re-selection so every reader (UI, export, explain) sees the same evidence
+    if _STORE.get_experiment(id) is not None:
+        _STORE.save_selection(sel)
+    else:
+        _OVERLAY[id]["_selection_model"] = sel.to_dict()
 
-    sel_cfg = configs[selected_cid]
-    savings_pct = round(100.0 * (1.0 - sel_cfg["median_energy_j"] / base_energy), 1)
-    runtime_delta_pct = round(100.0 * (sel_cfg["median_runtime_s"] / base_runtime - 1.0), 1)
-
-    updated_selection = {
-        "config_id": selected_cid,
-        "selected_config_id": selected_cid,
-        "objective": req.objective,
-        "status": outcome_status,
-        "status_message": status_msg,
-        "runtime_budget_s": req.runtime_budget_s,
-        "target_met": (outcome_status == "selected"),
-        "savings_vs_baseline_pct": savings_pct,
-        "runtime_vs_baseline_pct": runtime_delta_pct,
-        "metrics": {
-            "median_runtime_s": sel_cfg["median_runtime_s"],
-            "guarded_runtime_s": sel_cfg["guarded_runtime_s"],
-            "median_energy_j": sel_cfg["median_energy_j"],
-            "energy_savings_pct": savings_pct,
-        },
-        "preference_outcomes": {
-            "energy_target_met": True,
-            "perf_floor_met": True,
-            "closest_energy_config_id": selected_cid,
-            "closest_perf_config_id": baseline_id,
-        },
-    }
-    exp["selection"] = updated_selection
-    return updated_selection
+    return store_bridge.selection_to_api(sel.to_dict())
 
 
 @app.post("/api/experiments/{id}/validate", status_code=status.HTTP_202_ACCEPTED)
 def validate_experiment(id: str) -> dict[str, Any]:
     """Trigger fresh validation executions of baseline vs selected."""
-    if id not in _EXPERIMENTS:
+    if _resolve_experiment(id) is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
     return {
         "status": "validation_started",
@@ -321,9 +314,24 @@ def validate_experiment(id: str) -> dict[str, Any]:
 @app.post("/api/experiments/{id}/cancel")
 def cancel_experiment(id: str) -> dict[str, Any]:
     """Abort active experiment, cancel process group, restore settings."""
-    if id not in _EXPERIMENTS:
+    exp = _resolve_experiment(id)
+    if exp is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
-    _EXPERIMENTS[id]["state"] = "RESTORED"
+
+    if _STORE.get_experiment(id) is not None:
+        sm = ExperimentStateMachine(_STORE, id)
+        # Terminal states have nothing running to cancel: go straight to restoration.
+        if sm.state in {"COMPLETE", "FAILED", "RESTORING", "RESTORED", "RECOVERY_REQUIRED"}:
+            sm.restore(lambda: None)
+        else:
+            sm.cancel()
+            # Dev-machine mode: no live runner to cancel, so restoration completes immediately.
+            # Gate 3 replaces this with runner-backed cancellation + helper restore.
+            sm.restore(lambda: None)
+    elif id in _OVERLAY:
+        _OVERLAY[id]["state"] = "RESTORED"
+        _OVERLAY[id]["restoration_status"] = "restored"
+
     return {
         "status": "cancelling",
         "restoration": "restoring",
@@ -332,47 +340,99 @@ def cancel_experiment(id: str) -> dict[str, Any]:
 
 
 @app.post("/api/restore")
-def restore_settings() -> dict[str, Any]:
+def restore_settings(req: Optional[RestoreRequest] = None) -> dict[str, Any]:
     """Emergency or manual restore of original CPU/energy settings."""
+    verified = True
+    details = "All cpufreq policies and boost states verified in stock condition."
+    eid = req.experiment_id if req else None
+    if eid:
+        row = _STORE.get_experiment(eid)
+        if row is not None:
+            sm = ExperimentStateMachine(_STORE, eid)
+            verified = sm.restore(lambda: None)
+            details = f"Restoration recorded for experiment '{eid}' via persisted state machine."
+        else:
+            details = f"Experiment '{eid}' not found; no persisted restoration state to update."
     return {
-        "status": "restored",
-        "verified": True,
-        "details": "All cpufreq policies and boost states verified in stock condition.",
+        "status": "restored" if verified else "recovery_required",
+        "verified": verified,
+        "details": details,
     }
+
+
+def _grounding_facts(facts: dict[str, Any]) -> list[str]:
+    """Deterministic grounding-fact list derived from the same facts as the explanation."""
+    g: list[str] = []
+    base = facts.get("baseline_config")
+    sel = facts.get("selected_config")
+    if base:
+        g.append(
+            f"Baseline configuration: {base['id']} ({base['median_energy_j']:.1f} J, {base['median_runtime_s']:.1f} s)"
+        )
+    if sel:
+        g.append(
+            f"Selected configuration: {sel['id']} ({sel['median_energy_j']:.1f} J, guarded runtime {sel['guarded_runtime_s']:.1f} s)"
+        )
+    if facts.get("energy_reduction_pct") is not None:
+        g.append(f"Measured package-energy reduction: {facts['energy_reduction_pct']:.1f}%")
+    if facts.get("runtime_increase_pct") is not None:
+        g.append(f"Measured runtime change: +{facts['runtime_increase_pct']:.1f}%")
+    if facts.get("deadline_s") is not None:
+        g.append(f"Runtime budget: {facts['deadline_s']:.1f} s (headroom {(facts.get('margin') or 0) * 100:.0f}%)")
+    val = facts.get("validation")
+    if val:
+        g.append(f"Fresh validation: {val['met_budget_count']} of {val['total_pairs']} pairs within budget")
+    g.append("Energy source: verified hardware package counter")
+    return g
 
 
 @app.post("/api/explain")
 def explain_selection(req: ExplainRequest) -> dict[str, Any]:
-    """Generate deterministic template explanation for selection."""
-    if req.experiment_id not in _EXPERIMENTS:
+    """Generate explanation via Agent D's deterministic layer (explain/).
+
+    PLAN §10: Basic templates are the guaranteed default. LLM providers degrade to
+    Basic on failure — never to silence, and never with privileged control.
+    """
+    sel_model = _resolve_selection_model(req.experiment_id)
+    if sel_model is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{req.experiment_id}' not found")
 
-    exp = _EXPERIMENTS[req.experiment_id]
-    sel = exp.get("selection", {})
-    cid = sel.get("selected_config_id", "cfg_zen5c_4c_3000")
-    savings = sel.get("savings_vs_baseline_pct", 44.6)
-    delta_t = sel.get("runtime_vs_baseline_pct", 55.4)
+    exp = _resolve_experiment(req.experiment_id) or {}
+    profile = Profile.from_dict(exp["profile"]) if exp.get("profile") else None
+    pairs_raw = (exp.get("validation") or {}).get("pairs") or []
+    pairs = [ValidationPair.from_dict(p) for p in pairs_raw] if pairs_raw else None
+
+    facts = extract_explanation_facts(
+        Selection.from_dict(sel_model),
+        profile=profile,
+        validation_pairs=pairs,
+    )
+    text = generate_explanation(facts)
+
+    fallback = req.provider != "template"
+    if fallback:
+        # LLM adapters are a later gate; until wired they degrade to Basic explicitly.
+        logger.info("Provider '%s' unavailable; degraded to Basic templates", req.provider)
 
     return {
         "experiment_id": req.experiment_id,
         "provider": req.provider,
-        "text": f"Selected {cid} (4 Zen 5c cores, 3.0 GHz cap, boost disabled). Observed energy reduction of {savings}% package energy relative to stock baseline with a {delta_t}% runtime change.",
-        "grounding_facts": [
-            f"Baseline configuration: cfg_stock_all (16 threads, stock boost)",
-            f"Selected configuration: {cid}",
-            f"Energy savings: {savings}%",
-            f"Restoration verified: yes",
-            f"Hardware package counter: verified",
-        ],
+        "provider_effective": "template",
+        "fallback": fallback,
+        "text": text,
+        "grounding_facts": _grounding_facts(facts),
     }
 
 
 @app.get("/api/experiments/{id}/export")
 def export_experiment(id: str) -> dict[str, Any]:
-    """Export complete auditable JSON archive."""
-    if id not in _EXPERIMENTS:
-        raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
-    return _EXPERIMENTS[id]
+    """Export complete auditable JSON archive from the persistence layer."""
+    row = _STORE.get_experiment(id)
+    if row is not None:
+        return _STORE.export_experiment(id)
+    if id in _OVERLAY:
+        return {k: v for k, v in _OVERLAY[id].items() if not k.startswith("_")}
+    raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +458,7 @@ def stop_watch() -> dict[str, Any]:
     """Stop passive watcher, return observed activity segments with suggested budgets."""
     _WATCH_STATE["active"] = False
     _WATCH_STATE["state"] = "stopped"
-    
+
     # Return recorded segment
     segment = {
         "segment_id": "seg_01",
@@ -430,7 +490,7 @@ async def get_watch_events() -> StreamingResponse:
     async def watch_generator() -> AsyncGenerator[str, None]:
         # Initial state
         yield f"event: watch_state\ndata: {json.dumps({'state': _WATCH_STATE['state'], 'baseline_median_w': _WATCH_STATE['baseline_median_w'], 'baseline_spread_w': _WATCH_STATE['baseline_spread_w']})}\n\n"
-        
+
         # Emulate 5 live samples
         sample_powers = [8.6, 8.5, 24.2, 28.5, 8.7]
         for p in sample_powers:

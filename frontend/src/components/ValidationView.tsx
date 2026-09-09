@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Experiment } from '../types';
 import { explainSelection, validateExperiment } from '../api';
 
@@ -6,21 +6,60 @@ interface ValidationViewProps {
   experiment: Experiment;
 }
 
+const RESTORATION_LABELS: Record<string, { title: string; color: string; bg: string; border: string; icon: string }> = {
+  restored: {
+    title: 'Restoration Status: Fully Restored',
+    color: '#6ee7b7',
+    bg: '#064e3b15',
+    border: '#047857',
+    icon: '🛡️',
+  },
+  restoring: {
+    title: 'Restoration Status: Restoring…',
+    color: '#fcd34d',
+    bg: '#78350f15',
+    border: '#b45309',
+    icon: '⏳',
+  },
+  recovery_required: {
+    title: 'Restoration Status: Recovery Required',
+    color: '#fca5a5',
+    bg: '#7f1d1d15',
+    border: '#b91c1c',
+    icon: '⚠️',
+  },
+  not_required: {
+    title: 'Restoration Status: No Controls Applied',
+    color: '#9ca3af',
+    bg: '#1f293715',
+    border: '#374151',
+    icon: 'ℹ️',
+  },
+};
+
 export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) => {
   const { validation, selection, profile } = experiment;
   const [provider, setProvider] = useState<string>('template');
-  const [explanation, setExplanation] = useState<{ text: string; grounding_facts: string[] } | null>({
-    text: `Selected ${selection.selected_config_id ?? selection.config_id} (4 Zen 5c cores, 3.0 GHz cap, boost disabled). Observed verified energy savings of 44.6% package energy relative to stock baseline. Guarded runtime satisfies empirical rule.`,
-    grounding_facts: [
-      'Baseline configuration: cfg_stock_all (16 threads, stock boost)',
-      `Selected configuration: ${selection.selected_config_id ?? selection.config_id}`,
-      'Verified package energy savings: 44.6%',
-      'Restoration verified: yes',
-      'Hardware package counter: verified (intel-rapl:0)',
-    ],
-  });
+  const [explanation, setExplanation] = useState<{ text: string; grounding_facts: string[]; fallback?: boolean } | null>(null);
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [isExplaining, setIsExplaining] = useState<boolean>(false);
+
+  // Explanation comes from the API's deterministic template layer (explain/),
+  // grounded in the same persisted facts the dashboard renders.
+  useEffect(() => {
+    let cancelled = false;
+    explainSelection(experiment.id, provider)
+      .then((res) => {
+        if (!cancelled) {
+          setExplanation({ text: res.text, grounding_facts: res.grounding_facts, fallback: res.fallback });
+        }
+      })
+      .catch((e) => console.warn('Could not fetch explanation:', e));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [experiment.id, selection.config_id]);
 
   const handleRunValidation = async () => {
     try {
@@ -39,7 +78,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
       setIsExplaining(true);
       setProvider(p);
       const res = await explainSelection(experiment.id, p);
-      setExplanation({ text: res.text, grounding_facts: res.grounding_facts });
+      setExplanation({ text: res.text, grounding_facts: res.grounding_facts, fallback: res.fallback });
     } catch (e: any) {
       alert(`Explanation error: ${e.message}`);
     } finally {
@@ -114,13 +153,20 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
       <div style={{ background: '#111827', borderRadius: '0.75rem', padding: '1.25rem', border: '1px solid #1f2937' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h3 style={{ margin: 0, fontSize: '1rem', color: '#f3f4f6', fontWeight: 600 }}>
-            Fresh Validation Executions (3 Pairs)
+            Fresh Validation Executions ({validation.pairs.length} Pairs)
           </h3>
-          <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
-            Observed Energy Savings: -{validation.verified_savings_pct.toFixed(1)}%
-          </div>
+          {validation.verified_savings_pct != null && (
+            <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+              Observed Energy Savings: {validation.verified_savings_pct.toFixed(1)}%
+            </div>
+          )}
         </div>
 
+        {validation.pairs.length === 0 ? (
+          <div style={{ padding: '1rem 0.5rem', fontSize: '0.85rem', color: '#9ca3af' }}>
+            No validation pairs recorded yet. Run fresh validation to compare baseline vs selected.
+          </div>
+        ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
             <thead>
@@ -135,26 +181,32 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
             </thead>
             <tbody>
               {validation.pairs.map((p) => {
-                const eBase = p.baseline_run.package_energy_j ?? 0;
-                const eSel = p.selected_run.package_energy_j ?? 0;
-                const eSavings = Math.round(100 * (1 - eSel / (eBase || 1)));
+                const eBase = p.baseline_run.package_energy_j;
+                const eSel = p.selected_run.package_energy_j;
+                const eSavings = eBase != null && eSel != null && eBase > 0
+                  ? Math.round(100 * (1 - eSel / eBase))
+                  : null;
                 const tDelta = (p.selected_run.runtime_s - p.baseline_run.runtime_s).toFixed(1);
 
                 return (
                   <tr key={p.pair_index} style={{ borderBottom: '1px solid #1f2937' }}>
                     <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600 }}>Pair #{p.pair_index}</td>
                     <td style={{ padding: '0.6rem 0.5rem' }}>
-                      {p.baseline_run.runtime_s.toFixed(1)}s · {eBase.toFixed(1)} J
+                      {p.baseline_run.runtime_s.toFixed(1)}s · {eBase != null ? `${eBase.toFixed(1)} J` : 'energy N/A'}
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem', color: '#6ee7b7', fontWeight: 600 }}>
-                      {p.selected_run.runtime_s.toFixed(1)}s · {eSel.toFixed(1)} J
+                      {p.selected_run.runtime_s.toFixed(1)}s · {eSel != null ? `${eSel.toFixed(1)} J` : 'energy N/A'}
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem' }}>+{tDelta}s</td>
-                    <td style={{ padding: '0.6rem 0.5rem', color: '#10b981', fontWeight: 700 }}>
-                      -{eSavings}%
+                    <td style={{ padding: '0.6rem 0.5rem', color: eSavings != null ? '#10b981' : '#9ca3af', fontWeight: 700 }}>
+                      {eSavings != null ? `-${eSavings}%` : 'N/A'}
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem' }}>
-                      <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Verified output</span>
+                      {p.both_succeeded ? (
+                        <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Verified output</span>
+                      ) : (
+                        <span style={{ color: '#fca5a5', fontWeight: 600 }}>✗ Failed run retained</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -162,6 +214,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* Explanation Card */}
@@ -197,7 +250,12 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
 
         {explanation && (
           <div style={{ background: '#1f2937', borderRadius: '0.5rem', padding: '1rem', border: '1px solid #374151' }}>
-            <div style={{ fontSize: '0.9rem', color: '#f3f4f6', lineHeight: 1.5, marginBottom: '0.75rem' }}>
+            {explanation.fallback && (
+              <div style={{ fontSize: '0.75rem', color: '#fcd34d', marginBottom: '0.5rem' }}>
+                ⚠ Requested provider unavailable — degraded to deterministic Basic templates (guaranteed default).
+              </div>
+            )}
+            <div style={{ fontSize: '0.9rem', color: '#f3f4f6', lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>
               {explanation.text}
             </div>
             <div style={{ borderTop: '1px solid #374151', paddingTop: '0.6rem' }}>
@@ -214,28 +272,35 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
         )}
       </div>
 
-      {/* Restoration Card */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          background: '#064e3b15',
-          border: '1px solid #047857',
-          padding: '0.9rem 1.25rem',
-          borderRadius: '0.5rem',
-        }}
-      >
-        <div>
-          <div style={{ fontWeight: 600, color: '#6ee7b7', fontSize: '0.9rem' }}>
-            Restoration Status: Fully Restored
+      {/* Restoration Card — status always from the persisted experiment record, never guessed */}
+      {(() => {
+        const label = RESTORATION_LABELS[experiment.restoration_status] ?? RESTORATION_LABELS.not_required;
+        return (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: label.bg,
+              border: `1px solid ${label.border}`,
+              padding: '0.9rem 1.25rem',
+              borderRadius: '0.5rem',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600, color: label.color, fontSize: '0.9rem' }}>{label.title}</div>
+              <div style={{ fontSize: '0.75rem', color: '#a7f3d0' }}>
+                {experiment.restoration_status === 'restored'
+                  ? 'Stock frequencies, power limits, and boost configurations restored to initial state.'
+                  : experiment.restoration_status === 'recovery_required'
+                    ? 'Restoration could not be verified — run the manual restore command before the next experiment.'
+                    : 'Restoration state is tracked in the persisted experiment record.'}
+              </div>
+            </div>
+            <span style={{ fontSize: '1.2rem' }}>{label.icon}</span>
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#a7f3d0' }}>
-            Stock frequencies, power limits, and boost configurations restored to initial state.
-          </div>
-        </div>
-        <span style={{ fontSize: '1.2rem' }}>🛡️</span>
-      </div>
+        );
+      })()}
 
       {/* Mandatory Footer per PLAN §11 */}
       <footer

@@ -297,6 +297,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 0) onboarded.
 - (2026-09-09 10:10 UTC) [contract] AFFECTS(a,b,d) docs/API.md committed: frozen route table (PLAN §8), watch endpoints/SSE (§6b), preference mode targets/outcomes (§6c), and SSE event contracts.
 - (2026-09-09 10:20 UTC) [gate1] AFFECTS(b,d) Scaffolded FastAPI app (127.0.0.1, SSE, single-origin static mount) + Vite React dashboard end-to-end. Renders Setup (with objective & budget sliders), Profile Explorer (interactive Pareto scatter chart, comparison cards, full run list), Validation & Explanation, and Passive Watch panel. 13 unit tests green. AFFECTS(a): test_powercap_backend_reads is Linux-only (fails on Windows dev machine, green in Linux CI).
+- (2026-09-09 11:00 UTC) AFFECTS(b,d) Store-backed API + explanations landed: api/app.py persists experiments through B's Store (core/store.py, seeded with D's synthetic fixtures), /select routes through B's deterministic optimizer (deadline + preference + edge states), /explain routes through D's explain/ layer with explicit LLM→Basic fallback. ValidationView renders persisted restoration status + API-driven deterministic explanations; live smoke verified baseline_already_optimal / no_feasible_point edge states. 22 unit tests green.
+- (2026-09-09 11:00 UTC) AFFECTS(b) core/store.py record_run: runs table keys run_id alone with INSERT OR REPLACE, so identical run_ids across experiments silently reassign rows (fixture experiments reuse ids like cfg_zen5_4c_stock_r1). Worked around in api/store_bridge.py by namespacing run ids with the experiment id; consider UNIQUE(experiment_id, run_id) or run_id prefixing in the runner when wiring live runs.
 
 ### Agent D log
 
