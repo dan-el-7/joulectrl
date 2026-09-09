@@ -57,11 +57,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:22:00Z
-- session: B#6 · status: off
+- heartbeat: 2026-09-09T11:28:00Z
+- session: B#7 · status: active
 - branch: main
-- current unit: Gate 3 fresh validation-pair orchestration complete
-- next action: integrate with C's validation endpoint when available; preserve helper restore around each point
+- current unit: fix synthetic unavailable-counter simulated-clock regression
+- next action: patch advance_uj timing order and add regression test, then push immediately
 - notes for others: CLI uses HelperClient begin/apply/read/restore/end and only FixedComputeWorkload; no arbitrary command path. Windows has no os.getuid/helper socket, so it reports a clear error.
 
 
