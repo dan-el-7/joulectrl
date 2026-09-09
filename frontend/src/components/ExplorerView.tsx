@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Experiment } from '../types';
+import { ConfigSummary, Experiment } from '../types';
 import { fetchValidationPoints } from '../api';
 import { ParetoChart } from './ParetoChart';
 import { colors } from '../design';
@@ -73,6 +73,22 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     return curr.median_energy_j < prev.median_energy_j ? curr : prev;
   }, baseCfg);
 
+  // data-derived summary line — no hardcoded counts or core names
+  const nConfigs = Object.keys(configs).length;
+  const nReps = lowestEnergyCfg?.runtime_samples?.length ?? baseCfg?.runtime_samples?.length ?? 0;
+  const layoutsPresent = [...new Set(Object.values(configs).map((c) => c.configuration.layout))].sort();
+
+  /** one-line config descriptor from actual configuration fields */
+  const describeConfig = (c: ConfigSummary | undefined): string => {
+    if (!c) return '—';
+    const parts: string[] = [];
+    parts.push(`${c.configuration.cpu_affinity?.length ?? c.configuration.worker_count} cores`);
+    if (c.configuration.freq_cap_khz) parts.push(`${(c.configuration.freq_cap_khz / 1e6).toFixed(1)} GHz cap`);
+    if (c.configuration.boost === false) parts.push('Boost off');
+    else if (c.configuration.boost === true) parts.push('Boost on');
+    return parts.join(' · ');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Top Banner: Status + Interactive Budget Slider */}
@@ -106,7 +122,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             </span>
           </div>
           <div style={{ fontSize: '0.8rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
-            12 configurations tested across Zen 5 &amp; Zen 5c layouts (3 repetitions each).
+            {nConfigs} configurations tested across layout{layoutsPresent.length > 1 ? 's' : ''} {layoutsPresent.join(', ')}
+            {nReps ? ` (${nReps} repetitions each)` : ''}.
           </div>
         </div>
 
@@ -165,10 +182,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             Lowest Energy Overall
           </div>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.2rem' }}>
-            {lowestEnergyCfg ? lowestEnergyCfg.config_id : 'cfg_zen5c_4c_2000'}
+            {lowestEnergyCfg ? lowestEnergyCfg.config_id : '—'}
           </div>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-            4 Zen 5c cores · 2.0 GHz cap
+            {describeConfig(lowestEnergyCfg)}
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: colors.textTertiary }}>Runtime:</span>
@@ -195,7 +212,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             {selCfg ? selCfg.config_id : selectedId}
           </div>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-            4 Zen 5c cores · 3.0 GHz cap · Boost off
+            {describeConfig(selCfg)}
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: colors.textTertiary }}>Guarded Runtime:</span>

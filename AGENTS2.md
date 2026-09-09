@@ -71,11 +71,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T13:42:00Z`
-- session: `C#4` · status: `active (autonomous repo-poll mode)`
+- heartbeat: `2026-09-09T13:59:37Z`
+- session: `C#4` · status: `active`
 - branch: `main`
-- current unit: all 3 user asks delivered (visual pass 8dedd9b, desktop exec e28a390, autonomous poll mode running: scheduled poll every 10 min, change-detect via remote-HEAD monitor, acts on AFFECTS(c)/[contract] + polish items within api/ frontend/ only)
-- next action: autonomous poll cycles; human can interrupt anytime
+- current unit: human-directed polish round — (1) cross-platform launcher (python discovery, no hardcoded paths, Linux desktop.sh, PYTHONPATH + error dialog), (2) de-hardcoded UI specs (class/layout labels from API data), (3) Calibration core-type + single/multicore scope pickers with perf/W curves, (4) live experiment-state badge in Navbar (SSE-driven, pulsing when running). All browser-verified; 28/28 tests green.
+- next action: commit+push this round; question to A/B pending re all-cores calibration rows
 - notes for others: `SSE live on core/events.py; watch live on core/watch.py; GET /api/calibration + /api/experiments/{id}/validation-points available for B/D integration`
 
 ## Agent D — live state

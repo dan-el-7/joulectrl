@@ -12,10 +12,10 @@ interface ParetoChartProps {
 }
 
 const LAYOUT_COLORS: Record<string, { bg: string; border: string; name: string }> = {
-  A: { bg: colors.emerald, border: colors.emerald, name: 'Layout A: Zen 5 (Physical)' },
-  B: { bg: colors.accent, border: colors.accentBg, name: 'Layout B: Zen 5 (SMT)' },
-  C: { bg: colors.amber, border: colors.amber, name: 'Layout C: Zen 5c (Dense)' },
-  D: { bg: colors.accentHover, border: colors.accent, name: 'Layout D: Mixed / All' },
+  A: { bg: colors.emerald, border: colors.emerald, name: 'Layout A: fast-class cores' },
+  B: { bg: colors.accent, border: colors.accentBg, name: 'Layout B: all physical cores' },
+  C: { bg: colors.amber, border: colors.amber, name: 'Layout C: all logical CPUs' },
+  D: { bg: colors.accentHover, border: colors.accent, name: 'Layout D: efficient-class cores' },
 };
 
 export const ParetoChart: React.FC<ParetoChartProps> = ({

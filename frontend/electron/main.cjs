@@ -5,29 +5,63 @@
 const { app, BrowserWindow, Menu } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
 const isWindows = process.platform === 'win32';
 
 const PORT = parseInt(process.env.JOLECTRL_PORT || '8127', 10);
-const PY = process.env.JOUCTRL_PYTHON || 'C:/Users/Subhrajyoti/.venvs/joulectrl/Scripts/python.exe';
 // repo root = parent of frontend/
 const REPO = path.resolve(__dirname, '..');
+
+/* Python interpreter discovery — works on any Linux/macOS/Windows machine.
+ * Order: explicit env override → local venv in the repo → python3/python on PATH. */
+function findPython() {
+  if (process.env.JOUCTRL_PYTHON) return process.env.JOUCTRL_PYTHON;
+  const candidates = isWindows
+    ? ['.venv/Scripts/python.exe', 'venv/Scripts/python.exe']
+    : ['.venv/bin/python', 'venv/bin/python'];
+  for (const c of candidates) {
+    const p = path.join(REPO, c);
+    if (fs.existsSync(p)) return p;
+  }
+  return isWindows ? 'python' : 'python3';
+}
+const PY = findPython();
 
 let serverProc = null;
 let win = null;
 
 function startServer() {
+  // PYTHONPATH guarantees the repo root is importable regardless of the
+  // interpreter's cwd/sys.path policy (e.g. PYTHONSAFEPATH builds).
+  const env = { ...process.env, PYTHONPATH: [REPO, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) };
   serverProc = spawn(PY, ['-m', 'uvicorn', 'api.app:app', '--host', '127.0.0.1', '--port', String(PORT)], {
     cwd: REPO,
+    env,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
+  let lastErr = '';
   serverProc.stdout.on('data', (d) => console.log('[api]', d.toString().trim()));
-  serverProc.stderr.on('data', (d) => console.log('[api]', d.toString().trim()));
+  serverProc.stderr.on('data', (d) => {
+    const t = d.toString().trim();
+    console.log('[api]', t);
+    lastErr = t;
+  });
   serverProc.on('exit', (code) => {
     console.log('[api] exited', code);
     serverProc = null;
-    if (win && !app.isQuitting) app.quit();
+    if (win === null && !app.isQuitting && code !== 0) {
+      // server died before the window opened — show a actionable error
+      const { dialog } = require('electron');
+      dialog.showErrorBox(
+        'joulectrl — API server failed to start',
+        `Interpreter: ${PY}\nPort: ${PORT}\n\n${lastErr.slice(-800) || `exit code ${code}`}`
+      );
+      app.quit();
+    } else if (win && !app.isQuitting) {
+      app.quit();
+    }
   });
 }
 

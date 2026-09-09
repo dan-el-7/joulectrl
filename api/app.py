@@ -335,6 +335,26 @@ def get_calibration() -> dict[str, Any]:
     c1_rows = load_rows("calibration_c1.json")
     c2_rows = load_rows("calibration_c2_effective.json")
 
+    # Class hardware context from the capability fixture (labels stay data-driven;
+    # the UI never hardcodes core names). Falls back to class keys alone.
+    cap_classes: dict[str, Any] = {}
+    try:
+        cap_classes = _load_json_file("fixtures/real/capability_report.json").get("core_classes") or {}
+    except Exception:
+        pass
+    topo_info: dict[str, Any] = {}
+    try:
+        topo_info = {
+            "physical_cores": _load_json_file("fixtures/real/capability_report.json")
+            .get("cpu", {})
+            .get("n_cores"),
+            "logical_cores": _load_json_file("fixtures/real/capability_report.json")
+            .get("cpu", {})
+            .get("ncpu"),
+        }
+    except Exception:
+        pass
+
     def med(rows: list[dict[str, Any]], key: str) -> Optional[float]:
         vals = [r[key] for r in rows if r.get(key) is not None]
         return median(vals) if vals else None
@@ -408,12 +428,32 @@ def get_calibration() -> dict[str, Any]:
     out = sorted(classes.values(), key=lambda e: 0 if e["label"] == "fast" else 1)
     for entry in out:
         entry["points"].sort(key=lambda p: p["perf_per_watt"])
+        hw = cap_classes.get(entry["label"]) or {}
+        entry["hw_max_freq_khz"] = hw.get("hw_max_freq")
+        # scope: single-core (1 cpu) vs multicore (>1 cpus) points, client-side filterable
+        entry["points"] = [
+            {**p, "scope": "single" if len(p.get("cpus") or []) <= 1 else "multi"}
+            for p in entry["points"]
+        ]
+
+    # Which scopes exist per class (so the UI can mark unmeasured combos honestly)
+    scopes_available: dict[str, list[str]] = {}
+    for entry in out:
+        scopes_available[entry["label"]] = sorted({p["scope"] for p in entry["points"]})
+    all_cores_measured = any(
+        len(p.get("cpus") or []) >= (topo_info.get("physical_cores") or 0)
+        for entry in out
+        for p in entry["points"]
+    )
 
     return {
         "source": "fixtures/real/calibration_c1.json + calibration_c2_effective.json",
         "captured_utc": _fixture_captured_utc("calibration_c2_effective.json"),
         "kernel": "workloads/kernel/fixed_compute",
+        "topology": topo_info,
         "classes": out,
+        "scopes_available": scopes_available,
+        "all_cores_measured": all_cores_measured,
         "note": "Measured medians from the demo laptop's verified hardware counter; calibration data never mixes into workload Pareto selection.",
     }
 

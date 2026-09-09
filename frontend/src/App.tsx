@@ -33,6 +33,8 @@ export const App: React.FC = () => {
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
   const [restorationStatus, setRestorationStatus] = useState<string>('restored');
+  const [experimentState, setExperimentState] = useState<string | null>(null);
+  const [experimentStateMessage, setExperimentStateMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Initial data fetch
@@ -48,7 +50,10 @@ export const App: React.FC = () => {
       .catch((e) => console.warn('Could not fetch workloads:', e));
 
     fetchExperiment('exp_demo_clean_build')
-      .then(setExperiment)
+      .then((e) => {
+        setExperiment(e);
+        if (e.state) setExperimentState(e.state);
+      })
       .catch((e) => console.warn('Could not fetch default experiment:', e));
   }, []);
 
@@ -62,6 +67,8 @@ export const App: React.FC = () => {
       try {
         const data = JSON.parse(e.data);
         console.log('[SSE] experiment_state:', data);
+        if (data.state) setExperimentState(data.state);
+        setExperimentStateMessage(data.message ?? data.reason ?? null);
       } catch (err) {
         console.error(err);
       }
@@ -145,6 +152,8 @@ export const App: React.FC = () => {
         restorationStatus={restorationStatus}
         onEmergencyRestore={handleEmergencyRestore}
         isRestoring={isRestoring}
+        experimentState={experimentState}
+        experimentStateMessage={experimentStateMessage}
       />
 
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: '1300px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>

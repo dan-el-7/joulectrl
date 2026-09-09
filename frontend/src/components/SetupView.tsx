@@ -254,13 +254,21 @@ export const SetupView: React.FC<SetupViewProps> = ({
               <div style={{ color: colors.textTertiary, marginTop: '0.2rem', fontSize: '0.75rem' }}>
                 {capabilities.topology.logical_cores} logical CPUs ({capabilities.topology.physical_cores} physical cores)
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <span style={{ background: 'rgba(16,185,129,0.12)', color: colors.emerald, padding: '0.15rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.7rem' }}>
-                  Zen 5: CPUs {capabilities.topology.classes.fast.join(', ')}
-                </span>
-                <span style={{ background: colors.amber, color: colors.amber, padding: '0.15rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.7rem' }}>
-                  Zen 5c: CPUs {capabilities.topology.classes.efficient.join(', ')}
-                </span>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                {Object.entries(capabilities.topology.classes ?? {}).map(([cls, cpus]) => (
+                  <span
+                    key={cls}
+                    style={{
+                      background: cls === 'fast' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.10)',
+                      color: cls === 'fast' ? colors.emerald : colors.amber,
+                      padding: '0.15rem 0.4rem',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.7rem',
+                    }}
+                  >
+                    {cls} class: CPUs {(cpus as number[]).join(', ')}
+                  </span>
+                ))}
               </div>
             </div>
 
