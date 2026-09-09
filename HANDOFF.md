@@ -54,11 +54,12 @@ pull --rebase before editing, push immediately after).
 
 ## Agent B — resume packet
 
-- **Done & verified:** `core/models.py` v0 (9 tests) + `energy/synthetic.py` (4 tests) with wrap, reset, unavailability, and scripted profiles.
-- **In flight:** `b/synthetic-backend` ready to merge/push; starting `core/optimizer.py`.
-- **Resume here:** Commit and merge `b/synthetic-backend` to `main`, push to origin, implement `core/optimizer.py`.
-- **Gotchas:** `compute_delta_uj` returns None on missing or out-of-range reads; wraps cleanly modulo max_range.
-- **Handoffs owed / waiting on:** Synthetic backend ready for C/D; awaiting A's energy/base.py protocol co-signing.
+- **Done & verified:** `core/models.py` v0 (9 tests) + `energy/synthetic.py` (5 tests conforming to Agent A's `EnergyBackend` and `EnergyAccumulator`).
+- **In flight:** Starting `core/optimizer.py` (deadline selection + Pareto frontier + preference mode §6c + edge states).
+- **Resume here:** Implement `core/optimizer.py` and `tests/unit/test_optimizer.py`.
+- **Gotchas:** `EnergyAccumulator` enforces `plausible_max_watts`; keep test simulated durations proportional to energy jumps.
+- **Handoffs owed / waiting on:** Models v0 and synthetic backend published to unblock C & D.
+
 
 
 

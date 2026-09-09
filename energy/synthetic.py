@@ -40,6 +40,7 @@ class SyntheticEnergyBackend:
         scope: str = "package-0",
         unit: str = "uj",
     ) -> None:
+        self.name: str = "synthetic"
         self.scope = scope
         self.unit = unit
         self.max_energy_range_uj = max_energy_range_uj
@@ -55,19 +56,22 @@ class SyntheticEnergyBackend:
         self._segment_elapsed_s: float = 0.0
 
     # -----------------------------------------------------------------------
-    # Core EnergyBackend Protocol
+    # Core EnergyBackend Protocol (Agent A's energy/base.py)
     # -----------------------------------------------------------------------
 
-    def read_energy_uj(self) -> Optional[int]:
-        """Read the raw hardware energy counter in microjoules.
-        
-        Returns:
-            Current counter value in microjoules, or None if unavailable.
-            Non-negotiable invariant: NEVER returns 0 for missing reads.
-        """
+    def read_uj(self) -> Optional[int]:
+        """Raw counter value in microjoules, or None when unavailable."""
         if not self._available:
             return None
         return self._current_uj
+
+    def max_range_uj(self) -> Optional[int]:
+        """Advertised counter wrap range in microjoules."""
+        return self.max_energy_range_uj
+
+    def read_energy_uj(self) -> Optional[int]:
+        """Alias for read_uj() for backwards/explicit naming compatibility."""
+        return self.read_uj()
 
     def read(self) -> tuple[Optional[int], float]:
         """Read current energy counter and monotonic timestamp.
@@ -82,7 +86,7 @@ class SyntheticEnergyBackend:
     def compute_delta_uj(self, start_uj: Optional[int], end_uj: Optional[int]) -> Optional[int]:
         """Compute wrap-safe energy delta between two counter samples in microjoules.
         
-        Using modulo arithmetic from PLAN §5:
+        Using modulo arithmetic from PLAN Section 5:
             delta = (end_uj - start_uj) % max_energy_range_uj
             
         Returns:

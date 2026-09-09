@@ -57,12 +57,13 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:07:00Z
+- heartbeat: 2026-09-09T10:09:00Z
 - session: B#1 · status: active
-- branch: b/synthetic-backend
-- current unit: energy/synthetic.py completed; starting core/optimizer.py skeleton
+- branch: on main
+- current unit: synthetic backend verified against Agent A's energy/base protocol; starting core/optimizer.py
 - next action: implement core/optimizer.py and tests/unit/test_optimizer.py
-- notes for others: synthetic backend ready for C and D testing
+- notes for others: synthetic backend verified against EnergyBackend protocol; starting optimizer skeleton
+
 
 
 
