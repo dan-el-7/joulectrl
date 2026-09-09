@@ -6,7 +6,15 @@ This directory contains executable assets for the live hackathon presentation pe
 
 Run the demo from the repo root:
 ```bash
+# Run full demonstration
 python demo/run_demo.py
+
+# Or run a specific phase with custom preset
+python demo/run_demo.py --phase kernel --preset light
+
+# CLI Options:
+#   --phase {all,capabilities,kernel,watch,pareto,optimizer,validation}
+#   --preset {smoke,light,standard,heavy}
 ```
 
 ### Demonstration Phases

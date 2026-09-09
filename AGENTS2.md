@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T11:53:00Z`
+- heartbeat: `2026-09-09T11:58:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). Integration tests cleaned (zero ResourceWarnings); 38 tests green.`
+- current unit: `Gate 4 complete ([gate4]). run_demo.py CLI options added (--phase, --preset); 38 tests green.`
 - next action: `stand by for Agent A's C2 sweep results and live demo execution`
-- notes for others: `Demo assets and integration tests fully validated; ready for A's C2 sweep. 38 tests passing.`
+- notes for others: `run_demo.py supports interactive presenter options (--phase, --preset). Ready for A's C2 sweep. 38 tests passing.`

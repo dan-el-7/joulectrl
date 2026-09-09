@@ -57,15 +57,16 @@ def phase_1_capabilities() -> None:
     print("Restore Status:      All settings snapshotted and restorable.")
 
 
-def phase_2_kernel_execution() -> None:
-    print_banner("PHASE 2: LIVE DETERMINISTIC COMPUTE KERNEL")
+def phase_2_kernel_execution(preset: str = "smoke") -> None:
+    print_banner(f"PHASE 2: LIVE DETERMINISTIC COMPUTE KERNEL (PRESET: {preset.upper()})")
     print("Running deterministic compute kernel across varying worker counts...")
     print("Rule: Total chunks is fixed; work partitions across workers; checksum invariant.\n")
 
     with tempfile.TemporaryDirectory(prefix="joulectrl_demo_") as tmpdir:
-        wl = FixedComputeWorkload(chunks=1024, iters=50000)
+        wl = FixedComputeWorkload(preset=preset)
         ctx = RunContext(working_dir=tmpdir)
         wl.prepare(ctx)
+        expected_cs = wl.fingerprint().get("expected_checksum", "")
 
         for workers in (1, 2, 4):
             cmd = wl.command(workers=workers)
@@ -77,7 +78,7 @@ def phase_2_kernel_execution() -> None:
             data = json.loads(res.stdout)
             print(f"  Workers: {workers:2d} | Runtime: {t1 - t0:6.3f}s | Checksum: {data['checksum']} | Total Work: {data['total_work_units']}")
 
-    print("\nVerified: Checksum is strictly invariant (0x23e23165be5ef4b6) across worker counts!")
+    print(f"\nVerified: Checksum is strictly invariant ({expected_cs}) across worker counts!")
 
 
 def phase_3_pareto_frontier() -> None:
@@ -163,13 +164,39 @@ def phase_watch_mode() -> None:
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="joulectrl live presentation & demonstration runner")
+    parser.add_argument(
+        "--phase",
+        choices=["all", "capabilities", "kernel", "watch", "pareto", "optimizer", "validation"],
+        default="all",
+        help="Specific demo phase to run (default: all)",
+    )
+    parser.add_argument(
+        "--preset",
+        choices=["smoke", "light", "standard", "heavy"],
+        default="smoke",
+        help="Kernel workload preset for live execution (default: smoke)",
+    )
+
+    args = parser.parse_args()
+
     print("\nStarting joulectrl demonstration...")
-    phase_1_capabilities()
-    phase_2_kernel_execution()
-    phase_watch_mode()
-    phase_3_pareto_frontier()
-    sel = phase_4_optimizer()
-    phase_5_validation_and_explanation(sel)
+
+    if args.phase in ("all", "capabilities"):
+        phase_1_capabilities()
+    if args.phase in ("all", "kernel"):
+        phase_2_kernel_execution(preset=args.preset)
+    if args.phase in ("all", "watch"):
+        phase_watch_mode()
+    if args.phase in ("all", "pareto"):
+        phase_3_pareto_frontier()
+    if args.phase in ("all", "optimizer", "validation"):
+        sel = phase_4_optimizer()
+        if args.phase in ("all", "validation"):
+            phase_5_validation_and_explanation(sel)
+
     print("\nDemonstration complete.\n")
 
 
