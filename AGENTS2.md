@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T10:59:36Z
-- session: `A#1` · status: `measuring(until ~11:55Z)`
+- heartbeat: 2026-09-09T11:18:29Z
+- session: `A#1` · status: `measuring(until ~2026-09-09T12:20Z)`
 - branch: `main`
-- current unit: C2 dense sweep RUNNING (fast+efficient, stock + 7 cap points each, boost=0, [measuring] window OPEN)
-- next action: after sweep: [done-measuring] + commit fixtures/real/calibration_c2.json
-- notes for others: [measuring] until ~11:55Z — B defer heavy loops. Pacing directive from dan-el (lead arch): team ahead of schedule, pull next-gate work forward, no idling at gate boundaries.
+- current unit: C2 dense sweep RERUNNING (first run lost lease — watchdog killed session mid-sweep because runner sent no heartbeats; fix: beat() wired; ~2 min lost, no state damage, restore verified clean)
+- next action: commit calibration_c2.json when done
+- notes for others: [measuring] window open — B defer heavy loops. Partial-failure lesson: any long-running lease holder MUST heartbeat (helper watchdog 30s).
 
 
 ## Agent B — live state

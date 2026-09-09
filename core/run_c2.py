@@ -68,11 +68,16 @@ def main():
     c = HelperClient()
     boot_id = open("/proc/sys/kernel/random/boot_id").read().strip()
     assert c.begin_session()["ok"], "helper lease"
+
+    def beat():
+        c.heartbeat()  # watchdog lease keepalive — kernel runs + settle span >30s
+
     rows = []
     try:
         for cname, core_cpus in CLASSES.items():
             # ---- stock row (boost=1, no caps) ----
             for rep in range(1, REPS + 1):
+                beat()
                 e1 = c.read_energy()
                 r = run_pinned(core_cpus, 4, PARAMS)
                 e2 = c.read_energy()
@@ -91,12 +96,14 @@ def main():
                 req = {"boost": False,
                        "policy_freq_caps_khz": {f"policy{cpu}": cap for cpu in core_cpus}}
                 ap = c.apply_configuration(req)
+                beat()
                 if not ap.get("ok"):
                     print(f"apply failed at {cap}: {ap}", flush=True)
                     continue
                 accepted = ap["applied"]
                 time.sleep(0.5)  # settle after control change
                 for rep in range(1, REPS + 1):
+                    beat()
                     e1 = c.read_energy()
                     r = run_pinned(core_cpus, 4, PARAMS)
                     e2 = c.read_energy()
@@ -111,6 +118,7 @@ def main():
                     print(f"{cname} cap={cap/1e6:.2f}GHz rep{rep}: {r['runtime_s']}s {rows[-1]['package_energy_j']}J", flush=True)
                     time.sleep(0.5)
     finally:
+        beat()
         rr = c.restore()
         print("restore:", rr["ok"], rr.get("mismatches", []), flush=True)
         assert rr["ok"], f"RESTORE FAILED: {rr}"
