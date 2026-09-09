@@ -23,7 +23,9 @@ python demo/run_demo.py --phase kernel --preset light
    - Shows CPU topology (Ryzen AI 7 350: 8 physical cores, 16 threads).
    - Shows dual core-class mapping (Zen 5 on even CPUs up to 5.09 GHz, Zen 5c on odd CPUs up to 3.51 GHz).
    - Validates live hardware counter: `package-0` via sysfs powercap (idle verified at 8.6 mJ/s).
-   - Confirms recovery snapshot mechanism and restoration readiness.
+   - Evaluates C1 single-core stock calibration (Zen 5 1.45x throughput ratio over Zen 5c).
+   - Evaluates C2 dense sweep and canonical 8-point effective control space (`calibration_c2_effective.json`), demonstrating the 29.6% energy reduction tradeoff headline on Fast Zen 5 (4-worker).
+   - Confirms pre-demo controls re-verification pass (`controls_reverify.json`) and recovery snapshot/restoration readiness.
 
 2. **Phase 2: Deterministic Compute Kernel (Fixed Work Benchmark)**
    - Compiles and runs `workloads/kernel/fixed_compute` live.

@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T12:22:00Z`
+- heartbeat: `2026-09-09T12:24:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). demo/run_demo.py updated to cite calibration_c2_effective.json & controls_reverify.json; 39 tests green.`
+- current unit: `Gate 4 complete ([gate4]). demo/README.md updated with real calibration & reverify details; 39 tests green.`
 - next action: `stand by for live hackathon presentation`
-- notes for others: `C2 effective calibration tradeoff and pre-demo controls re-verification integrated into demo phase 1. All 39 tests passing.`
+- notes for others: `C2 effective calibration tradeoff and pre-demo controls re-verification documented in demo/README.md. All 39 tests passing.`

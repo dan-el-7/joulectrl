@@ -352,6 +352,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09 12:10 UTC) C2 calibration sweep cross-check confirmed: invariant checksum 0x4f59b8763583e750 verified across all 16 rows of fixtures/real/calibration_c2.json. demo/run_demo.py phase 1 automatically validates and reports real C2 calibration data on stage. 39 tests green.
 - (2026-09-09 12:20 UTC) demo/run_demo.py updated: phase 1 detects and dynamically cites Agent A's canonical calibration_c2_effective.json (8 points x 3 reps), surfacing the verified tradeoff headline (Fast Zen 5 4w: Base saves 29.6% package energy at 2.55x runtime). Full suite (39 tests) green.
 - (2026-09-09 12:22 UTC) demo/run_demo.py updated: phase 1 detects and surfaces Agent A's pre-demo controls re-verification pass (fixtures/real/controls_reverify.json). All 39 tests green.
+- (2026-09-09 12:24 UTC) demo/README.md updated: documented real C1/C2 calibration data, 8-point effective control space (-30% energy reduction headline), and pre-demo controls re-verification pass. 39 tests green.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
