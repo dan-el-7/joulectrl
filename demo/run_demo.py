@@ -99,6 +99,17 @@ def phase_1_capabilities() -> None:
         except Exception:
             pass
 
+    reverify_file = REAL_DIR / "controls_reverify.json"
+    if reverify_file.exists():
+        try:
+            with open(reverify_file, "r", encoding="utf-8") as f:
+                rev = json.load(f)
+            checks = rev.get("checks", {})
+            if checks.get("restore_ok") and checks.get("energy_advances"):
+                print(f"Pre-Demo Re-verify:  PASS (AC online={rev.get('ac_online')}, tuned={rev.get('tuned_profile')}, controls restored to stock)")
+        except Exception:
+            pass
+
     print("Restore Status:      All settings snapshotted and restorable.")
 
 
