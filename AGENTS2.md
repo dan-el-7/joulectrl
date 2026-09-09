@@ -57,8 +57,8 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:58:00Z
-- session: B#4 · status: active
+- heartbeat: 2026-09-09T11:01:00Z
+- session: B#4 · status: off
 - branch: main
 - current unit: Gate 2 safe fixed-compute CLI complete
 - next action: run Linux CI/demo validation when available; avoid expanding CLI beyond approved workloads
