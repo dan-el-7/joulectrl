@@ -199,7 +199,7 @@ class LiveEngine:
 
         # 2. Resolve selected candidate configuration
         sel = exp.get("selection") or {}
-        cand_cfg_id = sel.get("config_id")
+        cand_cfg_id = sel.get("selected_config_id") or sel.get("config_id")
         prof = exp.get("profile") or {}
         configs = prof.get("configurations") or {}
 
@@ -207,13 +207,40 @@ class LiveEngine:
         if cand_cfg_id and cand_cfg_id in configs:
             cand_raw = configs[cand_cfg_id].get("configuration") or {}
             cand_cfg = Configuration.from_dict(cand_raw)
+        elif sel.get("selected_configuration"):
+            cand_cfg = Configuration.from_dict(sel["selected_configuration"])
         elif sel.get("configuration"):
             cand_cfg = Configuration.from_dict(sel["configuration"])
+
+        if not cand_cfg and sel.get("candidates"):
+            for cand in sel["candidates"]:
+                if cand.get("config_id") == cand_cfg_id or not cand_cfg_id:
+                    cand_raw = cand.get("configuration") or {}
+                    if cand_raw:
+                        cand_cfg = Configuration.from_dict(cand_raw)
+                        cand_cfg_id = cand.get("config_id") or cand_cfg_id
+                        break
+
+        if not cand_cfg and configs:
+            for cid, cinfo in configs.items():
+                c_data = cinfo.get("configuration") or {}
+                if cid == cand_cfg_id or c_data.get("id") == cand_cfg_id or c_data.get("config_id") == cand_cfg_id:
+                    cand_cfg = Configuration.from_dict(c_data)
+                    cand_cfg_id = cid
+                    break
 
         if not cand_cfg and configs:
             first_id = next(iter(configs))
             cand_cfg = Configuration.from_dict(configs[first_id].get("configuration") or {})
             cand_cfg_id = first_id
+
+        if not cand_cfg and self.store:
+            runs = self.store.get_runs(exp_id)
+            for r in runs:
+                if r.configuration and (r.config_id == cand_cfg_id or not cand_cfg_id):
+                    cand_cfg = r.configuration
+                    cand_cfg_id = r.config_id
+                    break
 
         if not cand_cfg:
             logger.warning("No candidate config found for validation of %s", exp_id)
@@ -221,15 +248,30 @@ class LiveEngine:
             return
 
         # 3. Resolve baseline configuration
-        base_cfg_id = prof.get("baseline_config_id")
+        base_cfg_id = prof.get("baseline_config_id") or sel.get("baseline_config_id")
         base_cfg: Optional[Configuration] = None
         if base_cfg_id and base_cfg_id in configs:
             base_raw = configs[base_cfg_id].get("configuration") or {}
             base_cfg = Configuration.from_dict(base_raw)
         else:
             for cid, cinfo in configs.items():
-                if cinfo.get("is_baseline") or "stock" in cid:
+                if cinfo.get("is_baseline") or "stock" in cid or "baseline" in cid:
                     base_cfg = Configuration.from_dict(cinfo.get("configuration") or {})
+                    break
+
+        if not base_cfg and sel.get("candidates"):
+            for cand in sel["candidates"]:
+                if cand.get("is_baseline") or "stock" in cand.get("config_id", "") or cand.get("config_id") == base_cfg_id:
+                    base_raw = cand.get("configuration") or {}
+                    if base_raw:
+                        base_cfg = Configuration.from_dict(base_raw)
+                        break
+
+        if not base_cfg and self.store:
+            runs = self.store.get_runs(exp_id)
+            for r in runs:
+                if r.is_baseline or "stock" in (r.configuration.id if r.configuration else ""):
+                    base_cfg = r.configuration
                     break
 
         if not base_cfg:
@@ -272,6 +314,7 @@ class LiveEngine:
             self._emit(exp_id, "experiment_state", {"state": "validating", "message": "Executing fresh validation pairs on hardware"})
 
             runner = WorkloadRunner(None, working_dir=_REPO_ROOT)
+            self.__class__._active_runners[exp_id] = runner
             pairs: list[ValidationPair] = []
             self._overlay_for(exp_id)["validation"] = {
                 "status": "validating",
@@ -396,6 +439,7 @@ class LiveEngine:
             logger.exception("Validation execution failed: %s", exc)
             self._emit(exp_id, "experiment_state", {"state": "failed", "message": f"Validation failed: {exc}"})
         finally:
+            self.__class__._active_runners.pop(exp_id, None)
             if has_helper and helper:
                 try:
                     helper.restore()

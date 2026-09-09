@@ -146,9 +146,9 @@ class CapabilityReport:
 @dataclass
 class Configuration:
     """Concrete hardware/software execution configuration."""
-    id: str
-    layout: str  # e.g. "A", "B", "C", "D", "baseline", "stock"
-    worker_count: int
+    id: str = "config"
+    layout: str = "baseline"  # e.g. "A", "B", "C", "D", "baseline", "stock"
+    worker_count: int = 1
     cpu_affinity: list[int] = field(default_factory=list)
     freq_cap_khz: Optional[int] = None
     policy_freq_caps_khz: dict[int, int] = field(default_factory=dict)
@@ -161,7 +161,14 @@ class Configuration:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Configuration:
-        return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+        clean = dict(data)
+        if "id" not in clean:
+            clean["id"] = clean.get("config_id") or "config"
+        if "layout" not in clean:
+            clean["layout"] = clean.get("layout_id") or "baseline"
+        if "worker_count" not in clean:
+            clean["worker_count"] = clean.get("workers") or 1
+        return cls(**{k: v for k, v in clean.items() if k in cls.__dataclass_fields__})
 
 
 # ---------------------------------------------------------------------------

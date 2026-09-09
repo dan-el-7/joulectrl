@@ -70,7 +70,7 @@ const classColor = (label: string) =>
     ? colors.series.fast
     : label === 'efficient'
       ? colors.series.efficient
-      : colors.series.accent2;
+      : '#38bdf8';
 
 /** Data-driven class display name: "fast · ≤5.09 GHz" — never hardcoded core names. */
 const classDisplayName = (c: ClassSummary) => {
@@ -82,11 +82,13 @@ const SERIES_PALETTE: Record<string, string> = {
   'Zen 5 (4 cores)': '#a78bfa',
   'Zen 5 (8 threads)': '#c084fc',
   'Zen 5c (4 cores)': '#34d399',
+  'Zen 5c (8 threads)': '#10b981',
   'All Cores (8 cores)': '#38bdf8',
+  'All Cores (8 threads)': '#38bdf8',
   'All Cores (16 threads)': '#60a5fa',
   'fast': colors.series.fast,
   'efficient': colors.series.efficient,
-  'all': colors.series.accent2,
+  'all': '#38bdf8',
 };
 
 /* ------------------------------------------------------------------ */
@@ -158,6 +160,9 @@ function ScatterChart({
     for (const p of points) {
       const k = p.subSeries || seriesKey(p);
       (acc[k] ||= []).push(p);
+    }
+    for (const k in acc) {
+      acc[k].sort((a, b) => a.x - b.x);
     }
     return acc;
   }, [points, seriesKey]);

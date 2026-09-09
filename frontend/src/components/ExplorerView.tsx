@@ -62,33 +62,52 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   };
 
   const configs = profile?.configurations || {};
-  const baselineId = profile?.baseline_config_id || Object.keys(configs)[0];
+  const candList: any[] = (selection as any)?.candidates || (selection as any)?.candidate_summaries || [];
+  const baselineId = profile?.baseline_config_id || (selection as any)?.baseline_config_id || Object.keys(configs)[0];
   const selectedId = selection?.selected_config_id ?? selection?.config_id;
 
-  const baseCfg = baselineId ? configs[baselineId] : undefined;
-  const selCfg = selectedId ? configs[selectedId] : undefined;
+  const baseCfg: any = (baselineId ? configs[baselineId] : undefined)
+    || Object.values(configs).find((c: any) => c.config_id === baselineId || c.configuration?.id === baselineId || c.is_baseline)
+    || candList.find((c: any) => c.config_id === baselineId || c.configuration?.id === baselineId || c.is_baseline);
+
+  const selCfg: any = (selectedId ? configs[selectedId] : undefined)
+    || Object.values(configs).find((c: any) => c.config_id === selectedId || c.configuration?.id === selectedId)
+    || candList.find((c: any) => c.config_id === selectedId || c.configuration?.id === selectedId)
+    || ((selection as any)?.configuration || (selection as any)?.selected_configuration
+      ? { config_id: selectedId, configuration: (selection as any)?.configuration || (selection as any)?.selected_configuration }
+      : undefined);
+
+  const allConfigsList: any[] = Object.keys(configs).length > 0
+    ? Object.values(configs)
+    : candList;
 
   // Find lowest energy overall across usable configurations
-  const lowestEnergyCfg = Object.values(configs).reduce((prev, curr) => {
+  const lowestEnergyCfg: any = allConfigsList.reduce((prev: any, curr: any) => {
     if (!prev) return curr;
     if (curr.median_energy_j == null) return prev;
     if (prev.median_energy_j == null) return curr;
     return curr.median_energy_j < prev.median_energy_j ? curr : prev;
-  }, undefined as ConfigSummary | undefined) || baseCfg;
+  }, undefined) || baseCfg;
+
+  const guardedRuntime = selCfg?.guarded_runtime_s
+    ?? (selection as any)?.metrics?.guarded_runtime_s
+    ?? (selection as any)?.selected_guarded_runtime_s
+    ?? (selection as any)?.guarded_runtime_s;
 
   // data-derived summary line — no hardcoded counts or core names
-  const nConfigs = Object.keys(configs).length;
+  const nConfigs = allConfigsList.length;
   const nReps = lowestEnergyCfg?.runtime_samples?.length ?? baseCfg?.runtime_samples?.length ?? 0;
-  const layoutsPresent = [...new Set(Object.values(configs).map((c) => c.configuration.layout))].sort();
+  const layoutsPresent = [...new Set(allConfigsList.map((c) => c.configuration?.layout).filter(Boolean))].sort();
 
   /** one-line config descriptor from actual configuration fields */
-  const describeConfig = (c: ConfigSummary | undefined): string => {
-    if (!c) return '—';
+  const describeConfig = (c: any): string => {
+    const cfg = c?.configuration ?? c;
+    if (!cfg || (!cfg.cpu_affinity && cfg.worker_count == null)) return '—';
     const parts: string[] = [];
-    parts.push(`${c.configuration.cpu_affinity?.length ?? c.configuration.worker_count} cores`);
-    if (c.configuration.freq_cap_khz) parts.push(`${(c.configuration.freq_cap_khz / 1e6).toFixed(1)} GHz cap`);
-    if (c.configuration.boost === false) parts.push('Boost off');
-    else if (c.configuration.boost === true) parts.push('Boost on');
+    parts.push(`${cfg.cpu_affinity?.length ?? cfg.worker_count ?? 1} cores`);
+    if (cfg.freq_cap_khz) parts.push(`${(cfg.freq_cap_khz / 1e6).toFixed(1)} GHz cap`);
+    if (cfg.boost === false) parts.push('Boost off');
+    else if (cfg.boost === true) parts.push('Boost on');
     return parts.join(' · ');
   };
 
@@ -245,7 +264,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: colors.textTertiary }}>Guarded Runtime:</span>
             <span style={{ fontWeight: 700, color: colors.emerald }}>
-              {selCfg?.guarded_runtime_s != null ? `${selCfg.guarded_runtime_s.toFixed(2)}s (≤ ${tempBudget}s)` : 'Measuring…'}
+              {guardedRuntime != null ? `${guardedRuntime.toFixed(2)}s (≤ ${tempBudget}s)` : 'Measuring…'}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
@@ -260,18 +279,18 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           </div>
           <button
             onClick={onNavigateValidation}
-            disabled={!selCfg}
+            disabled={!selCfg && !selectedId}
             style={{
               width: '100%',
               marginTop: '0.6rem',
               padding: '0.4rem',
               borderRadius: '0.375rem',
               border: 'none',
-              backgroundColor: selCfg ? colors.emerald : colors.surfaceElevated,
-              color: selCfg ? colors.textPrimary : colors.textTertiary,
+              backgroundColor: (selCfg || selectedId) ? colors.emerald : colors.surfaceElevated,
+              color: (selCfg || selectedId) ? colors.textPrimary : colors.textTertiary,
               fontSize: '0.8rem',
               fontWeight: 600,
-              cursor: selCfg ? 'pointer' : 'default',
+              cursor: (selCfg || selectedId) ? 'pointer' : 'default',
             }}
           >
             Verify with Fresh Validation Runs →

@@ -172,7 +172,9 @@ def selection_to_api(sel: Optional[dict[str, Any]]) -> dict[str, Any]:
         "perf_floor_pct": sel.get("perf_floor_pct"),
         "preference_outcome_state": state,
         "perf_floor_miss_pct": sel.get("perf_floor_miss_pct"),
-        "energy_target_miss_pct": sel.get("energy_target_miss_pct"),
+        "selected_configuration": sel.get("selected_configuration"),
+        "configuration": sel.get("selected_configuration"),
+        "candidates": candidates,
         "candidate_summaries": candidates,
     }
     return api

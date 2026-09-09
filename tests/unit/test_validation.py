@@ -168,3 +168,83 @@ def test_live_engine_validation_execution(tmp_path):
     assert len(overlays["exp_test_val"]["validation"]["pairs"]) == 1
     assert overlays["exp_test_val"]["validation"]["verified_savings_pct"] == 30.0
 
+
+def test_configuration_from_dict_defaults_and_fallbacks():
+    from core.models import Configuration
+
+    # Missing id uses config_id or default
+    cfg1 = Configuration.from_dict({"config_id": "my_cfg", "worker_count": 4})
+    assert cfg1.id == "my_cfg"
+    assert cfg1.worker_count == 4
+    assert cfg1.layout == "baseline"
+
+    # Completely empty dict defaults cleanly
+    cfg2 = Configuration.from_dict({})
+    assert cfg2.id == "config"
+    assert cfg2.worker_count == 1
+    assert cfg2.layout == "baseline"
+
+
+def test_live_engine_validation_resolution_with_candidate_summaries(tmp_path):
+    from core.events import EventBus
+    from core.store import Store
+    from api import store_bridge
+    from api.engine import LiveEngine
+    from core.models import Configuration, RunRecord
+    from unittest.mock import MagicMock, patch
+
+    bus = EventBus()
+    store = Store(str(tmp_path / "test_summaries.db"))
+    store.create_experiment("exp_summaries_val", "fixed_compute", "deadline", 45.0)
+
+    cfg_cand = {"id": "cfg_resolved", "layout": "A", "worker_count": 4, "cpu_affinity": [0, 2, 4, 6], "boost": False}
+
+    overlays = {
+        "exp_summaries_val": {
+            "id": "exp_summaries_val",
+            "state": "selected",
+            "workload_id": "dummy",
+            "runtime_budget_s": 45.0,
+            "profile": {
+                "baseline_config_id": "cfg_base",
+                "configurations": {},  # Empty configurations dict, common in stored profiles
+            },
+            "selection": {
+                "selected_config_id": "cfg_resolved",
+                "selected_configuration": cfg_cand,
+                "candidates": [{"config_id": "cfg_resolved", "configuration": cfg_cand}],
+            },
+            "validation": {"status": "not_run", "pairs": []},
+        }
+    }
+
+    engine = LiveEngine(bus, store_bridge, overlays=overlays, store=store)
+
+    mock_run = MagicMock()
+    mock_run.side_effect = [
+        RunRecord(run_id="r1", experiment_id="exp_summaries_val", config_id="cfg_base", workload_name="dummy", repetition=1, runtime_s=2.0, package_energy_j=100.0, status="success"),
+        RunRecord(run_id="r2", experiment_id="exp_summaries_val", config_id="cfg_resolved", workload_name="dummy", repetition=1, runtime_s=2.2, package_energy_j=70.0, status="success"),
+    ]
+
+    with patch.object(engine, "_helper") as mock_h:
+        mock_helper = MagicMock()
+        mock_helper.read_energy.side_effect = [
+            {"ok": True, "uj": 50_000_000, "t": 0.5},
+            {"ok": True, "uj": 100_000_000, "t": 1.0},
+            {"ok": True, "uj": 200_000_000, "t": 3.0},
+            {"ok": True, "uj": 200_000_000, "t": 3.0},
+            {"ok": True, "uj": 270_000_000, "t": 5.2},
+        ]
+        mock_helper.begin_session.return_value = {"ok": True}
+        mock_helper.apply_configuration.return_value = {"ok": True}
+        mock_helper.restore.return_value = {"ok": True}
+        mock_h.return_value = mock_helper
+
+        with patch("core.runner.WorkloadRunner.run", mock_run):
+            engine._run_validation("exp_summaries_val", repetitions=1)
+
+    assert overlays["exp_summaries_val"]["state"] == "complete"
+    assert overlays["exp_summaries_val"]["validation"]["status"] == "verified"
+    assert len(overlays["exp_summaries_val"]["validation"]["pairs"]) == 1
+
+
