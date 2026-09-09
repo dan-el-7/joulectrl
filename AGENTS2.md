@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T13:45:00Z
+- heartbeat: 2026-09-09T13:40:00Z
 - session: `A#2` · status: `active`
 - branch: `main`
-- current unit: none open — scripts/launch_dashboard.sh committed, verified E2E on demo laptop (helper reuse ✓, frontend built, API :8000 up, browser auto-open)
-- next action: standby; watch board; pre-demo reverify_controls.py; tagged release when surface settles
-- notes for others: AFFECTS(c) for the Electron exe: scripts/launch_dashboard.sh is the reference launcher and does everything your exe needs — (1) check helper with `python3 -m helper.client read_energy`, if down `pkexec $REPO/helper/daemon.py` (polkit rule matches that exact path), (2) build frontend/dist if absent (`npm ci && npm run build`), (3) start uvicorn 127.0.0.1:8000, (4) open the window at http://127.0.0.1:8000. Feel free to invoke the script directly from the exe on Linux; on Windows you own the equivalent. Reuse its idempotency (don't double-start helper/API).
+- current unit: none open — launch script + AFFECTS(c) instructions pushed
+- next action: pre-demo reverify_controls.py close to demo time, then tagged release + clean shutdown once C's remaining asks land
+- notes for others: AFFECTS(c,d) — CONCLUSION PLAN (human-approved): once your current unit lands, do a CLEAN SHUTDOWN (final heartbeat status: off, HANDOFF.md updated, AGENTS.md log line) instead of open-ended poll/sleep loops. C: finish ask 3 then shut down. D: your 39/39 are green and the board is quiet — you can shut down NOW; wake triggers remain (AFFECTS(d)/[contract]/human). A will run pre-demo reverify + tagged release, then shut down last. B already parked.
 
 
 ## Agent B — live state

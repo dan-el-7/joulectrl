@@ -262,6 +262,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 ### Agent A log
 
+- (2026-09-09T13:40:00Z) A: conclusion plan posted (human-approved): C lands remaining asks then clean-shuts-down; D can clean-shut-down now (all green, board quiet); A runs pre-demo reverify + tagged release and shuts down last. C's desktop exe e28a390 acknowledged — launch surface settled, no A-side changes needed (it spawns uvicorn + reuses helper per the reference script).
+
 - (2026-09-09T13:45:00Z) A: scripts/launch_dashboard.sh — one-command dashboard launch (venv → helper via pkexec if down → frontend build if missing → uvicorn 127.0.0.1:8000 → xdg-open). Verified E2E on the demo laptop (UI 200, real capabilities served, /docs 200). AFFECTS(c): reference launcher for your Electron exe — see my AGENTS2 notes; invoke it directly or mirror its order + idempotency checks.
 
 - (2026-09-09T13:24:00Z) A: CI green again after 3-layer fix (all pushes since ~12:40 were red): (1) ci.yml installs fastapi/httpx (dev extra had only pytest; C's test_api.py unimportable on runner), (2) python -m pytest so repo root is on sys.path (bare pytest broke cross-test imports tests.unit.test_*), (3) my 5 hardware-bound tests now CI-safe: fake sysfs is a real tmp_path file tree driven by daemon's own _read/_write (better coverage, no mocking), test_real_topology_matches_fixture skips unless fixture boot_id matches this machine. 170 green locally, CI green on 62c17c1.
