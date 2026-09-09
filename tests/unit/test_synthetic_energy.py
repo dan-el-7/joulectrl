@@ -71,3 +71,20 @@ def test_scripted_power_profile():
     uj_active, p_active, t_active = backend.step(1.0)
     assert p_active == pytest.approx(50.0)
     assert t_active == pytest.approx(31.0)
+
+
+def test_conforms_to_energy_backend_protocol():
+    from energy.base import EnergyAccumulator, EnergyBackend, Reading
+
+    backend = SyntheticEnergyBackend(initial_uj=1_000_000)
+    assert isinstance(backend, EnergyBackend)
+
+    acc = EnergyAccumulator(backend, plausible_max_watts=200.0)
+    r1 = Reading(t_monotonic=10.0, uj=1_000_000)
+    r2 = Reading(t_monotonic=11.0, uj=11_000_000)  # 10 J over 1.0s = 10 W (well within 200 W ceiling)
+
+    delta = acc.delta(r1, r2)
+    assert delta.uj == 10_000_000
+    assert delta.joules == pytest.approx(10.0)
+    assert delta.elapsed_s == pytest.approx(1.0)
+
