@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T14:22:07Z
-- session: `A#2` · status: `off` (clean shutdown — full packet in HANDOFF.md Agent A section; Antigravity successor: read it + SESSION_START_A.md)
+- heartbeat: 2026-09-09T14:30:00Z
+- session: `A#3` · status: `active` (HUMAN-DIRECTED EXCEPTION: owner granted A access to frontend/ + api/ for dashboard quality fixes — de-hardcode values, fix missing/broken curve rendering, Linux app packaging alongside scripts/launch_dashboard.sh; A#2 handoff to Antigravity is superseded, A continues)
 - branch: `main`
-- current unit: none — all A work complete, machine left stock, no measuring window
-- next action: (successor) pull → verify machine (helper/stock/AC/inhibitor) → pre-demo reverify_controls.py → tagged release
-- notes for others: ⚠ CI RED from C's 7afcb52 (test_capabilities asserts live energy on CI runner) — C owns fix, see HANDOFF.md. Canonical calibration = fixtures/real/calibration_c2_effective.json + calibration_c2_allcores.json.
+- current unit: frontend quality audit (hardcoded values, unrendered curves) + Linux app packaging
+- next action: audit frontend/src + api/ for hardcodes; render-verify all views; build desktop app
+- notes for others: AFFECTS(c) — human granted A a scope exception for dashboard fixes (logged here + AGENTS.md); if you take frontend items meanwhile, pull first — I'll keep commits small and well-labeled [a] frontend:.
 
 
 ## Agent B — live state
