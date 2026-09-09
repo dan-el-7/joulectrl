@@ -1,0 +1,160 @@
+{
+  "schema": "joulectrl.calibration_c1/1",
+  "captured_utc": "2026-09-09T11:12:00Z",
+  "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
+  "kernel": "workloads/kernel/fixed_compute (gcc -O3), chunks=16384 iters=200000",
+  "params": {
+    "chunks": 16384,
+    "iters": 200000,
+    "reps": 5,
+    "workers": 1
+  },
+  "config": "stock (boost=1, no caps)",
+  "rows": [
+    {
+      "class": "fast",
+      "layout": "C1",
+      "cpus": [
+        0
+      ],
+      "rep": 1,
+      "package_energy_j": 79.3891,
+      "runtime_s": 8.4672,
+      "kernel_runtime_s": 8.4667,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "fast",
+      "layout": "C1",
+      "cpus": [
+        0
+      ],
+      "rep": 2,
+      "package_energy_j": 74.2317,
+      "runtime_s": 8.4667,
+      "kernel_runtime_s": 8.4662,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "fast",
+      "layout": "C1",
+      "cpus": [
+        0
+      ],
+      "rep": 3,
+      "package_energy_j": 76.2369,
+      "runtime_s": 8.4702,
+      "kernel_runtime_s": 8.4697,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "fast",
+      "layout": "C1",
+      "cpus": [
+        0
+      ],
+      "rep": 4,
+      "package_energy_j": 74.9857,
+      "runtime_s": 8.4717,
+      "kernel_runtime_s": 8.4712,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "fast",
+      "layout": "C1",
+      "cpus": [
+        0
+      ],
+      "rep": 5,
+      "package_energy_j": 73.5887,
+      "runtime_s": 8.4657,
+      "kernel_runtime_s": 8.4652,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "efficient",
+      "layout": "C1",
+      "cpus": [
+        1
+      ],
+      "rep": 1,
+      "package_energy_j": 79.2978,
+      "runtime_s": 12.2795,
+      "kernel_runtime_s": 12.279,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "efficient",
+      "layout": "C1",
+      "cpus": [
+        1
+      ],
+      "rep": 2,
+      "package_energy_j": 77.4061,
+      "runtime_s": 12.2794,
+      "kernel_runtime_s": 12.2789,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "efficient",
+      "layout": "C1",
+      "cpus": [
+        1
+      ],
+      "rep": 3,
+      "package_energy_j": 79.0797,
+      "runtime_s": 12.2787,
+      "kernel_runtime_s": 12.2782,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "efficient",
+      "layout": "C1",
+      "cpus": [
+        1
+      ],
+      "rep": 4,
+      "package_energy_j": 77.7536,
+      "runtime_s": 12.2829,
+      "kernel_runtime_s": 12.2824,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    },
+    {
+      "class": "efficient",
+      "layout": "C1",
+      "cpus": [
+        1
+      ],
+      "rep": 5,
+      "package_energy_j": 79.247,
+      "runtime_s": 12.2839,
+      "kernel_runtime_s": 12.2834,
+      "checksum": "0xc2493c07d6b29c85",
+      "returncode": 0
+    }
+  ],
+  "summary": {
+    "fast": {
+      "median_runtime_s": 8.4672,
+      "median_energy_j": 74.9857,
+      "median_chunks_per_s": 1934.996,
+      "avg_watts": 8.856
+    },
+    "efficient": {
+      "median_runtime_s": 12.2795,
+      "median_energy_j": 79.0797,
+      "median_chunks_per_s": 1334.256,
+      "avg_watts": 6.44
+    }
+  },
+  "notes": "fast(Zen5,cpu0): 8.467s med / 74.99J med / 8.86W avg. efficient(Zen5c,cpu1): 12.280s med / 79.08J med / 6.44W avg. Class map empirically CONFIRMED: fast single-core throughput is 1.45x efficient (1935 vs 1334 chunks/s) at stock. Single-core energy-per-task is close (75 vs 79 J) \u2014 fast finishes sooner at higher power. Checksum 0xc2493c07d6b29c85 identical across all 10 rows, both classes, and worker counts 1/2/4 (verified separately)."
+}

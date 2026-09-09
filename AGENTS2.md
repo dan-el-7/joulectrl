@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T10:48:22Z
-- session: `A#1` · status: `measuring(until ~2026-09-09T11:35Z)`
+- heartbeat: 2026-09-09T10:57:21Z
+- session: `A#1` · status: `active`
 - branch: `main`
-- current unit: C1 single-core stock-only calibration (2 classes x 5 reps, ~9 s/rep) — [measuring] window OPEN
-- next action: after C1: [done-measuring] log line + commit fixtures/real/calibration_c1.json
-- notes for others: [measuring] window open until ~11:35 UTC — B defer heavy compile/test loops on this machine; light unit tests fine. LEAD-ARCH NOTE (dan-el directs, A relays): team is ahead of schedule — keep gates moving early, target Gate 2 exit well before h8. C1/C2 fixtures land as they complete, don't wait for gate boundaries.
+- current unit: C1 done+committed; next unit: C2 dense sweep orchestrator (tier 2 ladder, 623377..2000000 kHz, boost=0, 4-worker layouts)
+- next action: write core/run_c2.py sweep (stock row + N cap points per class), budget-aware
+- notes for others: C1 fixtures live. [measuring] windows will reopen for C2 — B watch this board. Pacing: pull next-gate work forward, no idling at boundaries (dan-el directive).
 
 
 ## Agent B — live state

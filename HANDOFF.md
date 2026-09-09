@@ -45,11 +45,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent A — resume packet
 
-- **Done & verified:** repo bootstrapped; hour-0 hardware checklist re-verified (energy advances, class map, boost=0 cap honored, tuned/AC). energy/base.py + core/topology.py + core/discovery.py + fixtures/real/*.json + CI (commit 73ed1b1). Helper daemon unit complete: helper/daemon.py + helper/client.py + docs/HELPER.md + 8 tests (29 total green); verified live on this machine — apply/restore cycle zero-mismatch, out-of-range rejection, watchdog. MACHINE FACT: boost=0 clamps cpuinfo_max_freq to 2.0 GHz both classes; cap ladder 623377..2000000 kHz.
-- **In flight:** none — unit closed. (Committing now.)
-- **Resume here:** `cd ~/joulectrl-a && git pull --rebase origin main && .venv/bin/python -m pytest tests/unit -q` — then update fixtures/real/capability_report.json with the boost=0 cpuinfo-clamp fact + calib ladder, and wait on D's kernel for C1.
-- **Gotchas:** helper daemon must run as root: `pkexec /home/dan-el/joulectrl-a/helper/daemon.py` (polkit rule /etc/polkit-1/rules.d/49-joulectrl-helper.rules makes it passwordless; daemon has shebang, executable). Old daemon instances: kill by pgrep 'venv/bin/python3.*helper/daemon.py'. restore must write boost BEFORE caps (cpuinfo clamp). amd-pstate readback is async — _read_int_retry handles it. systemd-inhibit running (sleep blocked) for the session; dies on reboot (intended).
-- **Handoffs owed / waiting on:** D's kernel [contract] line (C1/C2 calibration driver). B: models v0 adopted for CapabilityReport-shaped output next.
+- **Done & verified:** repo bootstrapped; hour-0 checklist re-verified; energy/base.py + topology/discovery + fixtures + CI (73ed1b1); helper daemon unit (48e555e: apply/restore zero-mismatch live, watchdog, out-of-range rejection, 29 tests green); C1 calibration committed — fixtures/real/calibration_c1.json (fast 8.467s/74.99J/8.86W, efficient 12.280s/79.08J/6.44W, class map confirmed 1.45x). MACHINE FACTS: boost=0 clamps cpuinfo_max to 2.0 GHz both classes; amd-pstate readback async (retry needed); helper socket /run/joulectrl-helper.sock (passwordless pkexec via /etc/polkit-1/rules.d/49-joulectrl-helper.rules).
+- **In flight:** none — C1 unit closed.
+- **Resume here:** `cd ~/joulectrl-a && git pull --rebase origin main` — then write core/run_c2.py: C2 dense sweep (stock row first for scaling efficiency, then N cap points 623377..2000000 kHz boost=0 per class, 4 workers one SMT sibling each: fast layout CPUs [0,2,4,6], efficient [1,3,5,7]); bracket with [measuring] lines; commit fixtures/real/calibration_c2.json.
+- **Gotchas:** kernel point size: C2 should use chunks=32768 iters=200000 (~2x C1 work per worker? verify empirically — target 8-15s per point). Energy brackets run (e1 before launch, e2 after termination). run_c1.py's chunks/s parser fixed (value in parens). Helper daemon may need restart if machine rebooted: `pkexec /home/dan-el/joulectrl-a/helper/daemon.py` (passwordless).
+- **Handoffs owed / waiting on:** none open; C2 next. B's runner/CLI/watch landing — A co-signs watch baseline semantics on real hardware when B's detector is ready.
 
 
 ## Agent B — resume packet
