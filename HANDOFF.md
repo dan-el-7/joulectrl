@@ -55,7 +55,7 @@ pull --rebase before editing, push immediately after).
 ## Agent B — resume packet
 
 - **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), `core/optimizer.py` (11 tests). 29 unit tests green. `core/runner.py` and `tests/unit/test_runner.py` now cover successful measurement, unavailable energy, verification failure, timeout, process-group cancellation, and Linux affinity. They compile and the success path was manually smoke-tested using the bundled Python interpreter.
-- **In flight:** Commit/push the runner harness, then implement the Gate 2 `core/experiment.py` state-machine orchestration.
+- **In flight:** Implementing the Gate 2 `core/experiment.py` state-machine orchestration over `Store`.
 - **Resume here:** `Get-Content core/store.py core/runner.py` and create `core/experiment.py` with legal state transitions and cancellation/restoration visibility.
 - **Gotchas:** Runner uses `taskset --cpu-list` only on Linux, executes argument arrays directly (never shell string interpolation), and terminates POSIX process groups. This clone has no `python`, `py`, project venv, or pytest; bundled Python is `C:\Users\trive\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` but has no pytest.
 - **Handoffs owed / waiting on:** Gate 1 complete; unblocks all downstream agents. Ready for Agent D's workload runner integration.
