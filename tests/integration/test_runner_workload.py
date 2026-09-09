@@ -72,6 +72,7 @@ class TestRunnerWorkloadIntegration(unittest.TestCase):
             runs = store.get_runs(exp_id)
             self.assertEqual(len(runs), 1)
             self.assertEqual(runs[0].run_id, record.run_id)
+            store.close()
 
     def test_experiment_state_machine_with_runner_profile_point(self):
         """Test ExperimentStateMachine.run_profile_point orchestrating runner and workload."""
@@ -116,6 +117,7 @@ class TestRunnerWorkloadIntegration(unittest.TestCase):
 
             exp = store.get_experiment(exp_id)
             self.assertEqual(exp["restoration_status"], "restored")
+            store.close()
 
 
 if __name__ == "__main__":

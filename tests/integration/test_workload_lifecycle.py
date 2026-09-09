@@ -158,6 +158,7 @@ class TestWorkloadLifecycleIntegration(unittest.TestCase):
         # NONE->IDLE + 9 transitions = 10 total
         self.assertEqual(len(transitions), 10)
         self.assertEqual(transitions[-1]["to_state"], "RESTORED")
+        store.close()
 
     def test_state_machine_cancellation_flow(self):
         """Test cancellation transitions from PROFILING to CANCELLING -> RESTORING -> RESTORED."""
