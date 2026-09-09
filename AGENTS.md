@@ -340,6 +340,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 4) workloads/fixed_compute.py updated with 'c2_sweep' preset (32768 chunks, 200k iters) with verified invariant checksum 0x4f59b8763583e750 matching Agent A's C2 sweep runner. tests/integration/test_watch_mode.py updated to verify Agent B's advance_uj fix directly. All 38 tests green.
 - (2026-09-09 11:15 UTC) AFFECTS(b) Fixed missing typing.Any import in tests/integration/test_validation_export.py line 18 (resolves pytest collection error noted in session B#8). All 38 Agent D tests passing cleanly.
 - (2026-09-09 12:10 UTC) C2 calibration sweep cross-check confirmed: invariant checksum 0x4f59b8763583e750 verified across all 16 rows of fixtures/real/calibration_c2.json. demo/run_demo.py phase 1 automatically validates and reports real C2 calibration data on stage. 39 tests green.
+- (2026-09-09 12:20 UTC) demo/run_demo.py updated: phase 1 detects and dynamically cites Agent A's canonical calibration_c2_effective.json (8 points x 3 reps), surfacing the verified tradeoff headline (Fast Zen 5 4w: Base saves 29.6% package energy at 2.55x runtime). Full suite (39 tests) green.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 

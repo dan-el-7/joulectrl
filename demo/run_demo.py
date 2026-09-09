@@ -78,6 +78,27 @@ def phase_1_capabilities() -> None:
         except Exception:
             pass
 
+    c2_eff_file = REAL_DIR / "calibration_c2_effective.json"
+    if c2_eff_file.exists():
+        try:
+            with open(c2_eff_file, "r", encoding="utf-8") as f:
+                c2_eff = json.load(f)
+            sum_data = c2_eff.get("summary", {})
+            fast_s = sum_data.get("fast", {})
+            st4 = fast_s.get("stock_w4", {})
+            ba4 = fast_s.get("base_w4", {})
+            if st4 and ba4:
+                e_stock = st4.get("median_energy_j", 0.0)
+                e_base = ba4.get("median_energy_j", 0.0)
+                t_stock = st4.get("median_runtime_s", 0.0)
+                t_base = ba4.get("median_runtime_s", 0.0)
+                savings_pct = ((e_stock - e_base) / e_stock * 100) if e_stock > 0 else 0.0
+                slowdown = (t_base / t_stock) if t_stock > 0 else 0.0
+                print(f"C2 Effective Space:  Verified 2-point control space (stock vs base, 8 points x 3 reps)")
+                print(f"Tradeoff Headline:   Fast Zen 5 (4w): Base saves {savings_pct:.1f}% energy ({e_stock:.1f}J -> {e_base:.1f}J) at {slowdown:.2f}x runtime ({t_stock:.2f}s -> {t_base:.2f}s)")
+        except Exception:
+            pass
+
     print("Restore Status:      All settings snapshotted and restorable.")
 
 

@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T12:18:00Z`
+- heartbeat: `2026-09-09T12:20:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). C2 real fixture verified clean (0x4f59b8763583e750 invariant across all 16 rows); 39 tests green.`
+- current unit: `Gate 4 complete ([gate4]). demo/run_demo.py updated to cite calibration_c2_effective.json (-30% energy headline); 39 tests green.`
 - next action: `stand by for live hackathon presentation`
-- notes for others: `C2 calibration fixture confirmed clean. Invariant checksum 0x4f59b8763583e750 confirmed across all rows. Demo presentation ready.`
+- notes for others: `C2 effective calibration tradeoff integrated into demo phase 1. All 39 tests passing.`
