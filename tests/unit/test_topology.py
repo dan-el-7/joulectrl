@@ -64,8 +64,18 @@ def test_real_topology_matches_fixture():
                            "fixtures", "real", "topology.json")
     if not os.path.exists(fixture):
         pytest.skip("fixture not yet committed")
+    import json as _json
+    fx = _json.load(open(fixture))
+    # the fixture describes the demo laptop; on other machines (CI runners,
+    # dev laptops) there is nothing to match — skip rather than fail.
+    try:
+        with open("/proc/sys/kernel/random/boot_id") as f:
+            this_boot = f.read().strip()
+    except OSError:
+        pytest.skip("boot_id unreadable")
+    if fx.get("boot_id") and not fx["boot_id"].startswith(this_boot[:8]):
+        pytest.skip(f"fixture is from another machine (boot_id mismatch)")
     from core.topology import read_topology
     topo = read_topology()
-    fx = json.load(open(fixture))
     assert topo.ncpu == fx["ncpu"]
     assert {str(k): v for k, v in topo.cores.items()} == fx["smt_groups"]

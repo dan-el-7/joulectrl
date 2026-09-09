@@ -1,54 +1,46 @@
 """Tests for helper/daemon.py op logic (no root, no real sysfs).
 
-The daemon's sysfs-touching functions are monkeypatched; we test the protocol
-and state machine: lease exclusivity, snapshot-first apply, validation,
-restore verification, watchdog trigger.
+The daemon is exec'd with BASE/SOCKET_PATH/RECOVERY_FILE redirected into a
+tmp_path file tree, and its real _read/_write functions operate on that tree —
+so the tests exercise the genuine I/O code paths (works identically on the
+demo laptop and on CI runners, which have no cpufreq policies of their own).
 """
 
 import json
-import threading
 import time
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture()
 def daemon_ns(monkeypatch, tmp_path):
+    sysfs_root = tmp_path / "cpufreq"
     src = open("helper/daemon.py").read()
     src = src.replace('SOCKET_PATH = "/run/joulectrl-helper.sock"', f'SOCKET_PATH = "{tmp_path}/h.sock"')
     src = src.replace('RECOVERY_FILE = Path("/run/joulectrl-helper-recovery.json")',
                       f'RECOVERY_FILE = Path("{tmp_path}/rec.json")')
+    src = src.replace('BASE = "/sys/devices/system/cpu/cpufreq"', f'BASE = "{sysfs_root}"')
+    src = src.replace('ENERGY_PATH = "/sys/class/powercap/intel-rapl:0/energy_uj"',
+                      f'ENERGY_PATH = "{tmp_path}/energy_uj"')
+    src = src.replace('ENERGY_RANGE_PATH = "/sys/class/powercap/intel-rapl:0/max_energy_range_uj"',
+                      f'ENERGY_RANGE_PATH = "{tmp_path}/max_energy_range_uj"')
     ns = {"__name__": "daemon"}
     exec(compile(src, "daemon", "exec"), ns)
 
-    # fake sysfs
-    fake = {
-        "/sys/devices/system/cpu/cpufreq/boost": 1,
-        "/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_min_freq": 623377,
-        "/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq": 5090910,
-        "/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq": 623377,
-        "/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq": 5090000,
-        "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor": "performance",
-        "/sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors": "performance schedutil",
-    }
-    ns["_read_int"] = lambda p: fake.get(p)
-    ns["_read_str"] = lambda p: fake.get(p)
-    def fake_write(path, value):
-        fake[path] = value
-        return True
-    ns["_write_int"] = fake_write
-    ns["_write_str"] = fake_write
-    ns["_allowed_governors"] = lambda pd: {"performance", "schedutil"}
-    class FakePolicyDir:
-        name = "policy0"
-        def __truediv__(self, other):
-            return f"/sys/devices/system/cpu/cpufreq/policy0/{other}"
-        def __str__(self):
-            return "/sys/devices/system/cpu/cpufreq/policy0"
-    ns["_policy_dirs"] = lambda: [FakePolicyDir()]
+    # fake sysfs as a real file tree (daemon's own _read/_write work on it)
+    pol = sysfs_root / "policy0"
+    pol.mkdir(parents=True, exist_ok=True)
+    (sysfs_root / "boost").write_text("1")
+    (pol / "cpuinfo_min_freq").write_text("623377")
+    (pol / "cpuinfo_max_freq").write_text("5090910")
+    (pol / "scaling_min_freq").write_text("623377")
+    (pol / "scaling_max_freq").write_text("5090000")
+    (pol / "scaling_governor").write_text("performance")
+    (pol / "scaling_available_governors").write_text("performance schedutil")
+
     ns["_boot_id"] = lambda: "test-boot"
-    ns["RECOVERY_FILE"] = tmp_path / "rec.json"
-    ns["_fake_sysfs"] = fake
+    ns["_sysfs_root"] = str(sysfs_root)
     yield ns
     # reset session state between tests
     ns["_session"].update(active=False, uid=None, pid=None, last_heartbeat=0.0)
@@ -109,8 +101,9 @@ def test_restore_verifies_and_clears(daemon_ns):
         "boost": False, "policy_freq_caps_khz": {"policy0": 1500000}}})
     r = ns["op_restore"]({})
     assert r["ok"], r.get("mismatches")
-    assert ns["_fake_sysfs"]["/sys/devices/system/cpu/cpufreq/boost"] == 1
-    assert ns["_fake_sysfs"]["/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq"] == 5090000
+    root = ns["_sysfs_root"]
+    assert (Path(root) / "boost").read_text().strip() == "1"
+    assert (Path(root) / "policy0" / "scaling_max_freq").read_text().strip() == "5090000"
     assert not ns["RECOVERY_FILE"].exists()
     # second restore: nothing to restore
     r2 = ns["op_restore"]({})
@@ -133,12 +126,12 @@ def test_watchdog_restores_on_stale_heartbeat(daemon_ns, monkeypatch):
     # perform the restore the watchdog would do
     r = ns["op_restore"]({})
     assert r["ok"]
-    assert ns["_fake_sysfs"]["/sys/devices/system/cpu/cpufreq/boost"] == 1
+    assert (Path(ns["_sysfs_root"]) / "boost").read_text().strip() == "1"
     ns["op_end_session"]({})
 
 
 def test_read_energy_unavailable(daemon_ns):
     ns = daemon_ns
-    ns["_read_int"] = lambda p: None  # counter unreadable
+    # ENERGY_PATH (redirected into tmp_path) does not exist -> counter unreadable
     r = ns["op_read_energy"]({})
     assert not r["ok"] and r["error"] == "energy_unavailable"
