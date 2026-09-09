@@ -476,3 +476,29 @@ def test_export_from_store(client):
     data = res.json()
     assert data["id"] == SYNTHETIC_ID
     assert data["runs"], "export must include raw run records for auditability"
+
+
+def test_bisection_candidate_generation():
+    from api.engine import LiveEngine
+    engine = LiveEngine(bus=None, store_bridge_mod=None)
+    cls_map = {
+        "fast": {"cpus": [0, 2, 4, 6], "hw_max_freq": 5090910},
+        "efficient": {"cpus": [1, 3, 5, 7], "hw_max_freq": 3506494},
+    }
+    configs = engine._candidate_configs(cls_map, passive=True)
+    assert len(configs) >= 50, "Should generate a rich multi-resolution ladder"
+
+    # Verify order: Round 0 anchors (stock max and min cap) come first
+    first_cids = [c[0].id for c in configs[:6]]
+    assert "cfg_all_physical_stock" in first_cids
+    assert "cfg_all_physical_cap623m" in first_cids
+    assert "cfg_fast_class_stock" in first_cids
+    assert "cfg_fast_class_cap623m" in first_cids
+
+    # Verify Round 1 midpoint (50% cap ~1.31 GHz) comes next
+    mid_cids = [c[0].id for c in configs[6:12]]
+    assert any("cap1311m" in cid for cid in mid_cids)
+
+    # Verify all configs are unique
+    keys = [(tuple(c[0].cpu_affinity or []), c[0].boost, c[0].freq_cap_khz, c[0].worker_count) for c in configs]
+    assert len(keys) == len(set(keys)), "Every candidate configuration must be unique"

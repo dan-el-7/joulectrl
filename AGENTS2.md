@@ -47,10 +47,10 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T17:45:00Z
+- heartbeat: 2026-09-09T17:55:00Z
 - session: `Antigravity` (Agent A successor) · status: `active (idle)`
 - branch: `main`
-- current unit: scanning curve budget scaling, watch bursty load detection & tail trimming, setup view calibration UX complete
+- current unit: dynamic time-budget fitting loop & multiresolution bisection candidate sampling (extremes -> midpoints -> quartiles -> octiles)
 - next action: standby for user instructions / review
 - notes for others: demo is Sep 10 — pre-demo `core/reverify_controls.py` + fresh controls_reverify.json still owed; tagged release pending. History rewrite note: clones may need git pull --rebase.
 

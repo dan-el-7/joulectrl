@@ -148,25 +148,36 @@ class LiveEngine:
         passive = bool(request.get("experimental_passive_caps"))
         budget = request.get("runtime_budget_s") or 45.0
         cal_budget = request.get("calibration_budget_s")
-        effective_budget = cal_budget if cal_budget is not None else (budget or 120.0)
+        # Time budget for profiling: use calibration_budget_s if positive;
+        # if explicitly None (user checked "Exhaustive"), allow 1800s ceiling;
+        # otherwise default to 120.0s.
+        if cal_budget is not None and float(cal_budget) > 0:
+            time_limit_s = float(cal_budget)
+        elif "calibration_budget_s" in request and request.get("calibration_budget_s") is None:
+            time_limit_s = 1800.0  # Exhaustive mode ceiling
+        else:
+            time_limit_s = float(request.get("calibration_budget_s") or 120.0)
         preference = request.get("preference") or {}
 
         try:
-            self._emit(exp_id, "experiment_state", {"state": "profiling", "message": "Live measurement starting"})
+            self._emit(exp_id, "experiment_state", {
+                "state": "profiling",
+                "message": f"Profiling sweep starting ({time_limit_s:.0f}s allotted budget)",
+            })
 
             caps = seeded.get("_live_capabilities") or {}
             cls_map = self._class_map_from_capabilities(caps) or {"fast": {"cpus": [0, 2, 4, 6], "hw_max_freq": None},
                                                                   "efficient": {"cpus": [1, 3, 5, 7], "hw_max_freq": None}}
             cal = self._calibration_lookup(helper)
 
-            # Build candidate configurations: scaled to budget across layouts,
-            # worker counts, and intermediate frequency caps for a smooth curve.
-            configs = self._candidate_configs(cls_map, budget_s=effective_budget, passive=passive)
+            # Build candidate configurations ordered by multiresolution bisection:
+            # (highest stock, lowest min, 50% midpoint, 25% and 75% quartiles, octiles, etc.)
+            configs = self._candidate_configs(cls_map, budget_s=time_limit_s, passive=passive)
             runs: list[RunRecord] = []
             profile_rows: list[dict[str, Any]] = []
             measured_keys: set[tuple] = set()
 
-            # Calibration fast path: seed rows from A's fixtures for matching layouts
+            # Calibration fast path: seed rows from verified fixtures if available
             if cal and workload_id == "fixed_compute":
                 for row in cal.get("rows", []):
                     cap = (row.get("requested_control") or {}).get("cap_khz") or row.get("freq_cap_khz")
@@ -174,24 +185,60 @@ class LiveEngine:
                     measured_keys.add(key)
                 self._emit(exp_id, "experiment_state", {
                     "state": "profiling",
-                    "message": f"Using measured calibration (boot-id verified) — {len([r for r in cal['rows'] if r.get('rep', 1)==1])} points, fresh runs for unmeasured frequency/layout points",
+                    "message": f"Using verified calibration — {len(measured_keys)} points active; profiling intermediate curve points to fill {time_limit_s:.0f}s budget",
                 })
 
-            total = len(configs)
-            for i, (cfg, desc) in enumerate(configs):
+            start_wall = time.monotonic()
+            avg_run_s = 6.5
+            unmeasured_configs = [
+                (c, d) for c, d in configs
+                if (tuple(c.cpu_affinity or []), 1 if c.boost else 0, c.freq_cap_khz, c.worker_count) not in measured_keys
+            ]
+            est_total_runs = min(len(unmeasured_configs), max(1, int(time_limit_s / avg_run_s)))
+            run_idx = 0
+
+            # Dynamic time-fitting loop: run as many prioritized points as fit into time_limit_s
+            for cfg, desc in configs:
                 key = (tuple(cfg.cpu_affinity or []), 1 if cfg.boost else 0, cfg.freq_cap_khz, cfg.worker_count)
                 if key in measured_keys:
-                    continue  # covered by calibration — no fresh run needed
+                    continue  # already covered by calibration or previous measurement
+
+                now = time.monotonic()
+                elapsed = now - start_wall
+                remaining = time_limit_s - elapsed
+
+                # Update running average runtime from completed runs
+                valid_rts = [r.runtime_s for r in runs if r.runtime_s and r.runtime_s > 0]
+                if valid_rts:
+                    avg_run_s = sum(valid_rts) / len(valid_rts)
+
+                # Check if next run fits in remaining budget
+                # (Always allow run 1, but for subsequent runs stop if remaining < estimated next run duration)
+                if runs and (remaining < max(3.5, avg_run_s * 0.75)):
+                    logger.info(
+                        f"Profiling sweep filled allotted budget: elapsed={elapsed:.1f}s, remaining={remaining:.1f}s < est_next={avg_run_s:.1f}s. "
+                        f"Completed {len(runs)} fresh points."
+                    )
+                    break
+
+                run_idx += 1
+                est_total_runs = max(
+                    run_idx,
+                    min(len(unmeasured_configs), len(runs) + max(1, int(remaining / max(1.0, avg_run_s)))),
+                )
+
                 self._emit(exp_id, "run_progress", {
                     "experiment_id": exp_id, "phase": "profiling",
                     "config_id": cfg.id, "repetition": 1, "status": "running",
-                    "run_index": i + 1, "total_runs": total, "description": desc,
+                    "run_index": run_idx, "total_runs": est_total_runs, "description": desc,
+                    "elapsed_s": round(elapsed, 1), "remaining_s": round(remaining, 1),
                 })
                 rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg, passive=passive)
                 runs.append(rec)
+                measured_keys.add(key)
                 self._emit(exp_id, "run_complete", {
                     "experiment_id": exp_id, "phase": "profiling",
-                    "run_index": i + 1, "total_runs": total,
+                    "run_index": run_idx, "total_runs": est_total_runs,
                     "config_id": cfg.id,
                     "runtime_s": rec.runtime_s,
                     "package_energy_j": rec.package_energy_j,
@@ -226,11 +273,20 @@ class LiveEngine:
         budget_s: Optional[float] = 120.0,
         passive: bool = False,
     ) -> list[tuple[Configuration, str]]:
-        """Budget-aware candidate configurations covering classes, layouts, worker counts,
-        and intermediate frequency caps to produce a smooth scaling curve."""
-        out = []
-        seen = set()
-        # Extract classes dynamically by hw_max_freq ordering (fast = highest frequency)
+        """Multiresolution bisection candidate configurations:
+        Orders configurations adaptively:
+        - Round 0: Anchors / Extremes: highest (Stock) and lowest (Base min cap)
+        - Round 1: Midpoints: 50% frequency caps (~1.31 GHz) across primary layouts
+        - Round 2: Quartiles: 25% (~0.97 GHz) and 75% (~1.66 GHz) caps + 1w baselines
+        - Round 3: Octiles: 12.5%, 37.5%, 62.5%, 87.5% caps + passive points
+        - Round 4: 1/16ths and finer steps for high-density smooth curves.
+
+        This enables any time-budgeted scan to stop at any time and guarantee
+        that the points measured form a balanced, convex, representative Pareto curve.
+        """
+        out: list[tuple[Configuration, str]] = []
+        seen: set[tuple] = set()
+
         sorted_classes = sorted(
             cls_map.items(),
             key=lambda item: (item[1].get("hw_max_freq") or 0) if isinstance(item[1], dict) else 0,
@@ -246,9 +302,6 @@ class LiveEngine:
             fast = [0, 2, 4, 6, 8, 10, 12, 14]
             eff = [1, 3, 5, 7, 9, 11, 13, 15]
 
-        ncpu = max(fast + eff) + 1 if fast and eff else 16
-
-        # Physical cores: CPUs with ID < physical cores count (0..7 on 8-core CPU)
         fast_phys = [c for c in fast if c < 8] or fast[:4]
         eff_phys = [c for c in eff if c < 8] or eff[:4]
         phys = sorted(fast_phys + eff_phys)
@@ -256,83 +309,87 @@ class LiveEngine:
         fast_1w = [fast_phys[0]]
         eff_1w = [eff_phys[0]]
 
-        # Key core layouts across classes and worker counts
-        layouts = [
+        cap_min = 623377
+        cap_max = 2000000
+
+        def get_cap(fraction: float) -> int:
+            return round(cap_min + fraction * (cap_max - cap_min))
+
+        def add(cid: str, lay: str, workers: int, cpus: list[int], cap: Optional[int], boost: bool, desc: str):
+            key = (tuple(cpus), 1 if boost else 0, cap, workers)
+            if key not in seen:
+                seen.add(key)
+                out.append((
+                    Configuration(
+                        id=cid, layout=lay, worker_count=workers,
+                        cpu_affinity=list(cpus), freq_cap_khz=cap, boost=boost,
+                    ),
+                    desc,
+                ))
+
+        primary_layouts = [
             ("all_physical", phys, len(phys), "B"),
             ("fast_class", fast_phys, len(fast_phys), "A"),
+        ]
+        secondary_layouts = [
             ("efficient_class", eff_phys, len(eff_phys), "D"),
             ("all_logical", all_logical, len(all_logical), "C"),
-            ("fast_1w", fast_1w, 1, "A"),
-            ("eff_1w", eff_1w, 1, "D"),
         ]
 
-        # 1. Primary baseline & stock/base points for each layout
-        for name, cpus, workers, lay_letter in layouts:
-            for boost in (True, False):
-                cid = f"cfg_{name}_{'stock' if boost else 'base'}"
-                if cid not in seen:
-                    seen.add(cid)
-                    out.append((
-                        Configuration(
-                            id=cid, layout=lay_letter, worker_count=workers,
-                            cpu_affinity=list(cpus), freq_cap_khz=None, boost=boost,
-                        ),
-                        f"{name} {'stock' if boost else 'base'} ({workers}w)",
-                    ))
+        # Round 0: Anchors / Extremes (Highest stock and lowest base cap)
+        for name, cpus, workers, lay in primary_layouts:
+            add(f"cfg_{name}_stock", lay, workers, cpus, None, True, f"{name} stock max (highest, {workers}w)")
+            add(f"cfg_{name}_cap{cap_min//1000}m", lay, workers, cpus, cap_min, False, f"{name} min cap {cap_min/1e6:.2f} GHz (lowest, {workers}w)")
+            add(f"cfg_{name}_base", lay, workers, cpus, cap_max, False, f"{name} base 2.0 GHz ({workers}w)")
 
-        # 2. Intermediate frequency cap points to trace out a smooth curve
-        # Budget scaling: each point takes ~6-8s on average.
-        # Compute how many points we can afford given budget_s:
-        b = float(budget_s) if budget_s is not None else 120.0
-        total_target_pts = max(6, min(60, int(b / 7.0)))
-        remaining_slots = max(0, total_target_pts - len(out))
+        # Round 1: Midpoints (50% ~1.31 GHz) + Secondary layouts bounds
+        for name, cpus, workers, lay in primary_layouts:
+            cap_mid = get_cap(0.5)
+            add(f"cfg_{name}_cap{cap_mid//1000}m", lay, workers, cpus, cap_mid, False, f"{name} mid 50% {cap_mid/1e6:.2f} GHz ({workers}w)")
 
-        if remaining_slots > 0:
-            cap_min = 623377
-            cap_max = 2000000
-            # Distribute frequency steps
-            n_steps = max(2, min(8, remaining_slots // 3 + 1))
-            step = (cap_max - cap_min) / max(1, n_steps - 1)
-            cap_steps = [round(cap_min + i * step) for i in range(n_steps)]
+        for name, cpus, workers, lay in secondary_layouts:
+            add(f"cfg_{name}_stock", lay, workers, cpus, None, True, f"{name} stock ({workers}w)")
+            add(f"cfg_{name}_cap{cap_min//1000}m", lay, workers, cpus, cap_min, False, f"{name} min cap {cap_min/1e6:.2f} GHz ({workers}w)")
+            add(f"cfg_{name}_base", lay, workers, cpus, cap_max, False, f"{name} base 2.0 GHz ({workers}w)")
 
-            sweep_layouts = [
-                ("fast_class", fast_phys, len(fast_phys), "A"),
-                ("all_physical", phys, len(phys), "B"),
-                ("efficient_class", eff_phys, len(eff_phys), "D"),
-            ]
+        # Round 2: Quartiles (25% and 75%) + Single-core reference baselines
+        for fraction, label in [(0.25, "25%"), (0.75, "75%")]:
+            c = get_cap(fraction)
+            for name, cpus, workers, lay in primary_layouts:
+                add(f"cfg_{name}_cap{c//1000}m", lay, workers, cpus, c, False, f"{name} {label} {c/1e6:.2f} GHz ({workers}w)")
 
-            for cap in cap_steps:
-                for name, cpus, workers, lay_letter in sweep_layouts:
-                    if len(out) >= total_target_pts:
-                        break
-                    cid = f"cfg_{name}_cap{cap // 1000}m"
-                    if cid not in seen:
-                        seen.add(cid)
-                        out.append((
-                            Configuration(
-                                id=cid, layout=lay_letter, worker_count=workers,
-                                cpu_affinity=list(cpus), freq_cap_khz=cap, boost=False,
-                            ),
-                            f"{name} cap {cap/1e6:.2f} GHz ({workers}w)",
-                        ))
+        for name, cpus, workers, lay in secondary_layouts:
+            c = get_cap(0.5)
+            add(f"cfg_{name}_cap{c//1000}m", lay, workers, cpus, c, False, f"{name} mid 50% {c/1e6:.2f} GHz ({workers}w)")
 
-            # Passive mode intermediate caps (with boost on)
-            if passive or _PASSIVE_CAPS:
-                passive_steps = [4500000, 4000000, 3500000, 3000000, 2500000]
-                for p_cap in passive_steps:
-                    for name, cpus, workers, lay_letter in sweep_layouts[:2]:
-                        if len(out) >= total_target_pts:
-                            break
-                        cid = f"cfg_{name}_pcap{p_cap // 1000}m"
-                        if cid not in seen:
-                            seen.add(cid)
-                            out.append((
-                                Configuration(
-                                    id=cid, layout=lay_letter, worker_count=workers,
-                                    cpu_affinity=list(cpus), freq_cap_khz=p_cap, boost=True,
-                                ),
-                                f"{name} cap {p_cap/1e6:.2f} GHz boost-on (passive, {workers}w)",
-                            ))
+        for name, cpus, lay in [("fast_1w", fast_1w, "A"), ("eff_1w", eff_1w, "D")]:
+            add(f"cfg_{name}_stock", lay, 1, cpus, None, True, f"{name} stock (1w)")
+            add(f"cfg_{name}_base", lay, 1, cpus, cap_max, False, f"{name} base 2.0 GHz (1w)")
+
+        # Round 3: Octiles (12.5%, 37.5%, 62.5%, 87.5%)
+        for fraction, label in [(0.125, "12.5%"), (0.375, "37.5%"), (0.625, "62.5%"), (0.875, "87.5%")]:
+            c = get_cap(fraction)
+            for name, cpus, workers, lay in primary_layouts:
+                add(f"cfg_{name}_cap{c//1000}m", lay, workers, cpus, c, False, f"{name} {label} {c/1e6:.2f} GHz ({workers}w)")
+
+        for fraction, label in [(0.25, "25%"), (0.75, "75%")]:
+            c = get_cap(fraction)
+            for name, cpus, workers, lay in secondary_layouts:
+                add(f"cfg_{name}_cap{c//1000}m", lay, workers, cpus, c, False, f"{name} {label} {c/1e6:.2f} GHz ({workers}w)")
+
+        # Passive mode caps (with boost on)
+        if passive or _PASSIVE_CAPS:
+            for pcap, plabel in [(4500000, "4.5 GHz"), (2500000, "2.5 GHz"), (3500000, "mid 3.5 GHz"), (3000000, "3.0 GHz"), (4000000, "4.0 GHz")]:
+                for name, cpus, workers, lay in primary_layouts:
+                    add(f"cfg_{name}_pcap{pcap//1000}m", lay, workers, cpus, pcap, True, f"{name} passive {plabel} boost-on ({workers}w)")
+
+        # Round 4 & 5: 1/16ths and 1/32ths for dense curves when budget is large (e.g. 600s)
+        for denom in [16, 32]:
+            for num in range(1, denom, 2):
+                fraction = num / denom
+                c = get_cap(fraction)
+                for name, cpus, workers, lay in primary_layouts + secondary_layouts[:1]:
+                    add(f"cfg_{name}_cap{c//1000}m", lay, workers, cpus, c, False, f"{name} {num}/{denom} {c/1e6:.2f} GHz ({workers}w)")
 
         return out
 
