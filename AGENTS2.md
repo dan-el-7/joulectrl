@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:39:00Z
-- session: B#2 · status: active
+- heartbeat: 2026-09-09T10:41:00Z
+- session: B#2 · status: off
 - branch: main
 - current unit: Gate 2 runner and persisted experiment state machine complete
-- next action: await CI result, then integrate validation orchestration or CLI as the Gate 2 priority requires
-- notes for others: runner is ready for D workload plugins and C's run events; pytest is unavailable on this Windows clone, but compile and direct smoke passed.
+- next action: inspect CI, then integrate validation orchestration or CLI as the Gate 2 priority requires
+- notes for others: runner is ready for D workload plugins and C's run events; its Windows path uses process.terminate(), not os.killpg. pytest is unavailable on this clone, but compile and direct smoke passed.
 
 
 
