@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T13:16:00Z`
+- heartbeat: `2026-09-09T13:30:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Polling loop — 39/39 tests green. Pulled C#4 calibration view + design system (dc7efc4). No new AFFECTS(d).`
+- current unit: `Polling loop — 39/39 tests green. No new commits since 9fb6f15. No new AFFECTS(d).`
 - next action: `continue autonomous poll every 60s; push heartbeat if stale`
-- notes for others: `SESSION_START_D.md up. All 39 tests passing. C's CalibrationView + design.ts merged cleanly.`
+- notes for others: `All 39 tests passing. A CI-fixed (3-layer). C visual pass done. D stable.`
