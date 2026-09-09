@@ -2,6 +2,7 @@
 
 import pytest
 
+from core.models import Configuration, RunRecord
 from core.experiment import ExperimentStateMachine, InvalidTransition
 from core.store import Store
 
@@ -42,3 +43,18 @@ def test_failed_restore_is_visible_as_recovery_required(machine):
     assert not machine.restore(lambda: (_ for _ in ()).throw(RuntimeError("helper disconnected")))
     assert machine.state == "RECOVERY_REQUIRED"
     assert machine.store.get_experiment("exp")["restoration_status"] == "recovery_required"
+
+
+def test_profile_point_wires_runner_status_into_lifecycle(machine):
+    class Runner:
+        def run(self, workload, experiment_id, configuration, repetition, timeout_s=None):
+            return RunRecord(
+                run_id="run", experiment_id=experiment_id, config_id=configuration.id,
+                workload_name="fixed_compute", repetition=repetition,
+            )
+
+    record = machine.run_profile_point(
+        Runner(), object(), Configuration(id="stock", layout="all", worker_count=1), 1  # type: ignore[arg-type]
+    )
+    assert record.status == "success"
+    assert machine.state == "PROFILE_READY"

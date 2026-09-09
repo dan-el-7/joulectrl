@@ -57,11 +57,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:45:00Z
+- heartbeat: 2026-09-09T10:47:00Z
 - session: B#3 · status: active
 - branch: main
-- current unit: Gate 2 CLI integration over Store, Runner, and experiment state
-- next action: inspect existing API/demo conventions, then implement a minimal safe CLI workflow
+- current unit: Gate 2 Runner/State integration complete
+- next action: await CI or A's helper contract before adding CLI commands that can safely apply measured configurations
 - notes for others: runner is ready for D workload plugins and C's run events; its Windows path uses process.terminate(), not os.killpg. pytest is unavailable on this clone, but compile and direct smoke passed.
 
 

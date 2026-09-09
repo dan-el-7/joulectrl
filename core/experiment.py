@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
+from core.models import Configuration, RunRecord
+from core.runner import WorkloadRunner
 from core.store import Store
+from workloads.base import Workload
 
 
 class InvalidTransition(ValueError):
@@ -63,6 +66,38 @@ class ExperimentStateMachine:
         if self.state not in {"CANCELLING", "RESTORING", "RESTORED", "RECOVERY_REQUIRED"}:
             self.transition("CANCELLING", "user cancellation requested")
         return cancelled
+
+    def run_profile_point(
+        self,
+        runner: WorkloadRunner,
+        workload: Workload,
+        configuration: Configuration,
+        repetition: int,
+        *,
+        timeout_s: Optional[float] = None,
+    ) -> RunRecord:
+        """Wire one approved plugin execution into the persisted lifecycle.
+
+        Configuration application is intentionally outside this method: the caller
+        must have used the helper and verified readback before invoking it.
+        """
+        if self.state == "IDLE":
+            self.transition("CHECKING", "starting profile point")
+        if self.state == "CHECKING":
+            self.transition("PREPARING", "workload preparation")
+        if self.state == "PREPARING":
+            self.transition("PROFILING", "measurement bracket opened")
+        if self.state != "PROFILING":
+            raise InvalidTransition(f"cannot profile from {self.state}")
+
+        record = runner.run(
+            workload, self.experiment_id, configuration, repetition, timeout_s=timeout_s
+        )
+        if record.status == "success":
+            self.transition("PROFILE_READY", "profile point recorded")
+        else:
+            self.fail(f"profile point {record.status}: {record.error_message or 'unknown error'}")
+        return record
 
     def restore(self, restore_settings: Callable[[], None]) -> bool:
         """Invoke the helper-provided restore action and persist its exact outcome."""

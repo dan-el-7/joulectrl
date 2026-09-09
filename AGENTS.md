@@ -275,6 +275,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09 10:20 UTC) [gate1] core/store.py committed with SQLite persistence (experiments, state transitions, runs, calibrations, profile, selection, validation, JSON export). All Gate 1 deliverables complete: models v0 frozen contracts, synthetic backend, optimizer skeleton, SQLite store, 29 unit tests green.
 - (2026-09-09 10:31 UTC) AFFECTS(c,d) core/runner.py execution harness added: direct argument-array launch, Linux taskset affinity, measured counter bracket, output verification, timeout, and process-group cancellation. Focused runner tests added; bundled Python compile + success smoke pass locally (pytest is not installed on this Windows clone).
 - (2026-09-09 10:39 UTC) AFFECTS(a,c,d) core/experiment.py state machine added: persisted legal lifecycle transitions, cancellation, and restoration/recovery-required visibility. Focused unit tests added; bundled Python compilation and full lifecycle smoke pass locally (pytest unavailable on this clone).
+- (2026-09-09 10:47 UTC) AFFECTS(c,d) `ExperimentStateMachine.run_profile_point()` now wires an approved workload through the runner and persisted CHECKING→PREPARING→PROFILING→PROFILE_READY/FAILED lifecycle. Focused test plus bundled-Python smoke pass; CI could not be inspected from this host (GitHub Actions page fetch failed).
 
 
 
