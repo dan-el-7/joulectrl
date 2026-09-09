@@ -80,7 +80,7 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T12:36:00Z`
+- heartbeat: `2026-09-09T12:49:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
 - current unit: `Gate 4 complete ([gate4]). All deliverables verified, 39 tests green, demo ready.`
