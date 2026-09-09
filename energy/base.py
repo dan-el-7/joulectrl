@@ -132,3 +132,33 @@ class PowercapBackend:
                 return int(f.read().strip())
         except OSError:
             return None
+
+
+class HelperEnergyBackend:
+    """sysfs powercap counter read via the joulectrl helper daemon.
+
+    Used on systems where powercap sysfs is root-only (-r--------)
+    so unprivileged processes (like the dashboard API) can read the real
+    hardware energy counter without needing root permissions themselves.
+    """
+
+    def __init__(self, helper: Any = None, max_range_uj: Optional[int] = 65_532_610_987):
+        self.name = "helper:read_energy"
+        self._helper = helper
+        self._range = max_range_uj
+
+    def read_uj(self) -> Optional[int]:
+        try:
+            if self._helper is None:
+                from helper.client import HelperClient
+                self._helper = HelperClient()
+            resp = self._helper.read_energy()
+            if resp.get("ok") and "uj" in resp:
+                return int(resp["uj"])
+            return None
+        except Exception:
+            return None
+
+    def max_range_uj(self) -> Optional[int]:
+        return self._range
+

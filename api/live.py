@@ -147,6 +147,27 @@ def _best_energy_backend() -> tuple[Any, dict[str, Any]]:
     except Exception:
         pass  # discovery is Linux-only; dev machines fall through to synthetic
 
+    # Helper daemon probe: on machines where powercap is root-only (-r--------, e.g. demo laptop),
+    # the helper daemon provides unprivileged read_energy() access to the real hardware counter.
+    try:
+        from energy.base import HelperEnergyBackend
+        from helper.client import HelperClient
+
+        h = HelperClient()
+        probe = h.read_energy()
+        if probe.get("ok") and probe.get("uj") is not None:
+            backend = HelperEnergyBackend(h)
+            info = {
+                "source": "helper_powercap",
+                "domain": "package-0",
+                "path": "/sys/class/powercap/intel-rapl:0/energy_uj",
+                "synthetic": False,
+                "note": "Live hardware RAPL counter via joulectrl helper daemon",
+            }
+            return backend, info
+    except Exception:
+        pass
+
     from energy.synthetic import SyntheticEnergyBackend
 
     backend = SyntheticEnergyBackend()
@@ -301,9 +322,9 @@ class WatchService:
         self._seg_counter += 1
         energy_j = segment.energy_j
         runtime_s = segment.runtime_s
-        # Suggested budget = observed runtime + one poll interval of headroom
-        # per detection uncertainty (§6b), bounded by a 5% margin floor.
-        suggested = round(runtime_s + self.detector.poll_interval_s, 2)
+        # Suggested budget via Agent B's deterministic suggest_budget (runtime * 1.05 floor)
+        from core.budget import suggest_budget
+        suggested = suggest_budget([segment]) or round(runtime_s * 1.05, 2)
         onset_label = self._label_ts(segment.start_ts)
         end_label = self._label_ts(segment.end_ts)
         return {
@@ -318,7 +339,7 @@ class WatchService:
             "energy_available": energy_j is not None,
             "suggested_budget_s": suggested,
             "mode": "watch",
-            "note": "Estimated via idle-return detection. Uncertainty ±"
+            "note": "Estimated via idle-return detection (first spike to last spike, idle tail trimmed). Uncertainty ±"
             f"{self.detector.poll_interval_s:.1f}s.",
         }
 

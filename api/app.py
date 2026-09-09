@@ -279,6 +279,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
         if engine.start_experiment(exp_id, {
             "workload_id": req.workload_id, "objective": req.objective,
             "runtime_budget_s": req.runtime_budget_s,
+            "calibration_budget_s": req.calibration_budget_s,
             "preference": req.preference.model_dump() if req.preference else None,
             "experimental_passive_caps": req.experimental_passive_caps,
         }, seeded):

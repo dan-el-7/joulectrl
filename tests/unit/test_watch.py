@@ -37,3 +37,45 @@ def test_watch_missing_counter_never_becomes_zero():
     assert result is not None
     assert not result.energy_available
     assert result.energy_j is None
+
+
+def test_watch_bursty_geekbench_absorbs_pauses_and_trims_tail():
+    """Simulate a bursty multi-phase workload (like Geekbench):
+    - Baseline idle at 10W (0-5s)
+    - Phase 1 burst at 45W (5-10s)
+    - Inter-test pause at 10W (10-16s, 6s gap)
+    - Phase 2 burst at 55W (16-25s)
+    - Inter-test pause at 10W (25-32s, 7s gap)
+    - Phase 3 burst at 60W (32-40s)
+    - Workload complete: sustained idle (40-60s)
+    Verify:
+    1. Pauses are absorbed into ONE segment.
+    2. Start is exact first spike (t=5.0).
+    3. End is exact last active spike (t=40.0).
+    4. Runtime is 35.0s (40.0 - 5.0).
+    5. The trailing 15s idle grace is trimmed away!
+    """
+    detector = WatchDetector(baseline_window_s=5, onset_s=2, idle_grace_s=15)
+    closed = None
+    uj = 1000000
+
+    for t in range(60):
+        # Determine power
+        if 5 <= t <= 10:
+            p = 45.0
+        elif 16 <= t <= 25:
+            p = 55.0
+        elif 32 <= t <= 40:
+            p = 60.0
+        else:
+            p = 10.0
+        uj += int(p * 1e6)
+        res = detector.observe(p, uj, float(t))
+        if res is not None:
+            closed = res
+
+    assert closed is not None
+    assert closed.start_ts == 5.0
+    assert closed.end_ts == 40.0
+    assert closed.runtime_s == 35.0
+

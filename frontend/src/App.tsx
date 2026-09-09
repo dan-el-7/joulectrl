@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   createExperiment,
   fetchCapabilities,
+  fetchCalibration,
   fetchExperiment,
   fetchWorkloads,
   reselectConfiguration,
@@ -29,6 +30,11 @@ export const App: React.FC = () => {
   const [perfFloorPct, setPerfFloorPct] = useState<number>(90);
   const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(120);
   const [expPassiveCaps, setExpPassiveCaps] = useState<boolean>(false);
+  const [hasCalibration, setHasCalibration] = useState<boolean>(true);
+  const [latestWatchedSegment, setLatestWatchedSegment] = useState<{
+    duration_s: number;
+    suggested_budget_s: number;
+  } | null>(null);
 
   // Status flags
   const [isStarting, setIsStarting] = useState<boolean>(false);
@@ -50,6 +56,16 @@ export const App: React.FC = () => {
     fetchWorkloads()
       .then(setWorkloads)
       .catch((e) => console.warn('Could not fetch workloads:', e));
+
+    fetchCalibration()
+      .then((cal) => {
+        const hasPts = Boolean(cal?.classes?.some((c: any) => c.points?.length > 0));
+        setHasCalibration(hasPts);
+      })
+      .catch((e) => {
+        console.warn('Could not fetch calibration:', e);
+        setHasCalibration(false);
+      });
 
     fetchExperiment('exp_demo_clean_build')
       .then((e) => {
@@ -161,8 +177,11 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleApplySuggestedBudget = (budgetS: number) => {
+  const handleApplySuggestedBudget = (budgetS: number, durationS?: number) => {
     setRuntimeBudgetS(budgetS);
+    if (durationS != null) {
+      setLatestWatchedSegment({ duration_s: durationS, suggested_budget_s: budgetS });
+    }
     setActiveTab('setup');
   };
 
@@ -205,6 +224,9 @@ export const App: React.FC = () => {
                 ? experiment.profile.configurations?.[experiment.profile.baseline_config_id]?.median_runtime_s ?? null
                 : null
             }
+            hasCalibration={hasCalibration}
+            latestWatchedSegment={latestWatchedSegment}
+            onOpenWatchTab={() => setActiveTab('watch')}
           />
         )}
 

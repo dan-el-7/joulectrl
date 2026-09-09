@@ -47,11 +47,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T17:25:00Z
-- session: `A#3` · status: `off` (clean shutdown — FULL HANDOFF: AGENT_A_HANDOFF.md, for Antigravity iteration)
-- branch: `main` (all pushed, CI green, 175 tests green)
-- current unit: none — machine stock, helper+API+inhibitor running, dashboard live
-- next action: (successor) read AGENT_A_HANDOFF.md — state, session work, gotchas, open items, commands
+- heartbeat: 2026-09-09T17:45:00Z
+- session: `Antigravity` (Agent A successor) · status: `active (idle)`
+- branch: `main`
+- current unit: scanning curve budget scaling, watch bursty load detection & tail trimming, setup view calibration UX complete
+- next action: standby for user instructions / review
 - notes for others: demo is Sep 10 — pre-demo `core/reverify_controls.py` + fresh controls_reverify.json still owed; tagged release pending. History rewrite note: clones may need git pull --rebase.
 
 

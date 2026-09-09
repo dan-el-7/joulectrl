@@ -91,17 +91,27 @@ export async function fetchValidationPoints(experimentId: string): Promise<any> 
   return res.json();
 }
 
+export async function fetchCalibration(): Promise<any> {
+  const res = await fetch(`${API_BASE}/calibration`);
+  if (!res.ok) throw new Error(`Failed to fetch calibration: ${res.statusText}`);
+  return res.json();
+}
+
 export async function fetchWatchStatus(): Promise<WatchStatus> {
   const res = await fetch(`${API_BASE}/watch/status`);
   if (!res.ok) throw new Error(`Failed to fetch watch status: ${res.statusText}`);
   return res.json();
 }
 
-export async function startWatch(): Promise<any> {
+export async function startWatch(params?: { poll_hz?: number; onset_consecutive_s?: number; idle_grace_s?: number }): Promise<any> {
   const res = await fetch(`${API_BASE}/watch/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ poll_hz: 1.0, onset_consecutive_s: 3, idle_grace_s: 10 }),
+    body: JSON.stringify({
+      poll_hz: params?.poll_hz ?? 1.0,
+      onset_consecutive_s: params?.onset_consecutive_s ?? 3,
+      idle_grace_s: params?.idle_grace_s ?? 18,
+    }),
   });
   if (!res.ok) throw new Error(`Failed to start watch: ${res.statusText}`);
   return res.json();

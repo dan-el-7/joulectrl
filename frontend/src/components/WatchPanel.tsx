@@ -16,7 +16,7 @@ interface WatchSegmentResult {
 }
 
 interface WatchPanelProps {
-  onApplySuggestedBudget: (budgetS: number) => void;
+  onApplySuggestedBudget: (budgetS: number, durationS?: number) => void;
 }
 
 const SAMPLE_HISTORY = 60;
@@ -88,7 +88,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         setSamples([]);
         setLatestSegment(null);
         setLiveState(null);
-        await startWatch();
+        await startWatch({ idle_grace_s: 18 });
       }
       await refreshStatus();
     } catch (e: any) {
@@ -155,6 +155,9 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             Watches package power passively (0.5–1 Hz) while you run your own task. Automatically suggests a runtime budget.
             {status?.source?.synthetic && (
               <span style={{ color: colors.amber }}> · demo source: synthetic scripted profile (no readable package counter on this machine)</span>
+            )}
+            {!status?.source?.synthetic && status?.source?.source && (
+              <span style={{ color: colors.emerald }}> · live hardware source: {status.source.source}</span>
             )}
           </div>
         </div>
@@ -240,7 +243,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           </div>
 
           <button
-            onClick={() => onApplySuggestedBudget(latestSegment.suggested_budget_s)}
+            onClick={() => onApplySuggestedBudget(latestSegment.suggested_budget_s, latestSegment.duration_s)}
             style={{
               padding: '0.6rem 1.2rem',
               borderRadius: '0.375rem',

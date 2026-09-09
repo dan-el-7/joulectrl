@@ -74,6 +74,12 @@ interface SetupViewProps {
   onStartExperiment: () => void;
   isStarting: boolean;
   baselineRuntimeS?: number | null;
+  hasCalibration?: boolean;
+  latestWatchedSegment?: {
+    duration_s: number;
+    suggested_budget_s: number;
+  } | null;
+  onOpenWatchTab?: () => void;
 }
 
 export const SetupView: React.FC<SetupViewProps> = ({
@@ -96,7 +102,11 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onStartExperiment,
   isStarting,
   baselineRuntimeS,
+  hasCalibration = true,
+  latestWatchedSegment,
+  onOpenWatchTab,
 }) => {
+  const [showCalibrationSettings, setShowCalibrationSettings] = React.useState<boolean>(false);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Left Column: Workload & Objective Configuration */}
@@ -204,6 +214,42 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   Unlimited
                 </label>
               </div>
+
+              {/* Watch Mode Auto-detect helper */}
+              {latestWatchedSegment ? (
+                <div style={{ marginTop: '0.75rem', background: 'rgba(113,112,255,0.08)', border: '1px solid rgba(113,112,255,0.25)', borderRadius: '0.375rem', padding: '0.45rem 0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.76rem', color: colors.textSecondary }}>
+                    ⚡ Watched task: <strong>{latestWatchedSegment.duration_s}s</strong> (suggested: {latestWatchedSegment.suggested_budget_s}s)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onChangeRuntimeBudget(latestWatchedSegment.suggested_budget_s)}
+                    style={{
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 4,
+                      background: colors.accentBg,
+                      color: colors.textPrimary,
+                      border: 'none',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Apply Watched
+                  </button>
+                </div>
+              ) : (
+                <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={onOpenWatchTab}
+                    style={{ background: 'transparent', border: 'none', color: colors.accentHover, fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <span>⏱ Auto-detect task runtime in Watch Mode →</span>
+                  </button>
+                </div>
+              )}
+
               <div style={{ fontSize: '0.72rem', color: colors.textTertiary, marginTop: '0.4rem' }}>
                 Rule: lowest-energy measured configuration meeting the empirical runtime rule (with 5% guard margin).
               </div>
@@ -262,60 +308,123 @@ export const SetupView: React.FC<SetupViewProps> = ({
           )}
         </div>
 
-        {/* 3. Calibration Budget */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: colors.textTertiary, marginBottom: '0.4rem' }}>
-            <span>Calibration Sweep Budget (C2 ladder):</span>
-            <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
-              {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS}s`}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <input
-              type="range"
-              min="30"
-              max="1800"
-              step="10"
-              value={Math.min(Math.max(calibrationBudgetS ?? 120, 30), 1800)}
-              disabled={calibrationBudgetS === null}
-              onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
-              style={{ flex: 1, accentColor: colors.accent }}
-            />
-            <NumField value={calibrationBudgetS ?? 120} onCommit={onChangeCalibrationBudget} unit="s" />
-            <label style={{ fontSize: '0.75rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <input
-                type="checkbox"
-                checked={calibrationBudgetS === null}
-                onChange={(e) => onChangeCalibrationBudget(e.target.checked ? null : 120)}
-              />
-              Exhaustive
-            </label>
-          </div>
-        </div>
+        {/* 3. Calibration Status & Optional Sweep Settings */}
+        {hasCalibration ? (
+          <div style={{
+            marginBottom: '1.5rem',
+            background: 'rgba(16,185,129,0.06)',
+            border: '1px solid rgba(16,185,129,0.22)',
+            borderRadius: '0.5rem',
+            padding: '0.75rem 1rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ color: colors.emerald, fontSize: '0.95rem', fontWeight: 'bold' }}>✓</span>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: colors.textPrimary }}>
+                    Hardware Calibration Active
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: colors.textTertiary }}>
+                    Pre-measured C1/C2 curves and baseline are loaded — optimization uses existing verified points.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCalibrationSettings((prev) => !prev)}
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '0.25rem',
+                  padding: '0.25rem 0.5rem',
+                  color: colors.accentHover,
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {showCalibrationSettings ? 'Hide Sweep Settings' : 'Sweep / Recalibrate'}
+              </button>
+            </div>
 
-        {/* Experimental: passive-mode caps */}
-        <div
-          style={{
-            marginBottom: '1rem', padding: '0.6rem 0.8rem', borderRadius: '0.5rem',
-            border: `1px dashed ${expPassiveCaps ? colors.amber : colors.border}`,
-            background: expPassiveCaps ? 'rgba(245,158,11,0.06)' : 'transparent',
-          }}
-        >
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={expPassiveCaps}
-              onChange={(e) => onChangeExpPassiveCaps(e.target.checked)}
-              style={{ marginTop: 3, accentColor: colors.amber }}
-            />
-            <span style={{ fontSize: '0.8rem', color: colors.textSecondary }}>
-              <span style={{ color: colors.amber, fontWeight: 600 }}>EXPERIMENTAL:</span> intermediate
-              frequency caps (amd_pstate passive mode) — adds 3.0–4.5 GHz boost-on points to the sweep.
-              Caps bind only in passive mode; measured gains are marginal (~4% energy at +27% runtime on
-              this machine) and mode-switching perturbs the system. Restored automatically after the run.
-            </span>
-          </label>
-        </div>
+            {showCalibrationSettings && (
+              <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: colors.textTertiary, marginBottom: '0.35rem' }}>
+                  <span>Scan / Calibration Sweep Budget:</span>
+                  <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
+                    {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS}s`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <input
+                    type="range"
+                    min="30"
+                    max="1800"
+                    step="10"
+                    value={Math.min(Math.max(calibrationBudgetS ?? 120, 30), 1800)}
+                    disabled={calibrationBudgetS === null}
+                    onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: colors.accent }}
+                  />
+                  <NumField value={calibrationBudgetS ?? 120} onCommit={onChangeCalibrationBudget} unit="s" />
+                  <label style={{ fontSize: '0.72rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={calibrationBudgetS === null}
+                      onChange={(e) => onChangeCalibrationBudget(e.target.checked ? null : 120)}
+                    />
+                    Exhaustive
+                  </label>
+                </div>
+
+                {/* Experimental passive caps */}
+                <div style={{ marginTop: '0.6rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={expPassiveCaps}
+                      onChange={(e) => onChangeExpPassiveCaps(e.target.checked)}
+                      style={{ marginTop: 2, accentColor: colors.amber }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
+                      <span style={{ color: colors.amber, fontWeight: 600 }}>Experimental:</span> passive-mode caps (sweeps 2.5–4.5 GHz boost-on points)
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* First-run calibration sweep needed */
+          <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: colors.border }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: colors.textTertiary, marginBottom: '0.4rem' }}>
+              <span>Initial Calibration Sweep Budget:</span>
+              <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
+                {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS}s`}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <input
+                type="range"
+                min="30"
+                max="1800"
+                step="10"
+                value={Math.min(Math.max(calibrationBudgetS ?? 120, 30), 1800)}
+                disabled={calibrationBudgetS === null}
+                onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
+                style={{ flex: 1, accentColor: colors.accent }}
+              />
+              <NumField value={calibrationBudgetS ?? 120} onCommit={onChangeCalibrationBudget} unit="s" />
+              <label style={{ fontSize: '0.75rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <input
+                  type="checkbox"
+                  checked={calibrationBudgetS === null}
+                  onChange={(e) => onChangeCalibrationBudget(e.target.checked ? null : 120)}
+                />
+                Exhaustive
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Action Button */}
         <button
@@ -334,7 +443,13 @@ export const SetupView: React.FC<SetupViewProps> = ({
             boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.3)',
           }}
         >
-          {isStarting ? 'Profiling Workload...' : 'Profile Workload & Search Minimum Energy'}
+          {isStarting
+            ? 'Optimizing Workload...'
+            : objective === 'deadline'
+              ? 'Optimize Workload for Deadline'
+              : objective === 'preference'
+                ? 'Optimize for Preference Target'
+                : 'Explore Pareto Candidates'}
         </button>
       </div>
 

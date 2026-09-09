@@ -90,6 +90,7 @@ class WatchDetector:
         self.state = "calibrating"
         self._candidate_start: Optional[float] = None
         self._candidate_energy: Optional[int] = None
+        self._candidate_active_samples: int = 0
         self._last_above_ts: Optional[float] = None
         self._last_above_energy: Optional[int] = None
         self._idle_since: Optional[float] = None
@@ -112,22 +113,38 @@ class WatchDetector:
             self._set_baseline()
 
         assert self.baseline_w is not None
-        in_idle_band = abs(power_w - self.baseline_w) <= max(3.0 * self.spread_w, 2.0)
-        if self.state == "idle":
-            if in_idle_band:
-                self._candidate_start = None
-                self._candidate_energy = None
-                return None
-            if self._candidate_start is None:
-                self._candidate_start = timestamp
-                self._candidate_energy = energy_uj
-            if timestamp - self._candidate_start >= self.onset_s:
-                self.state = "active"
-                self._last_above_ts = timestamp
-                self._last_above_energy = energy_uj
-            return None
+        threshold = self.baseline_w + max(3.0 * self.spread_w, 2.0)
+        is_above_band = power_w > threshold
+        in_idle_band = not is_above_band
 
-        # Active: a short in-band dip is absorbed until the grace period elapses.
+        if self.state == "idle":
+            if is_above_band:
+                if self._candidate_start is None:
+                    # Capture exact first moment power spiked above idle baseline
+                    self._candidate_start = timestamp
+                    self._candidate_energy = energy_uj
+                    self._candidate_active_samples = 1
+                else:
+                    self._candidate_active_samples += 1
+
+                # Confirm active once sustained beyond onset duration
+                if (timestamp - self._candidate_start >= self.onset_s) or (self._candidate_active_samples >= int(self.onset_s)):
+                    self.state = "active"
+                    self._last_above_ts = timestamp
+                    self._last_above_energy = energy_uj
+                    self._idle_since = None
+                return None
+            else:
+                # Brief dip during onset: do not discard candidate start immediately
+                # unless idle persists longer than onset window (rejects blips)
+                if self._candidate_start is not None:
+                    if timestamp - self._candidate_start > max(self.onset_s + 2.0, 4.0):
+                        self._candidate_start = None
+                        self._candidate_energy = None
+                        self._candidate_active_samples = 0
+                return None
+
+        # Active: a short in-band dip is absorbed until the grace period elapses (Geekbench bursty phases).
         if in_idle_band:
             if self._idle_since is None:
                 self._idle_since = timestamp
@@ -136,6 +153,7 @@ class WatchDetector:
                 self._segments.append(segment)
                 return segment
         else:
+            # Active spike: update last above-band timestamp & energy; absorb preceding dip
             self._idle_since = None
             self._last_above_ts = timestamp
             self._last_above_energy = energy_uj
@@ -150,6 +168,7 @@ class WatchDetector:
     def _close_segment(self) -> WatchSegment:
         start = self._candidate_start
         assert start is not None and self._last_above_ts is not None
+        # Trim trailing idle grace: end_ts is strictly the last above-band sample
         segment = WatchSegment(
             start_ts=start,
             end_ts=self._last_above_ts,
@@ -164,7 +183,9 @@ class WatchDetector:
         self.state = "idle"
         self._candidate_start = None
         self._candidate_energy = None
+        self._candidate_active_samples = 0
         self._last_above_ts = None
         self._last_above_energy = None
         self._idle_since = None
         return segment
+
