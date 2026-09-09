@@ -331,7 +331,13 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setShowCalibrationSettings((prev) => !prev)}
+                onClick={() => {
+                  setShowCalibrationSettings((prev) => {
+                    const next = !prev;
+                    onChangeCalibrationBudget(next ? (calibrationBudgetS && calibrationBudgetS > 0 ? calibrationBudgetS : 120) : 0);
+                    return next;
+                  });
+                }}
                 style={{
                   background: 'transparent',
                   border: `1px solid ${colors.border}`,
@@ -342,7 +348,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                {showCalibrationSettings ? 'Hide Sweep Settings' : 'Sweep / Recalibrate'}
+                {showCalibrationSettings ? 'Use Calibration Only' : 'Sweep / Recalibrate'}
               </button>
             </div>
 
@@ -351,7 +357,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: colors.textTertiary, marginBottom: '0.35rem' }}>
                   <span>Scan / Calibration Sweep Budget:</span>
                   <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
-                    {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS}s`}
+                    {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS || 120}s`}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -360,12 +366,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
                     min="30"
                     max="1800"
                     step="10"
-                    value={Math.min(Math.max(calibrationBudgetS ?? 120, 30), 1800)}
+                    value={Math.min(Math.max(calibrationBudgetS || 120, 30), 1800)}
                     disabled={calibrationBudgetS === null}
                     onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
                     style={{ flex: 1, accentColor: colors.accent }}
                   />
-                  <NumField value={calibrationBudgetS ?? 120} onCommit={onChangeCalibrationBudget} unit="s" />
+                  <NumField value={calibrationBudgetS || 120} onCommit={onChangeCalibrationBudget} unit="s" />
                   <label style={{ fontSize: '0.72rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <input
                       type="checkbox"

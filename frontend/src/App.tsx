@@ -23,12 +23,12 @@ export const App: React.FC = () => {
   const [experiment, setExperiment] = useState<Experiment | null>(null);
 
   // Setup view state
-  const [selectedWorkload, setSelectedWorkload] = useState<string>('clean_build');
+  const [selectedWorkload, setSelectedWorkload] = useState<string>('fixed_compute');
   const [objective, setObjective] = useState<string>('deadline');
   const [runtimeBudgetS, setRuntimeBudgetS] = useState<number | null>(45.0);
   const [energyTargetPct, setEnergyTargetPct] = useState<number>(70);
   const [perfFloorPct, setPerfFloorPct] = useState<number>(90);
-  const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(120);
+  const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(0);
   const [expPassiveCaps, setExpPassiveCaps] = useState<boolean>(false);
   const [hasCalibration, setHasCalibration] = useState<boolean>(true);
   const [latestWatchedSegment, setLatestWatchedSegment] = useState<{
@@ -61,6 +61,9 @@ export const App: React.FC = () => {
       .then((cal) => {
         const hasPts = Boolean(cal?.classes?.some((c: any) => c.points?.length > 0));
         setHasCalibration(hasPts);
+        if (hasPts) {
+          setCalibrationBudgetS(0);
+        }
       })
       .catch((e) => {
         console.warn('Could not fetch calibration:', e);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ConfigSummary, Experiment } from '../types';
+import { ConfigSummary, Experiment, Selection } from '../types';
 import { fetchValidationPoints } from '../api';
 import { ParetoChart } from './ParetoChart';
 import { colors } from '../design';
@@ -30,8 +30,9 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   onReselect,
   onNavigateValidation,
 }) => {
-  const { profile, selection } = experiment;
-  const [tempBudget, setTempBudget] = useState<number>(selection.runtime_budget_s ?? 45.0);
+  const { profile } = experiment;
+  const selection = experiment.selection as Partial<Selection> | null | undefined;
+  const [tempBudget, setTempBudget] = useState<number>(selection?.runtime_budget_s ?? 45.0);
   const [candidates, setCandidates] = useState<ValidationPointCandidate[] | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
@@ -60,18 +61,20 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     });
   };
 
-  const configs = profile.configurations;
-  const baselineId = profile.baseline_config_id;
-  const selectedId = selection.selected_config_id ?? selection.config_id;
+  const configs = profile?.configurations || {};
+  const baselineId = profile?.baseline_config_id || Object.keys(configs)[0];
+  const selectedId = selection?.selected_config_id ?? selection?.config_id;
 
-  const baseCfg = configs[baselineId];
-  const selCfg = configs[selectedId];
+  const baseCfg = baselineId ? configs[baselineId] : undefined;
+  const selCfg = selectedId ? configs[selectedId] : undefined;
 
   // Find lowest energy overall across usable configurations
   const lowestEnergyCfg = Object.values(configs).reduce((prev, curr) => {
     if (!prev) return curr;
+    if (curr.median_energy_j == null) return prev;
+    if (prev.median_energy_j == null) return curr;
     return curr.median_energy_j < prev.median_energy_j ? curr : prev;
-  }, baseCfg);
+  }, undefined as ConfigSummary | undefined) || baseCfg;
 
   // data-derived summary line — no hardcoded counts or core names
   const nConfigs = Object.keys(configs).length;
@@ -233,34 +236,41 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             Selected Within Budget ★
           </div>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.emerald, marginTop: '0.2rem' }}>
-            {selCfg ? selCfg.config_id : selectedId}
+            {selCfg ? selCfg.config_id : selectedId ? selectedId : 'Profiling in progress…'}
           </div>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
             {describeConfig(selCfg)}
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: colors.textTertiary }}>Guarded Runtime:</span>
-            <span style={{ fontWeight: 700, color: colors.emerald }}>{selCfg?.guarded_runtime_s}s (≤ {tempBudget}s)</span>
+            <span style={{ fontWeight: 700, color: colors.emerald }}>
+              {selCfg?.guarded_runtime_s != null ? `${selCfg.guarded_runtime_s.toFixed(2)}s (≤ ${tempBudget}s)` : 'Measuring…'}
+            </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
             <span style={{ color: colors.textTertiary }}>Energy Savings:</span>
             <span style={{ fontWeight: 700, color: colors.emerald, fontSize: '1rem' }}>
-              -{selection.savings_vs_baseline_pct ?? selection.energy_reduction_pct ?? 0}%
+              {selection?.savings_vs_baseline_pct != null
+                ? `-${selection.savings_vs_baseline_pct}%`
+                : selection?.energy_reduction_pct != null
+                ? `-${selection.energy_reduction_pct.toFixed(1)}%`
+                : '—'}
             </span>
           </div>
           <button
             onClick={onNavigateValidation}
+            disabled={!selCfg}
             style={{
               width: '100%',
               marginTop: '0.6rem',
               padding: '0.4rem',
               borderRadius: '0.375rem',
               border: 'none',
-              backgroundColor: colors.emerald,
-              color: colors.textPrimary,
+              backgroundColor: selCfg ? colors.emerald : colors.surfaceElevated,
+              color: selCfg ? colors.textPrimary : colors.textTertiary,
               fontSize: '0.8rem',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: selCfg ? 'pointer' : 'default',
             }}
           >
             Verify with Fresh Validation Runs →
@@ -274,7 +284,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         selectedConfigId={selectedId}
         baselineConfigId={baselineId}
         deadlineS={tempBudget}
-        frontierConfigIds={selection.frontier_config_ids}
+        frontierConfigIds={selection?.frontier_config_ids ?? []}
         onSelectConfig={(cid) => {
           // Point click selection
         }}
@@ -335,56 +345,62 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       {/* Complete Run List Table */}
       <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: colors.border }}>
         <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
-          Individual Execution Runs ({profile.runs.length} captured)
+          Individual Execution Runs ({(profile?.runs || []).length} captured)
         </h3>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: colors.textTertiary }}>
-                <th style={{ padding: '0.5rem' }}>Run ID</th>
-                <th style={{ padding: '0.5rem' }}>Configuration</th>
-                <th style={{ padding: '0.5rem' }}>Layout</th>
-                <th style={{ padding: '0.5rem' }}>Rep</th>
-                <th style={{ padding: '0.5rem' }}>Runtime (s)</th>
-                <th style={{ padding: '0.5rem' }}>Energy (J)</th>
-                <th style={{ padding: '0.5rem' }}>Avg Power (W)</th>
-                <th style={{ padding: '0.5rem' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profile.runs.map((r) => {
-                const isSelected = r.config_id === selectedId;
-                const isBase = r.config_id === baselineId;
-                return (
-                  <tr
-                    key={r.run_id}
-                    style={{
-                      borderBottom: colors.border,
-                      backgroundColor: isSelected ? 'rgba(16,185,129,0.15)' : isBase ? 'rgba(244,88,110,0.10)' : 'transparent',
-                    }}
-                  >
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.run_id}</td>
-                    <td style={{ padding: '0.5rem', fontWeight: isSelected || isBase ? 600 : 400 }}>
-                      {r.config_id}
-                      {isSelected && <span style={{ color: colors.emerald, marginLeft: 4 }}>★</span>}
-                    </td>
-                    <td style={{ padding: '0.5rem' }}>{r.configuration?.layout ?? '-'}</td>
-                    <td style={{ padding: '0.5rem' }}>#{r.repetition}</td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.runtime_s.toFixed(2)}</td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', color: isSelected ? colors.emerald : colors.textSecondary }}>
-                      {r.package_energy_j ? `${r.package_energy_j.toFixed(1)} J` : 'unavailable'}
-                    </td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>
-                      {r.package_energy_j ? (r.package_energy_j / r.runtime_s).toFixed(1) : '-'} W
-                    </td>
-                    <td style={{ padding: '0.5rem' }}>
-                      <span style={{ color: colors.emerald, fontWeight: 600 }}>✓ verified</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {(profile?.runs || []).length === 0 ? (
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: colors.textTertiary, fontSize: '0.85rem' }}>
+              No individual execution runs recorded yet. Start a sweep to profile configurations live on hardware.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: colors.textTertiary }}>
+                  <th style={{ padding: '0.5rem' }}>Run ID</th>
+                  <th style={{ padding: '0.5rem' }}>Configuration</th>
+                  <th style={{ padding: '0.5rem' }}>Layout</th>
+                  <th style={{ padding: '0.5rem' }}>Rep</th>
+                  <th style={{ padding: '0.5rem' }}>Runtime (s)</th>
+                  <th style={{ padding: '0.5rem' }}>Energy (J)</th>
+                  <th style={{ padding: '0.5rem' }}>Avg Power (W)</th>
+                  <th style={{ padding: '0.5rem' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(profile?.runs || []).map((r) => {
+                  const isSelected = r.config_id === selectedId;
+                  const isBase = r.config_id === baselineId;
+                  return (
+                    <tr
+                      key={r.run_id}
+                      style={{
+                        borderBottom: colors.border,
+                        backgroundColor: isSelected ? 'rgba(16,185,129,0.15)' : isBase ? 'rgba(244,88,110,0.10)' : 'transparent',
+                      }}
+                    >
+                      <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.run_id}</td>
+                      <td style={{ padding: '0.5rem', fontWeight: isSelected || isBase ? 600 : 400 }}>
+                        {r.config_id}
+                        {isSelected && <span style={{ color: colors.emerald, marginLeft: 4 }}>★</span>}
+                      </td>
+                      <td style={{ padding: '0.5rem' }}>{r.configuration?.layout ?? '-'}</td>
+                      <td style={{ padding: '0.5rem' }}>#{r.repetition}</td>
+                      <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.runtime_s != null ? r.runtime_s.toFixed(2) : '—'}</td>
+                      <td style={{ padding: '0.5rem', fontFamily: 'monospace', color: isSelected ? colors.emerald : colors.textSecondary }}>
+                        {r.package_energy_j != null ? `${r.package_energy_j.toFixed(1)} J` : 'unavailable'}
+                      </td>
+                      <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>
+                        {r.package_energy_j != null && r.runtime_s ? (r.package_energy_j / r.runtime_s).toFixed(1) + ' W' : '-'}
+                      </td>
+                      <td style={{ padding: '0.5rem' }}>
+                        <span style={{ color: colors.emerald, fontWeight: 600 }}>✓ verified</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

@@ -150,21 +150,18 @@ class LiveEngine:
         cal_budget = request.get("calibration_budget_s")
         # Time budget for profiling: use calibration_budget_s if positive;
         # if explicitly None (user checked "Exhaustive"), allow 1800s ceiling;
-        # otherwise default to 120.0s.
+        # if 0, fast-path from existing calibration without running fresh sweep.
         if cal_budget is not None and float(cal_budget) > 0:
             time_limit_s = float(cal_budget)
         elif "calibration_budget_s" in request and request.get("calibration_budget_s") is None:
             time_limit_s = 1800.0  # Exhaustive mode ceiling
+        elif cal_budget == 0 or cal_budget == "0":
+            time_limit_s = 0.0
         else:
-            time_limit_s = float(request.get("calibration_budget_s") or 120.0)
+            time_limit_s = 0.0 if cal_budget is None else float(cal_budget or 0.0)
         preference = request.get("preference") or {}
 
         try:
-            self._emit(exp_id, "experiment_state", {
-                "state": "profiling",
-                "message": f"Profiling sweep starting ({time_limit_s:.0f}s allotted budget)",
-            })
-
             caps = seeded.get("_live_capabilities") or {}
             cls_map = self._class_map_from_capabilities(caps) or {"fast": {"cpus": [0, 2, 4, 6], "hw_max_freq": None},
                                                                   "efficient": {"cpus": [1, 3, 5, 7], "hw_max_freq": None}}
@@ -178,29 +175,41 @@ class LiveEngine:
             measured_keys: set[tuple] = set()
 
             # Calibration fast path: seed rows from verified fixtures if available
-            if cal and workload_id == "fixed_compute":
+            if cal:
                 for row in cal.get("rows", []):
                     cap = (row.get("requested_control") or {}).get("cap_khz") or row.get("freq_cap_khz")
                     key = (tuple(row["cpus"]), 1 if row["boost"] else 0, cap, row.get("workers", 4))
                     measured_keys.add(key)
-                self._emit(exp_id, "experiment_state", {
-                    "state": "profiling",
-                    "message": f"Using verified calibration — {len(measured_keys)} points active; profiling intermediate curve points to fill {time_limit_s:.0f}s budget",
-                })
+                cal_rows = self._profile_rows(cal, [], cls_map, workload_id)
+                if cal_rows:
+                    cal_sel = self._select(cal_rows, objective, budget, preference, exp_id)
+                    # If no sweep budget was allotted, fast-path complete immediately!
+                    if time_limit_s <= 0:
+                        self._persist(exp_id, seeded, [], cal_rows, cal_sel, True, state="selected")
+                        self._emit(exp_id, "experiment_state", {
+                            "state": "selected",
+                            "message": f"Optimization complete using verified hardware calibration ({len(cal_rows)} points)",
+                        })
+                        return
+                    # Otherwise persist initial calibration points while sweep begins
+                    self._persist(exp_id, seeded, [], cal_rows, cal_sel, True, state="profiling")
+                    self._emit(exp_id, "experiment_state", {
+                        "state": "profiling",
+                        "message": f"Using verified calibration ({len(measured_keys)} points active); profiling intermediate curve points to fill {time_limit_s:.0f}s budget",
+                    })
+
+            self._emit(exp_id, "experiment_state", {
+                "state": "profiling",
+                "message": f"Profiling sweep starting ({time_limit_s:.0f}s allotted budget)",
+            })
 
             # If starting a fresh live experiment, clear old dummy fixture runs
             # so the dashboard starts clean and populates live as tests complete!
             overlay = self._overlay_for(exp_id)
-            if overlay and "profile" in overlay:
-                if cal and workload_id == "fixed_compute":
-                    cal_rows = self._profile_rows(cal, [], cls_map, workload_id)
-                    if cal_rows:
-                        cal_sel = self._select(cal_rows, objective, budget, preference, exp_id)
-                        self._persist(exp_id, seeded, [], cal_rows, cal_sel, True, state="profiling")
-                else:
-                    overlay["profile"]["runs"] = []
-                    overlay["profile"]["configurations"] = {}
-                    overlay["selection"] = None
+            if overlay and "profile" in overlay and not cal:
+                overlay["profile"]["runs"] = []
+                overlay["profile"]["configurations"] = {}
+                overlay["selection"] = None
 
             start_wall = time.monotonic()
             avg_run_s = 6.5
