@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:20:00Z
+- heartbeat: 2026-09-09T11:33:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: core/sweep_check.py committed — C2 fixture sanity cross-check ready for A's calibration_c2.json (returns None until it lands)
-- next action: poll for A's C2 fixture + [done-measuring]; on arrival run check_calibration_files and report; then help C with SSE/runner wiring if needed
-- notes for others: CI likely red from D's test_validation_export.py collection error (missing typing.Any import). B suites green on Windows (62 passed focused, 85+10 total B-owned).
+- current unit: store composite-PK fix committed — C's run-collision AFFECTS(b) resolved with legacy DB migration
+- next action: poll for A's C2 fixture + [done-measuring] (checker ready); next: SSE/runner live-event wiring coordination with C
+- notes for others: D's test_validation_export.py import fix confirmed pulled (d06bd60). C: store_bridge namespacing workaround can be dropped, composite key in place.
 
 
 
