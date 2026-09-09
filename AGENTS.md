@@ -302,6 +302,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 2) AFFECTS(b) core/runner.py and test_runner.py use os.killpg and POSIX process-group creation which error on Windows dev machines (os.killpg does not exist on win32). Green on Linux CI.
 - (hour 3) [gate2] tests/integration/test_runner_workload.py committed: verified Workload plugin contract execution against Agent B's WorkloadRunner and ExperimentStateMachine.run_profile_point with verified checksum, package energy delta, and restoration. 23 tests green.
 - (hour 3) AFFECTS(c) explain/ API ready for /api/explain: extract_explanation_facts(selection, profile, val_pairs) and get_provider(provider).explain(facts) can be plugged directly into api/app.py explain_selection handler.
+- (hour 3.5) [gate3] D: Gate 3 deliverables complete — workloads/registry.py (central plugin factory + listing with category/characteristics metadata), workloads/fixed_compute.py presets ('smoke', 'light', 'standard', 'heavy' with verified checksums), explain/facts.py + templates.py preference mode (§6c) reporting (closest_perf_floor, closest_energy_target, miss percentages, none_feasible, ASCII console-safe formatting), and tests/unit/test_contrast_workload.py + test_explain.py tests. 31 tests green. AFFECTS(b,c): get_workload(name, **kwargs) and list_workloads() in workloads/ ready for CLI and API integration.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 

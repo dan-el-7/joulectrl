@@ -61,29 +61,38 @@ def format_preference_explanation(facts: dict[str, Any]) -> str:
     """Format explanation for Preference Mode (§6c)."""
     sel = facts.get("selected_config")
     base = facts.get("baseline_config")
-    e_target = facts.get("energy_target_pct")
-    perf_floor = facts.get("perf_floor_pct")
+    e_target = facts.get("energy_target_pct") or 0.0
+    perf_floor = facts.get("perf_floor_pct") or 0.0
     state = facts.get("preference_outcome_state")
     e_red = facts.get("energy_reduction_pct")
     t_inc = facts.get("runtime_increase_pct")
 
     lines = [
-        f"Preference Mode targets: energy ≤ {e_target:.1f}% of baseline, performance ≥ {perf_floor:.1f}% of baseline speed.",
+        f"Preference Mode targets: energy <= {e_target:.1f}% of baseline, performance >= {perf_floor:.1f}% of baseline speed.",
     ]
 
-    if state == "both_met":
+    if state == "both_met" and sel:
+        throughput_pct = 100.0 / (1.0 + (t_inc or 0.0) / 100.0)
         lines.append(
             f"Configuration {sel['id']} satisfies both targets, achieving a {e_red:.1f}% energy reduction "
-            f"while retaining {100.0 / (1.0 + (t_inc or 0.0) / 100.0):.1f}% of baseline throughput."
+            f"while retaining {throughput_pct:.1f}% of baseline throughput."
         )
-    elif state == "closest_perf_floor":
+    elif state == "closest_perf_floor" and sel:
+        e_miss = facts.get("energy_target_miss_pct")
+        miss_str = f" (energy target missed by {e_miss:.1f}%)" if e_miss is not None else ""
         lines.append(
-            f"No measured configuration met both targets. Selected {sel['id']} as the closest candidate meeting the performance floor."
+            f"No measured configuration met both targets. Selected {sel['id']} as the closest candidate "
+            f"meeting the performance floor{miss_str}."
         )
-    elif state == "closest_energy_target":
+    elif state == "closest_energy_target" and sel:
+        p_miss = facts.get("perf_floor_miss_pct")
+        miss_str = f" (performance floor missed by {p_miss:.1f}%)" if p_miss is not None else ""
         lines.append(
-            f"No measured configuration met both targets. Selected {sel['id']} as the closest candidate meeting the energy target."
+            f"No measured configuration met both targets. Selected {sel['id']} as the closest candidate "
+            f"meeting the energy target{miss_str}."
         )
+    elif state == "none_feasible":
+        lines.append("No measured configuration could satisfy either the energy target or the performance floor.")
     else:
         lines.append(facts.get("status_message") or "No configuration satisfied the preference targets.")
 
@@ -94,7 +103,7 @@ def format_preference_explanation(facts: dict[str, Any]) -> str:
         )
 
     val = facts.get("validation")
-    if val and val["validation_passed"]:
+    if val and val.get("validation_passed"):
         lines.append(f"Fresh validation verified: {val['met_budget_count']} of {val['total_pairs']} pairs succeeded.")
 
     return "\n\n".join(lines)
@@ -106,10 +115,16 @@ def format_edge_state_explanation(facts: dict[str, Any]) -> str:
     deadline_s = facts.get("deadline_s")
 
     if status == "no_feasible_point":
-        return (
-            f"No feasible configuration found meeting your runtime budget of {deadline_s:.1f}s. "
-            f"All measured configurations exceeded the guarded runtime threshold."
-        )
+        if deadline_s is not None:
+            return (
+                f"No feasible configuration found meeting your runtime budget of {deadline_s:.1f}s. "
+                f"All measured configurations exceeded the guarded runtime threshold."
+            )
+        else:
+            return (
+                "No feasible configuration found meeting the specified targets. "
+                "All measured configurations exceeded the guarded threshold."
+            )
     elif status == "baseline_already_optimal":
         return (
             "The baseline configuration is already the lowest-energy measured configuration. "

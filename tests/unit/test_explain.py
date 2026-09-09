@@ -87,10 +87,76 @@ class TestExplanationLayer(unittest.TestCase):
         facts = extract_explanation_facts(pref_sel, self.profile, self.val_pairs)
         text = generate_explanation(facts)
         self.assertIn("Preference Mode targets", text)
-        self.assertIn("energy ≤ 70.0%", text)
-        self.assertIn("performance ≥ 60.0%", text)
+        self.assertIn("energy <= 70.0%", text)
+        self.assertIn("performance >= 60.0%", text)
         self.assertIn("satisfies both targets", text)
         self.assertIn("44.6% energy reduction", text)
+
+    def test_preference_closest_perf_floor(self):
+        pref_sel = Selection(
+            experiment_id="exp-pref-cpf",
+            objective_mode="preference",
+            status="selected",
+            status_message="Selected",
+            selected_config_id="cfg_zen5c_4c_3000",
+            selected_configuration=self.selection.selected_configuration,
+            selected_median_energy_j=1200.0,
+            selected_median_runtime_s=32.0,
+            baseline_config_id="cfg_stock_all",
+            baseline_median_energy_j=1580.0,
+            baseline_median_runtime_s=28.5,
+            energy_reduction_pct=24.1,
+            runtime_increase_pct=12.3,
+            energy_target_pct=70.0,
+            perf_floor_pct=85.0,
+            preference_outcome_state="closest_perf_floor",
+            energy_target_miss_pct=6.0,
+        )
+        facts = extract_explanation_facts(pref_sel, self.profile)
+        text = generate_explanation(facts)
+        self.assertIn("No measured configuration met both targets", text)
+        self.assertIn("closest candidate meeting the performance floor", text)
+        self.assertIn("energy target missed by 6.0%", text)
+
+    def test_preference_closest_energy_target(self):
+        pref_sel = Selection(
+            experiment_id="exp-pref-cet",
+            objective_mode="preference",
+            status="selected",
+            status_message="Selected",
+            selected_config_id="cfg_zen5c_4c_2000",
+            selected_configuration=self.selection.selected_configuration,
+            selected_median_energy_j=810.0,
+            selected_median_runtime_s=62.0,
+            baseline_config_id="cfg_stock_all",
+            baseline_median_energy_j=1580.0,
+            baseline_median_runtime_s=28.5,
+            energy_reduction_pct=48.7,
+            runtime_increase_pct=117.5,
+            energy_target_pct=60.0,
+            perf_floor_pct=80.0,
+            preference_outcome_state="closest_energy_target",
+            perf_floor_miss_pct=35.2,
+        )
+        facts = extract_explanation_facts(pref_sel, self.profile)
+        text = generate_explanation(facts)
+        self.assertIn("No measured configuration met both targets", text)
+        self.assertIn("closest candidate meeting the energy target", text)
+        self.assertIn("performance floor missed by 35.2%", text)
+
+    def test_preference_none_feasible(self):
+        pref_sel = Selection(
+            experiment_id="exp-pref-none",
+            objective_mode="preference",
+            status="no_feasible_point",
+            status_message="No configuration satisfied targets",
+            energy_target_pct=30.0,
+            perf_floor_pct=99.0,
+            preference_outcome_state="none_feasible",
+        )
+        facts = extract_explanation_facts(pref_sel)
+        text = generate_explanation(facts)
+        self.assertIn("No feasible configuration found meeting the specified targets", text)
 
     def test_edge_states(self):
         # 1. No feasible point

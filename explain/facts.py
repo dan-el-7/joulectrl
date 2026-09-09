@@ -30,8 +30,11 @@ def extract_explanation_facts(
         "energy_target_pct": selection.energy_target_pct,
         "perf_floor_pct": selection.perf_floor_pct,
         "preference_outcome_state": selection.preference_outcome_state,
+        "energy_target_miss_pct": selection.energy_target_miss_pct,
+        "perf_floor_miss_pct": selection.perf_floor_miss_pct,
         "energy_reduction_pct": selection.energy_reduction_pct,
         "runtime_increase_pct": selection.runtime_increase_pct,
+        "frontier_config_ids": selection.frontier_config_ids,
     }
 
     # Selected configuration details

@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T10:45:00Z`
+- heartbeat: `2026-09-09T11:05:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/runner-workload-integration`
-- current unit: `committed tests/integration/test_runner_workload.py (Gate 2 deliverable met)`
-- next action: `prepare Gate 3 contrast workloads and preference-mode template tests per PLAN §4/§6c`
-- notes for others: `Gate 2 exit met: Workload plugin contract verified against Agent B runner and state machine. 23 tests green.`
+- branch: `d/gate3-contrast-and-preference`
+- current unit: `Gate 3 deliverables complete: workloads registry, fixed_compute presets, preference templates, contrast tests (31 tests green)`
+- next action: `merge to main, prepare Gate 4 fresh validation pair fixtures and drift check integration tests`
+- notes for others: `Gate 3 exit met ([gate3]). get_workload(name, **kwargs) and list_workloads() in workloads/ ready for CLI and API. 31 tests green.`

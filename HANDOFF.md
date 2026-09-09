@@ -75,8 +75,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/`, integration tests `tests/integration/test_workload_lifecycle.py`, demo script `demo/run_demo.py`, and runner workload integration `tests/integration/test_runner_workload.py`. 23 tests passing.
-- **In flight:** Gate 3 preparation: contrast workload variations and preference-mode template extensions.
-- **Resume here:** `python -m unittest tests/integration/test_runner_workload.py`
-- **Gotchas:** `WorkloadRunner` requires `RunContext` initialized and `workload.prepare()` invoked outside measurement window.
-- **Handoffs owed / waiting on:** Gate 2 exit met for Agent D (`[gate2]` posted). Unblocked cross-cutting validation.
+- **Done & verified:** Gate 3 exit met ([gate3]): Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py` with presets ('smoke', 'light', 'standard', 'heavy'), workload registry `workloads/registry.py` with `get_workload`/`list_workloads`, clean-build plugin `workloads/clean_build.py`, explanation layer `explain/` with complete preference mode support (closest perf floor, closest energy target, miss percentages, none feasible, ASCII console safety), unit tests in `tests/unit/test_contrast_workload.py` and `tests/unit/test_explain.py`. 31 tests passing (100% green).
+- **In flight:** Gate 4 preparation: 3 fresh validation pairs, drift check verification, and watch-mode integration testing.
+- **Resume here:** `python -m unittest tests/unit/test_contrast_workload.py tests/unit/test_explain.py`
+- **Gotchas:** Terminal output on Windows cp1252 consoles cannot encode unicode mathematical symbols like ≤ / ≥ — use ASCII <= and >= in all explanation strings.
+- **Handoffs owed / waiting on:** Gate 3 exit met for Agent D (`[gate3]` posted). Unblocks Agent B and C CLI/API workload dynamic loading and preference explanation rendering.

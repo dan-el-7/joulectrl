@@ -19,6 +19,36 @@ KERNEL_SRC = os.path.join(KERNEL_DIR, "fixed_compute.c")
 REFERENCE_CHECKSUMS = {
     (4096, 100000): "0x3a762069507139ac",
     (1024, 50000): "0x23e23165be5ef4b6",
+    (2048, 50000): "0x8d10852193c21759",
+    (8192, 100000): "0x38a6af54e0c98b86",
+}
+
+# Standard parameter presets
+PRESETS: dict[str, dict[str, Any]] = {
+    "smoke": {
+        "chunks": 1024,
+        "iters": 50000,
+        "checksum": "0x23e23165be5ef4b6",
+        "description": "Fast smoke-test compute (1024 chunks, 50k iters)",
+    },
+    "light": {
+        "chunks": 2048,
+        "iters": 50000,
+        "checksum": "0x8d10852193c21759",
+        "description": "Light compute load (2048 chunks, 50k iters)",
+    },
+    "standard": {
+        "chunks": 4096,
+        "iters": 100000,
+        "checksum": "0x3a762069507139ac",
+        "description": "Standard compute benchmark (4096 chunks, 100k iters)",
+    },
+    "heavy": {
+        "chunks": 8192,
+        "iters": 100000,
+        "checksum": "0x38a6af54e0c98b86",
+        "description": "Heavy compute load (8192 chunks, 100k iters)",
+    },
 }
 
 
@@ -26,16 +56,28 @@ class FixedComputeWorkload(Workload):
     """Deterministic CPU-bound integer hashing kernel workload.
     
     Demonstrates workload scaling with invariant checksum and zero GIL contention.
+    Supports standard presets ('smoke', 'light', 'standard', 'heavy') or custom
+    (chunks, iters) parameters.
     """
 
     def __init__(
         self,
-        chunks: int = 4096,
-        iters: int = 100000,
+        preset: Optional[str] = None,
+        chunks: Optional[int] = None,
+        iters: Optional[int] = None,
         binary_path: Optional[str] = None,
     ):
-        self.chunks = chunks
-        self.iters = iters
+        self.preset = preset
+        if preset is not None:
+            if preset not in PRESETS:
+                raise ValueError(f"Unknown preset '{preset}'. Available: {list(PRESETS.keys())}")
+            p_data = PRESETS[preset]
+            self.chunks = chunks if chunks is not None else p_data["chunks"]
+            self.iters = iters if iters is not None else p_data["iters"]
+        else:
+            self.chunks = chunks if chunks is not None else 4096
+            self.iters = iters if iters is not None else 100000
+
         self._custom_binary = binary_path
         self._resolved_binary: Optional[str] = binary_path
 
@@ -133,6 +175,7 @@ class FixedComputeWorkload(Workload):
             "source_sha256": src_sha,
             "chunks": self.chunks,
             "iters_per_chunk": self.iters,
+            "preset": self.preset,
             "total_work_units": self.chunks * self.iters,
             "compiler": os.environ.get("CC", "gcc"),
             "cflags": "-O3 -Wall -Wextra -pthread",
