@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
+from core.events import EventBus, ExperimentEvents, default_bus, _timestamp_iso
 from core.models import Configuration, RunRecord
 from core.runner import WorkloadRunner
 from core.store import Store
@@ -38,9 +39,17 @@ _ALLOWED = {
 class ExperimentStateMachine:
     """Guard the persisted lifecycle for a single experiment."""
 
-    def __init__(self, store: Store, experiment_id: str) -> None:
+    def __init__(
+        self,
+        store: Store,
+        experiment_id: str,
+        *,
+        events: Optional[ExperimentEvents] = None,
+        bus: Optional[EventBus] = None,
+    ) -> None:
         self.store = store
         self.experiment_id = experiment_id
+        self.events = events or (bus or default_bus()).for_experiment(experiment_id)
         if not self.store.get_experiment(experiment_id):
             raise ValueError(f"Experiment {experiment_id} does not exist")
 
@@ -51,9 +60,20 @@ class ExperimentStateMachine:
         return str(experiment["state"])
 
     def transition(self, target: str, reason: str = "") -> None:
-        if target not in _ALLOWED.get(self.state, set()):
-            raise InvalidTransition(f"cannot transition {self.state} -> {target}")
+        current = self.state
+        if target not in _ALLOWED.get(current, set()):
+            raise InvalidTransition(f"cannot transition {current} -> {target}")
         self.store.transition_state(self.experiment_id, target, reason)
+        self.events.publish(
+            "experiment_state",
+            {
+                "experiment_id": self.experiment_id,
+                "state": target,
+                "previous_state": current,
+                "timestamp": _timestamp_iso(),
+                "message": reason,
+            },
+        )
 
     def fail(self, reason: str) -> None:
         """Record failure, then always enter the restoration path."""
@@ -90,8 +110,26 @@ class ExperimentStateMachine:
         if self.state != "PROFILING":
             raise InvalidTransition(f"cannot profile from {self.state}")
 
+        self.events.publish(
+            "run_progress",
+            {
+                "experiment_id": self.experiment_id,
+                "phase": "profiling",
+                "config_id": configuration.id,
+                "repetition": repetition,
+                "status": "running",
+            },
+        )
         record = runner.run(
             workload, self.experiment_id, configuration, repetition, timeout_s=timeout_s
+        )
+        self.events.publish(
+            "run_complete",
+            {
+                "experiment_id": self.experiment_id,
+                "phase": "profiling",
+                "run_record": record.to_dict(),
+            },
         )
         if record.status == "success":
             self.transition("PROFILE_READY", "profile point recorded")
@@ -104,14 +142,31 @@ class ExperimentStateMachine:
         if self.state not in {"RESTORING", "RESTORED", "RECOVERY_REQUIRED"}:
             self.transition("RESTORING", "restoration required")
         self.store.update_restoration_status(self.experiment_id, "restoring")
+        self.events.publish(
+            "restore_status",
+            {"status": "restoring", "verified": False, "timestamp": _timestamp_iso()},
+        )
         try:
             restore_settings()
         except Exception as exc:
             self.store.update_restoration_status(self.experiment_id, "recovery_required")
+            self.events.publish(
+                "restore_status",
+                {
+                    "status": "recovery_required",
+                    "verified": False,
+                    "error": str(exc),
+                    "timestamp": _timestamp_iso(),
+                },
+            )
             if self.state == "RESTORING":
                 self.transition("RECOVERY_REQUIRED", f"restore failed: {exc}")
             return False
         self.store.update_restoration_status(self.experiment_id, "restored")
+        self.events.publish(
+            "restore_status",
+            {"status": "restored", "verified": True, "timestamp": _timestamp_iso()},
+        )
         if self.state == "RESTORING":
             self.transition("RESTORED", "restore verified")
         return True
