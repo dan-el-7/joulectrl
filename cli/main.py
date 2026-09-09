@@ -128,6 +128,25 @@ def check_calibration(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def run_doctor(args: argparse.Namespace) -> int:
+    """Render A's capability report (core/doctor.py); degrades off-Linux."""
+    from core.doctor import doctor_report, format_doctor
+
+    # The helper socket is Linux-only; skip the probe on other platforms so
+    # the report renders (with honest "unavailable" fields) on dev machines.
+    helper_available = sys.platform.startswith("linux")
+    try:
+        report = doctor_report(helper_available=helper_available)
+    except Exception as exc:  # discovery may fail hard on non-Linux dev boxes
+        print(f"capability discovery failed on this machine: {exc}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print(format_doctor(report))
+    return 0
+
+
 def run_fixed_compute(args: argparse.Namespace) -> int:
     capability = _capability(Path(args.capabilities))
     energy = capability.get("package_energy", {})
@@ -196,6 +215,11 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--c2", default="fixtures/real/calibration_c2.json")
     check.add_argument("--c1", default="fixtures/real/calibration_c1.json")
     check.set_defaults(handler=check_calibration)
+    doctor = sub.add_parser(
+        "doctor", help="capability report: topology, classes, controls, energy source"
+    )
+    doctor.add_argument("--json", action="store_true", help="emit the raw report dict")
+    doctor.set_defaults(handler=run_doctor)
     run = sub.add_parser("run-fixed", help="measure the approved fixed-compute workload")
     run.add_argument("--capabilities", default="fixtures/real/capability_report.json")
     run.add_argument("--socket", default="/run/joulectrl-helper.sock")

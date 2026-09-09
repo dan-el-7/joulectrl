@@ -112,3 +112,12 @@ def test_check_calibration_problems_return_1(tmp_path, capsys):
     )
     assert code == 1
     assert "PROBLEMS FOUND" in capsys.readouterr().out
+
+
+def test_doctor_command_renders_or_degrades_cleanly(capsys):
+    # On Linux: exit 0 with a rendered report. On Windows: either a rendered
+    # degraded report (exit 0) or a clean error (exit 2) — never a traceback.
+    code = run_cli(["doctor"], capsys)
+    assert code in (0, 2)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.out + captured.err
