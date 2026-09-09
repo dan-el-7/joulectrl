@@ -7,8 +7,120 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
-from core.models import Configuration, Profile, RunRecord, ValidationPair
+from core.models import Configuration, CoreClassMap, Profile, RunRecord, ValidationPair
 from core.store import Store
+
+
+@dataclass
+class LayoutSpec:
+    """One PLAN §6 execution layout: mask shape, worker count, class requirement."""
+
+    layout_id: str
+    description: str
+    workers: int
+    requires_class: Optional[str]  # None = whole machine
+
+
+def _sibling_pairs(class_cpus: Sequence[int], count: int) -> list[int]:
+    """First `count` physical cores' CPUs of a class (one entry per core, assuming
+    class lists are ordered and SMT siblings share a core index)."""
+    return list(class_cpus[:count])
+
+
+def layout_configurations(class_map: CoreClassMap) -> list[Configuration]:
+    """Build the execution layouts (PLAN §6) from the discovered class map.
+
+    Layout A: 4 verified higher-performance physical cores, one SMT sibling each.
+    Layout B: all 8 physical cores, one SMT sibling each.
+    Layout C: all 16 logical CPUs.
+    Layout D: all four efficient-class physical cores, one SMT sibling each.
+
+    If class identification is unavailable (heterogeneous=False / empty classes),
+    fall back to a documented four-physical-core mask, labeled accordingly.
+    """
+    classes = class_map.classes or {}
+    fast = class_map.fast_class
+    efficient = class_map.efficient_class
+    fast_cpus = classes.get(fast) or []
+    efficient_cpus = classes.get(efficient) or []
+    heterogeneous = class_map.is_heterogeneous and fast_cpus and efficient_cpus
+
+    configs: list[Configuration] = []
+    if heterogeneous:
+        configs.append(
+            Configuration(
+                id="layout_A_fast_4c",
+                layout="A",
+                cpu_affinity=_sibling_pairs(fast_cpus, 4),
+                worker_count=4,
+                metadata={"description": "4 fast-class physical cores, one SMT sibling each"},
+            )
+        )
+        configs.append(
+            Configuration(
+                id="layout_D_efficient_4c",
+                layout="D",
+                cpu_affinity=_sibling_pairs(efficient_cpus, 4),
+                worker_count=4,
+                metadata={"description": "4 efficient-class physical cores, one SMT sibling each"},
+            )
+        )
+    else:
+        # Documented fallback: first four physical CPUs, labeled accordingly.
+        physical = class_map.layouts.get("B") or sorted(
+            cpu for cpus in classes.values() for cpu in cpus
+        )[:4]
+        configs.append(
+            Configuration(
+                id="layout_A_unclassified_4c",
+                layout="A",
+                cpu_affinity=list(physical[:4]),
+                worker_count=4,
+                metadata={"description": "fallback: 4 physical cores (class identification unavailable)"},
+            )
+        )
+
+    layout_b = class_map.layouts.get("B")
+    if layout_b:
+        configs.append(
+            Configuration(
+                id="layout_B_all_physical",
+                layout="B",
+                cpu_affinity=list(layout_b),
+                worker_count=8,
+                metadata={"description": "all physical cores, one SMT sibling each"},
+            )
+        )
+    layout_c = class_map.layouts.get("C")
+    if layout_c:
+        configs.append(
+            Configuration(
+                id="layout_C_all_logical",
+                layout="C",
+                cpu_affinity=list(layout_c),
+                worker_count=16,
+                metadata={"description": "all logical CPUs"},
+            )
+        )
+    return configs
+
+
+def dedupe_configurations(configs: Sequence[Configuration]) -> list[Configuration]:
+    """PLAN §6: deduplicate settings that resolve identically after per-policy
+    resolution (same layout shape + same effective affinity + same workers)."""
+    seen: dict[tuple, int] = {}
+    unique: list[Configuration] = []
+    for config in configs:
+        key = (
+            config.layout,
+            tuple(sorted(set(config.cpu_affinity or []))),
+            config.worker_count,
+        )
+        if key in seen:
+            continue
+        seen[key] = 1
+        unique.append(config)
+    return unique
 
 
 @dataclass

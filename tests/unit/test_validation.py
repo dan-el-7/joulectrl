@@ -45,3 +45,60 @@ def test_validation_marks_restore_failure_and_never_claims_ok():
     ).run()
     assert report.restoration_errors
     assert not report.ok
+
+
+# ---------------------------------------------------------------------------
+# Execution-layout validation points (PLAN §6, Gate 3 B-item)
+# ---------------------------------------------------------------------------
+
+from core.models import CoreClassMap
+from core.validation import dedupe_configurations, layout_configurations
+
+
+def heterogeneous_map():
+    return CoreClassMap(
+        classes={"fast": [0, 2, 4, 6, 8, 10, 12, 14], "efficient": [1, 3, 5, 7, 9, 11, 13, 15]},
+        layouts={"B": list(range(16)), "C": list(range(16))},
+        fast_class="fast",
+        efficient_class="efficient",
+        is_heterogeneous=True,
+    )
+
+
+def test_layout_configurations_build_all_four_layouts():
+    configs = {c.id: c for c in layout_configurations(heterogeneous_map())}
+    assert set(configs) == {"layout_A_fast_4c", "layout_B_all_physical", "layout_C_all_logical", "layout_D_efficient_4c"}
+    a = configs["layout_A_fast_4c"]
+    assert a.layout == "A" and a.worker_count == 4
+    assert a.cpu_affinity == [0, 2, 4, 6]
+    d = configs["layout_D_efficient_4c"]
+    assert d.cpu_affinity == [1, 3, 5, 7]
+    b = configs["layout_B_all_physical"]
+    assert b.layout == "B" and b.worker_count == 8
+    c = configs["layout_C_all_logical"]
+    assert c.layout == "C" and c.worker_count == 16
+
+
+def test_layout_fallback_when_class_identification_unavailable():
+    class_map = CoreClassMap(
+        classes={"all": list(range(16))},
+        layouts={"B": list(range(16)), "C": list(range(16))},
+        fast_class="",
+        efficient_class="",
+        is_heterogeneous=False,
+    )
+    configs = {c.id: c for c in layout_configurations(class_map)}
+    assert "layout_A_fast_4c" not in configs
+    assert "layout_D_efficient_4c" not in configs
+    fallback = configs["layout_A_unclassified_4c"]
+    assert fallback.worker_count == 4
+    assert "fallback" in fallback.metadata["description"]
+    assert "class identification unavailable" in fallback.metadata["description"]
+
+
+def test_dedupe_configurations_collapses_identical_resolutions():
+    cfg1 = Configuration(id="a", layout="A", worker_count=4, cpu_affinity=[0, 2, 4, 6])
+    cfg_dup = Configuration(id="a2", layout="A", worker_count=4, cpu_affinity=[6, 4, 2, 0])
+    cfg_other = Configuration(id="b", layout="A", worker_count=4, cpu_affinity=[0, 2, 4, 8])
+    result = dedupe_configurations([cfg1, cfg_dup, cfg_other])
+    assert [c.id for c in result] == ["a", "b"]
