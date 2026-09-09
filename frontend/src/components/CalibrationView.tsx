@@ -43,6 +43,7 @@ interface CalibrationData {
   classes: ClassSummary[];
   scopes_available?: Record<string, string[]>;
   all_cores_measured?: boolean;
+  workers_available?: number[];
 }
 
 type ClassFilter = 'all' | string;
@@ -56,11 +57,17 @@ const fmt = (v: number | undefined | null, digits = 1) =>
   v == null || Number.isNaN(v as number) ? '—' : (v as number).toFixed(digits);
 
 const classColor = (label: string) =>
-  label === 'fast' ? colors.series.fast : colors.series.efficient;
+  label === 'fast'
+    ? colors.series.fast
+    : label === 'efficient'
+      ? colors.series.efficient
+      : colors.series.accent2;
 
 /** Data-driven class display name: "fast · ≤5.09 GHz" — never hardcoded core names. */
-const classDisplayName = (c: ClassSummary) =>
-  c.hw_max_freq_khz ? `${c.label} · ≤${(c.hw_max_freq_khz / 1e6).toFixed(2)} GHz` : c.label;
+const classDisplayName = (c: ClassSummary) => {
+  if (c.label === 'all') return 'all cores (mixed classes)';
+  return c.hw_max_freq_khz ? `${c.label} · ≤${(c.hw_max_freq_khz / 1e6).toFixed(2)} GHz` : c.label;
+};
 
 /* ------------------------------------------------------------------ */
 /* chart primitives (SVG)                                              */
@@ -258,7 +265,7 @@ export const CalibrationView: React.FC = () => {
   const scopeOptions: { key: ScopeFilter; label: string; disabled?: boolean }[] = [
     { key: 'all', label: 'All scopes' },
     { key: 'single', label: 'Single-core' },
-    { key: 'multi', label: `Multicore${nPhys ? ` (${nPhys} cores max measured)` : ''}` },
+    { key: 'multi', label: `Multicore${data?.workers_available?.length ? ` (${data.workers_available.filter((w) => w > 1).join('/')} workers)` : ''}` },
   ];
 
   return (
@@ -298,13 +305,12 @@ export const CalibrationView: React.FC = () => {
         </div>
       )}
 
-      {/* all-cores honesty notice */}
+      {/* all-cores honesty notice — only when genuinely unmeasured */}
       {scopeFilter === 'multi' && data && data.all_cores_measured === false && (
         <div style={{ ...card, padding: 12, ...type.small, color: colors.textTertiary, border: `1px solid ${colors.border}` }}>
           <span style={{ color: colors.amber, fontWeight: 600 }}>Not yet measured:</span> no all-cores
           calibration rows exist (nothing at {nPhys ?? '—'} physical / {nLog ?? '—'} logical workers).
-          Showing the widest layouts that were calibrated. A question is posted to Agent A about adding
-          an all-cores sweep row.
+          Showing the widest layouts that were calibrated.
         </div>
       )}
 

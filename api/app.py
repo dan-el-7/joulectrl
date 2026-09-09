@@ -334,6 +334,15 @@ def get_calibration() -> dict[str, Any]:
 
     c1_rows = load_rows("calibration_c1.json")
     c2_rows = load_rows("calibration_c2_effective.json")
+    allcores_rows = load_rows("calibration_c2_allcores.json")
+
+    # All-cores rows carry no per-class split (they span both classes) — expose
+    # them as a synthetic "all" class so the UI can offer them alongside
+    # fast/efficient. Rows keep their real layout (all8 / all16).
+    for row in allcores_rows:
+        row = dict(row)
+        row["class"] = "all"
+        c2_rows.append(row)
 
     # Class hardware context from the capability fixture (labels stay data-driven;
     # the UI never hardcodes core names). Falls back to class keys alone.
@@ -425,7 +434,7 @@ def get_calibration() -> dict[str, Any]:
         )
 
     # sort: fast first, points by perf/W ascending
-    out = sorted(classes.values(), key=lambda e: 0 if e["label"] == "fast" else 1)
+    out = sorted(classes.values(), key=lambda e: {"fast": 0, "efficient": 1, "all": 2}.get(e["label"], 3))
     for entry in out:
         entry["points"].sort(key=lambda p: p["perf_per_watt"])
         hw = cap_classes.get(entry["label"]) or {}
@@ -440,20 +449,25 @@ def get_calibration() -> dict[str, Any]:
     scopes_available: dict[str, list[str]] = {}
     for entry in out:
         scopes_available[entry["label"]] = sorted({p["scope"] for p in entry["points"]})
+    n_phys = topo_info.get("physical_cores") or 0
+    n_log = topo_info.get("logical_cores") or 0
     all_cores_measured = any(
-        len(p.get("cpus") or []) >= (topo_info.get("physical_cores") or 0)
-        for entry in out
-        for p in entry["points"]
+        n_phys and len(p.get("cpus") or []) >= n_phys for entry in out for p in entry["points"]
+    )
+    workers_available = sorted(
+        {p["workers"] for entry in out for p in entry["points"]}
     )
 
     return {
-        "source": "fixtures/real/calibration_c1.json + calibration_c2_effective.json",
-        "captured_utc": _fixture_captured_utc("calibration_c2_effective.json"),
+        "source": "fixtures/real/calibration_c1.json + calibration_c2_effective.json + calibration_c2_allcores.json",
+        "captured_utc": _fixture_captured_utc("calibration_c2_allcores.json")
+        or _fixture_captured_utc("calibration_c2_effective.json"),
         "kernel": "workloads/kernel/fixed_compute",
         "topology": topo_info,
         "classes": out,
         "scopes_available": scopes_available,
         "all_cores_measured": all_cores_measured,
+        "workers_available": workers_available,
         "note": "Measured medians from the demo laptop's verified hardware counter; calibration data never mixes into workload Pareto selection.",
     }
 
