@@ -78,9 +78,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `<UTC timestamp>`
-- session: `D#<n>` · status: `active | blocked(<reason>) | off`
-- branch: `<branch or "on main">`
-- current unit: `<one line>`
-- next action: `<exact next step>`
-- notes for others: `<...>`
+- heartbeat: `2026-09-09T10:10:00Z`
+- session: `D#1` · status: `active`
+- branch: `d/compute-kernel`
+- current unit: `committed compute kernel; starting workloads/base.py contract`
+- next action: `implement workloads/base.py Workload interface per PLAN §8 with unit tests`
+- notes for others: `compute kernel ready in workloads/kernel/ for Agent A C1/C2 calibration`

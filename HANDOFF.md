@@ -73,8 +73,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** `<...>`
-- **In flight:** `<...>`
-- **Resume here:** `<...>`
-- **Gotchas:** `<...>`
-- **Handoffs owed / waiting on:** `<...>`
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c` + `Makefile` + `build.sh` + `README.md` committed and tested (`tests/unit/test_compute_kernel.py` passes, verified checksum invariance across workers 1, 2, 4).
+- **In flight:** Implementing `workloads/base.py` plugin contract per PLAN §8.
+- **Resume here:** `python -m unittest tests/unit/test_compute_kernel.py`
+- **Gotchas:** `fixed_compute` needs `-pthread` on Linux. Checksum for default parameters is `0x3a762069507139ac`.
+- **Handoffs owed / waiting on:** Unblocked Agent A with compute kernel for calibration (C1 and C2).
