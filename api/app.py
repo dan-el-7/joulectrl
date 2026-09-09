@@ -187,7 +187,17 @@ def get_capabilities() -> dict[str, Any]:
                 },
                 "energy": {
                     "backend": (energy.get("package_paths") or [None])[0],
-                    "domain": "package",
+                    # RAPL domain derived from the discovered path (e.g.
+                    # intel-rapl:0 -> package-0) so live and fixture shapes match
+                    "domain": (
+                        "package-"
+                        + ((energy.get("package_paths") or [{}])[0].get("path", "")
+                           .rsplit("intel-rapl:", 1)[-1]
+                           .split("/")[0]
+                           .split(":")[0])
+                        if (energy.get("package_paths") or [{}])[0].get("path")
+                        else "package-0"
+                    ),
                     "available": energy_usable,
                     "root_required": energy.get("readable") == "permission_required",
                 },
