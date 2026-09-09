@@ -124,11 +124,13 @@ class SyntheticEnergyBackend:
 
     def advance_uj(self, delta_uj: int, dt_s: float = 0.0) -> None:
         """Advance the counter by delta_uj, wrapping at max_energy_range_uj."""
+        # Time is independent of counter availability: watch-mode detection must
+        # retain monotonic timing while energy reads are temporarily unavailable.
+        if dt_s > 0:
+            self._simulated_time_s += dt_s
         if not self._available:
             return
         self._current_uj = (self._current_uj + delta_uj) % self.max_energy_range_uj
-        if dt_s > 0:
-            self._simulated_time_s += dt_s
 
     def advance_j(self, joules: float, dt_s: float = 0.0) -> None:
         """Advance the counter by Joules."""

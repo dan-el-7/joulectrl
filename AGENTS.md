@@ -286,6 +286,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09 10:58 UTC) AFFECTS(a,c,d) Added `cli/main.py` `run-fixed`: only the approved fixed-compute plugin, helper-backed energy/control operations, persisted run, and unconditional restore/end-session. Arbitrary shell commands are not accepted. Help/compile smoke pass; Windows correctly reports helper OS limitation.
 - (2026-09-09 11:10 UTC) AFFECTS(a,c,d) Added `core/watch.py` passive detector and scripted-profile tests: learned idle baseline, sustained onset backdating, dip absorption, sustained idle end backtracking, wrap-safe energy, and unavailable-energy honesty. Bundled-Python compile/smoke confirms 31s→80s / 49s scripted window.
 - (2026-09-09 11:22 UTC) AFFECTS(a,c,d) Added `core/validation.py`: seeded randomized fresh baseline/candidate pairs, apply/restore callbacks around every run, deadline marking, persistence, and restoration-error honesty. Focused tests and bundled-Python smoke pass.
+- (2026-09-09 11:30 UTC) AFFECTS(d) Fixed `energy/synthetic.py`: simulated monotonic time now advances even while counter reads are unavailable, preserving watch detection timing. Added regression test; bundled-Python compile/smoke pass.
 
 
 

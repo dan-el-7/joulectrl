@@ -73,6 +73,18 @@ def test_scripted_power_profile():
     assert t_active == pytest.approx(31.0)
 
 
+def test_unavailable_counter_keeps_simulated_clock_moving():
+    backend = SyntheticEnergyBackend()
+    backend.enable_simulated_clock(0.0)
+    backend.set_available(False)
+
+    energy_uj, power_w, timestamp = backend.step(2.0)
+
+    assert energy_uj is None
+    assert power_w == pytest.approx(10.0)
+    assert timestamp == pytest.approx(2.0)
+
+
 def test_conforms_to_energy_backend_protocol():
     from energy.base import EnergyAccumulator, EnergyBackend, Reading
 
@@ -87,4 +99,3 @@ def test_conforms_to_energy_backend_protocol():
     assert delta.uj == 10_000_000
     assert delta.joules == pytest.approx(10.0)
     assert delta.elapsed_s == pytest.approx(1.0)
-
