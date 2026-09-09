@@ -55,7 +55,7 @@ pull --rebase before editing, push immediately after).
 ## Agent B — resume packet
 
 - **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), `core/optimizer.py` (11 tests). 29 unit tests green. `core/runner.py` and `tests/unit/test_runner.py` cover successful measurement, unavailable energy, verification failure, timeout, process-group cancellation, and Linux affinity. `core/experiment.py` and `tests/unit/test_experiment.py` cover legal lifecycle transitions, cancellation, and recovery-required restoration failure. Both units compile and manually smoke-test with the bundled Python interpreter.
-- **In flight:** None; runner and state machine are committed and pushed. Next is CI inspection, then the next Gate 2 integration unit.
+- **In flight:** B#3 is implementing the Gate 2 CLI integration over `Store`, `WorkloadRunner`, and `ExperimentStateMachine`.
 - **Resume here:** `git status --short; git log --oneline -5` then inspect CI before beginning `core/validation.py` or CLI work.
 - **Gotchas:** Runner uses `taskset --cpu-list` only on Linux, executes argument arrays directly (never shell string interpolation), and terminates POSIX process groups. This clone has no `python`, `py`, project venv, or pytest; bundled Python is `C:\Users\trive\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` but has no pytest.
 - **Handoffs owed / waiting on:** Gate 1 complete; unblocks all downstream agents. Ready for Agent D's workload runner integration.
