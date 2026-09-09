@@ -133,19 +133,43 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>Dynamic Budget Slider</div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, color: colors.emerald }}>{tempBudget}s</div>
           </div>
-          <input
-            type="range"
-            min="25"
-            max="65"
-            step="0.5"
-            value={tempBudget}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              setTempBudget(val);
-              onReselect(val);
-            }}
-            style={{ width: '140px', accentColor: colors.emerald }}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="range"
+              min="1"
+              max="300"
+              step="0.5"
+              value={Math.min(Math.max(tempBudget, 1), 300)}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setTempBudget(val);
+                onReselect(val);
+              }}
+              style={{ width: '140px', accentColor: colors.emerald }}
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={tempBudget}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v > 0) setTempBudget(v);
+              }}
+              onBlur={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v > 0) onReselect(v);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+              style={{
+                width: 64, padding: '2px 6px', borderRadius: 4,
+                border: `1px solid ${colors.border}`, background: colors.surfaceElevated,
+                color: colors.textPrimary, fontSize: '0.8rem',
+              }}
+            />
+            <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>s</span>
+          </div>
         </div>
       </div>
 

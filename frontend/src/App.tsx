@@ -196,6 +196,11 @@ export const App: React.FC = () => {
             onChangeCalibrationBudget={setCalibrationBudgetS}
             onStartExperiment={handleStartExperiment}
             isStarting={isStarting}
+            baselineRuntimeS={
+              experiment?.profile?.baseline_config_id
+                ? experiment.profile.configurations?.[experiment.profile.baseline_config_id]?.median_runtime_s ?? null
+                : null
+            }
           />
         )}
 

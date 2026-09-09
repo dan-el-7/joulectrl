@@ -403,6 +403,18 @@ export const CalibrationView: React.FC = () => {
             Higher is better. Points with equal class + worker count but different controls show the
             measured frequency/boost tradeoff.
           </div>
+          {/* machine-fact honesty note: why the curve is 2 points on this laptop */}
+          {data && classes.length > 0 && classes.every((c) => new Set(c.points.filter((p) => p.workers > 1).map((p) => p.control)).size <= 2) && (
+            <div style={{ ...type.small, color: colors.textTertiary, maxWidth: 640, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${colors.borderSubtle}` }}>
+              <span style={{ color: colors.amber }}>Two control points per class</span> — measured machine
+              fact (Gate B, see capability report): on this hardware frequency caps bind only with boost
+              off, which clamps both classes to base clock (~2 GHz); intermediate caps all measure base.
+              The effective control space is stock (boost on) vs base (boost off), so each curve is the
+              measured segment between exactly those two operating points — not a missing sweep. A
+              denser curve would need a machine whose caps bind across a frequency ladder (discrete P-state
+              list) or working EPP tiers; the discovery code path handles both when present.
+            </div>
+          )}
           {hovered && (
             <div
               style={{

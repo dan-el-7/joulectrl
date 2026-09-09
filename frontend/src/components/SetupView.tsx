@@ -2,6 +2,58 @@ import React from 'react';
 import { CapabilitiesResponse, WorkloadInfo, classCpus } from '../types';
 import { colors } from '../design';
 
+
+/** Numeric text input synced with a slider — free typing, no artificial caps. */
+const NumField: React.FC<{
+  value: number;
+  onCommit: (v: number) => void;
+  min?: number;
+  max?: number;
+  unit?: string;
+  width?: number;
+}> = ({ value, onCommit, min, max, unit, width = 84 }) => {
+  const [text, setText] = React.useState(String(value));
+  const [focused, setFocused] = React.useState(false);
+  React.useEffect(() => {
+    if (!focused) setText(String(value));
+  }, [value, focused]);
+  const commit = () => {
+    const v = parseFloat(text);
+    if (Number.isFinite(v) && v > 0) onCommit(v);
+    else setText(String(value));
+  };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); commit(); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { commit(); (e.target as HTMLInputElement).blur(); } }}
+        onChange={(e) => setText(e.target.value)}
+        style={{
+          width, padding: '2px 6px', borderRadius: 4,
+          border: `1px solid ${colors.border}`, background: colors.surfaceElevated,
+          color: colors.textPrimary, fontFamily: 'inherit', fontSize: '0.8rem',
+        }}
+      />
+      {unit && <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>{unit}</span>}
+    </span>
+  );
+};
+
+/** Honest warning when a runtime budget is implausibly small/large vs the task. */
+const budgetWarning = (budgetS: number | null, estTaskS?: number | null): string | null => {
+  if (budgetS === null) return null;
+  if (budgetS < 1) return 'Sub-second budget: almost no measured configuration can finish in time — the selector will honestly report no feasible point.';
+  if (budgetS < 5) return 'Very tight budget: only the fastest (highest-power) configurations can meet this; expect little or no energy saving.';
+  if (estTaskS && budgetS < estTaskS * 0.5)
+    return `Budget is less than half the measured baseline runtime (~${estTaskS.toFixed(1)}s) — likely infeasible; the baseline itself may not finish in time.`;
+  if (budgetS > 3600) return 'Budget over an hour: valid, but energy savings plateau once runtime is unconstrained.';
+  return null;
+};
+
 interface SetupViewProps {
   capabilities: CapabilitiesResponse | null;
   workloads: WorkloadInfo[];
@@ -19,6 +71,7 @@ interface SetupViewProps {
   onChangeCalibrationBudget: (val: number | null) => void;
   onStartExperiment: () => void;
   isStarting: boolean;
+  baselineRuntimeS?: number | null;
 }
 
 export const SetupView: React.FC<SetupViewProps> = ({
@@ -38,6 +91,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onChangeCalibrationBudget,
   onStartExperiment,
   isStarting,
+  baselineRuntimeS,
 }) => {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
@@ -124,13 +178,18 @@ export const SetupView: React.FC<SetupViewProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <input
                   type="range"
-                  min="20"
-                  max="90"
+                  min="1"
+                  max="300"
                   step="0.5"
-                  value={runtimeBudgetS ?? 45}
+                  value={Math.min(Math.max(runtimeBudgetS ?? 45, 1), 300)}
                   disabled={runtimeBudgetS === null}
                   onChange={(e) => onChangeRuntimeBudget(parseFloat(e.target.value))}
                   style={{ flex: 1, accentColor: colors.emerald }}
+                />
+                <NumField
+                  value={runtimeBudgetS ?? 45}
+                  onCommit={onChangeRuntimeBudget}
+                  unit="s"
                 />
                 <label style={{ fontSize: '0.75rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <input
@@ -144,6 +203,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
               <div style={{ fontSize: '0.72rem', color: colors.textTertiary, marginTop: '0.4rem' }}>
                 Rule: lowest-energy measured configuration meeting the empirical runtime rule (with 5% guard margin).
               </div>
+              {budgetWarning(runtimeBudgetS, baselineRuntimeS) && (
+                <div style={{ fontSize: '0.75rem', color: colors.amber, marginTop: '0.35rem', display: 'flex', gap: 6 }}>
+                  <span>⚠</span>
+                  <span>{budgetWarning(runtimeBudgetS, baselineRuntimeS)}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -156,13 +221,16 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 </div>
                 <input
                   type="range"
-                  min="40"
+                  min="5"
                   max="100"
                   step="5"
-                  value={energyTargetPct}
+                  value={Math.min(Math.max(energyTargetPct, 5), 100)}
                   onChange={(e) => onChangeEnergyTarget(parseInt(e.target.value))}
                   style={{ width: '100%', accentColor: colors.amber }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                  <NumField value={energyTargetPct} onCommit={onChangeEnergyTarget} unit="%" />
+                </div>
               </div>
 
               <div>
@@ -172,13 +240,16 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 </div>
                 <input
                   type="range"
-                  min="50"
+                  min="10"
                   max="100"
                   step="5"
-                  value={perfFloorPct}
+                  value={Math.min(Math.max(perfFloorPct, 10), 100)}
                   onChange={(e) => onChangePerfFloor(parseInt(e.target.value))}
                   style={{ width: '100%', accentColor: colors.accent }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                  <NumField value={perfFloorPct} onCommit={onChangePerfFloor} unit="%" />
+                </div>
               </div>
               <div style={{ fontSize: '0.72rem', color: colors.textTertiary }}>
                 Spec §6c: Reports closest honest outcome explicitly if no single candidate satisfies both constraints.
@@ -199,13 +270,14 @@ export const SetupView: React.FC<SetupViewProps> = ({
             <input
               type="range"
               min="30"
-              max="300"
+              max="1800"
               step="10"
-              value={calibrationBudgetS ?? 120}
+              value={Math.min(Math.max(calibrationBudgetS ?? 120, 30), 1800)}
               disabled={calibrationBudgetS === null}
               onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
               style={{ flex: 1, accentColor: colors.accent }}
             />
+            <NumField value={calibrationBudgetS ?? 120} onCommit={onChangeCalibrationBudget} unit="s" />
             <label style={{ fontSize: '0.75rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <input
                 type="checkbox"
