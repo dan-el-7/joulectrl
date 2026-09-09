@@ -11,7 +11,7 @@ const isWindows = process.platform === 'win32';
 
 const PORT = parseInt(process.env.JOLECTRL_PORT || '8127', 10);
 // repo root = parent of frontend/
-const REPO = path.resolve(__dirname, '..');
+const REPO = path.resolve(__dirname, '../..');
 
 /* Python interpreter discovery — works on any Linux/macOS/Windows machine.
  * Order: explicit env override → local venv in the repo → python3/python on PATH. */

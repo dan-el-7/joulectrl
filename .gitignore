@@ -13,4 +13,5 @@ htmlcov/
 run_data/
 node_modules/
 frontend/dist/
+fixed_compute
 .DS_Store

@@ -251,6 +251,7 @@ def apply_live_profile(
     configurations: dict[str, dict[str, Any]],
     selection: Any,
     profile_source: str,
+    state: str = "selected",
 ) -> None:
     """Merge live-engine results into an experiment overlay dict (in place).
 
@@ -269,7 +270,7 @@ def apply_live_profile(
     profile["configurations"] = configurations
     profile["runs"] = runs
     profile["baseline_config_id"] = next(iter(configurations), None)
-    overlay["selection"] = selection_to_api(sel_dict)
+    overlay["selection"] = selection_to_api(sel_dict) if sel_dict else None
     overlay["_selection_model"] = sel_dict
-    overlay["state"] = "selected"
+    overlay["state"] = state
     overlay["profile_source"] = profile_source

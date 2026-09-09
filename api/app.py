@@ -284,6 +284,9 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             "experimental_passive_caps": req.experimental_passive_caps,
         }, seeded):
             _OVERLAY[exp_id]["state"] = "profiling"
+            prof = _OVERLAY[exp_id].setdefault("profile", {})
+            prof["runs"] = []
+            prof["configurations"] = {}
     except Exception as exc:  # pragma: no cover - stay on fixture path
         logging.warning("live engine unavailable, using fixture mode: %s", exc)
 

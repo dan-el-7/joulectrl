@@ -35,32 +35,42 @@ class EventBuffer:
         self._lock = threading.Lock()
         self._events: list[Event] = []
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._event: Optional[asyncio.Event] = None
 
     def attach(self, loop: asyncio.AbstractEventLoop) -> None:
         with self._lock:
             self._loop = loop
+            self._event = asyncio.Event()
 
     def push(self, event: Event) -> None:
         with self._lock:
             self._events.append(event)
             loop = self._loop
-        if loop is not None:
-            self._wake(loop)
-
-    def _wake(self, loop: asyncio.AbstractEventLoop) -> None:
-        try:
-            loop.call_soon_threadsafe(self._drain)
-        except RuntimeError:
-            pass  # loop closed — the stream is going away anyway
-
-    def _drain(self) -> None:
-        pass
+            ev = self._event
+        if loop is not None and ev is not None:
+            try:
+                loop.call_soon_threadsafe(ev.set)
+            except RuntimeError:
+                pass  # loop closed
 
     def pop_all(self) -> list[Event]:
         with self._lock:
             events = self._events
             self._events = []
+            if self._event is not None:
+                self._event.clear()
             return events
+
+    async def wait(self, timeout_s: float) -> bool:
+        ev = self._event
+        if ev is None:
+            await asyncio.sleep(timeout_s)
+            return False
+        try:
+            await asyncio.wait_for(ev.wait(), timeout=timeout_s)
+            return True
+        except asyncio.TimeoutError:
+            return False
 
 
 async def stream_experiment_events(
@@ -99,7 +109,7 @@ async def stream_experiment_events(
     try:
         idle = 0.0
         while idle < max_idle_s:
-            await asyncio.sleep(keepalive_s / 2)
+            has_events = await buffer.wait(timeout_s=keepalive_s / 2)
             events = buffer.pop_all()
             if events:
                 idle = 0.0
@@ -107,7 +117,7 @@ async def stream_experiment_events(
                     yield event.sse_frame()
                     if on_event is not None:
                         await on_event(event)
-            else:
+            elif not has_events:
                 idle += keepalive_s / 2
                 yield ": keepalive\n\n"
     finally:

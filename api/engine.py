@@ -188,6 +188,20 @@ class LiveEngine:
                     "message": f"Using verified calibration — {len(measured_keys)} points active; profiling intermediate curve points to fill {time_limit_s:.0f}s budget",
                 })
 
+            # If starting a fresh live experiment, clear old dummy fixture runs
+            # so the dashboard starts clean and populates live as tests complete!
+            overlay = self._overlay_for(exp_id)
+            if overlay and "profile" in overlay:
+                if cal and workload_id == "fixed_compute":
+                    cal_rows = self._profile_rows(cal, [], cls_map, workload_id)
+                    if cal_rows:
+                        cal_sel = self._select(cal_rows, objective, budget, preference, exp_id)
+                        self._persist(exp_id, seeded, [], cal_rows, cal_sel, True, state="profiling")
+                else:
+                    overlay["profile"]["runs"] = []
+                    overlay["profile"]["configurations"] = {}
+                    overlay["selection"] = None
+
             start_wall = time.monotonic()
             avg_run_s = 6.5
             unmeasured_configs = [
@@ -236,6 +250,16 @@ class LiveEngine:
                 rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg, passive=passive)
                 runs.append(rec)
                 measured_keys.add(key)
+
+                # PROGRESSIVE UPDATE: update overlay and store on EVERY run so UI live-plots!
+                current_rows = self._profile_rows(cal, runs, cls_map, workload_id)
+                if current_rows:
+                    try:
+                        current_sel = self._select(current_rows, objective, budget, preference, exp_id)
+                        self._persist(exp_id, seeded, runs, current_rows, current_sel, cal is not None, state="profiling")
+                    except Exception as e:
+                        logger.warning(f"intermediate persist failed: {e}")
+
                 self._emit(exp_id, "run_complete", {
                     "experiment_id": exp_id, "phase": "profiling",
                     "run_index": run_idx, "total_runs": est_total_runs,
@@ -252,7 +276,7 @@ class LiveEngine:
                 return
 
             selection = self._select(profile_rows, objective, budget, preference, exp_id)
-            self._persist(exp_id, seeded, runs, profile_rows, selection, cal is not None)
+            self._persist(exp_id, seeded, runs, profile_rows, selection, cal is not None, state="selected")
             self._emit(exp_id, "experiment_state", {"state": "selected", "message": "Selection complete (live)"})
 
         except Exception as exc:  # pragma: no cover
@@ -529,7 +553,7 @@ class LiveEngine:
         return select_deadline(summaries, deadline_s=budget,
                                baseline_config_id=baseline.config_id, experiment_id=exp_id)
 
-    def _persist(self, exp_id, seeded, runs, rows, selection, used_calibration):
+    def _persist(self, exp_id, seeded, runs, rows, selection, used_calibration, state: str = "selected"):
         """Update the overlay with live results so GET /experiments/{id} reflects them."""
         try:
             runs_api = []
@@ -570,7 +594,7 @@ class LiveEngine:
                     "sources": row["sources"],
                 }
             self.sb.apply_live_profile(self._overlay_for(exp_id), exp_id, runs_api, configs, selection,
-                                       "calibration" if used_calibration else "fresh_runs")
+                                       "calibration" if used_calibration else "fresh_runs", state=state)
         except Exception:
             logger.exception("persist failed")
 
