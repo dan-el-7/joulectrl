@@ -1,4 +1,9 @@
-# SESSION_START_A.md — new Agent A session brief (read this FIRST)
+# SESSION_START_A.md — READ AGENT_A_HANDOFF.md FIRST (Sep 9 2026 ~17:25Z)
+
+The complete, current handoff for any successor (incl. Antigravity) is now
+AGENT_A_HANDOFF.md in this repo root. It supersedes the brief below, which is
+kept for A#1→A#2 history.
+
 
 You are Agent A (Hardware & Measurement) on the joulectrl 4-agent team. This file is the
 complete context you need. Written 2026-09-09 ~12:30 UTC by session A#1 when it ran low on

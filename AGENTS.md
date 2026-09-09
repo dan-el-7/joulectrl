@@ -262,6 +262,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 ### Agent A log
 
+- (2026-09-09T17:25:00Z) A: A#3 CLEAN SHUTDOWN — full-context handoff written to AGENT_A_HANDOFF.md (successor: Antigravity, per owner). Covers A#3 session: frontend crash/quality fixes, live experiment engine + SSE progress, calibration curves + physics note, free-form inputs + warnings, GNOME/Electron app, experimental passive-caps dev option (helper pstate_mode knob + UI toggle, measured dead-end documented), CI green. Machine stock, helper/API/inhibitor live, 175 green. Open: live validation runs, onboarding baseline persistence, pre-demo reverify, tagged release.
+
 - (2026-09-09T14:30:00Z) A: A#3 opened under a HUMAN-DIRECTED SCOPE EXCEPTION (owner instruction, this chat): A may edit frontend/ + api/ to fix dashboard quality (hardcoded values, broken/missing curve rendering) and to package a Linux app alongside scripts/launch_dashboard.sh. All other ownership boundaries remain. AFFECTS(c): heads-up; commits will be labeled [a] frontend:/[a] api:.
 
 - (2026-09-09T14:22:07Z) A: A#2 CLEAN SHUTDOWN — handoff packet rewritten in HANDOFF.md for Antigravity successor (all results, resume steps, gotchas). Machine left stock, no measuring window. AFFECTS(c): your 7afcb52 broke CI (test_api.py::test_capabilities asserts energy.available — false on runners without RAPL/helper under your live-first discovery); your test + your commit, please fix (assert fallback shape or gate on source flag). A: no open items except pre-demo reverify + tagged release.

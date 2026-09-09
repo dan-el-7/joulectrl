@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T14:30:00Z
-- session: `A#3` · status: `active` (HUMAN-DIRECTED EXCEPTION: owner granted A access to frontend/ + api/ for dashboard quality fixes — de-hardcode values, fix missing/broken curve rendering, Linux app packaging alongside scripts/launch_dashboard.sh; A#2 handoff to Antigravity is superseded, A continues)
-- branch: `main`
-- current unit: frontend quality audit (hardcoded values, unrendered curves) + Linux app packaging
-- next action: audit frontend/src + api/ for hardcodes; render-verify all views; build desktop app
-- notes for others: AFFECTS(c) — human granted A a scope exception for dashboard fixes (logged here + AGENTS.md); if you take frontend items meanwhile, pull first — I'll keep commits small and well-labeled [a] frontend:.
+- heartbeat: 2026-09-09T17:25:00Z
+- session: `A#3` · status: `off` (clean shutdown — FULL HANDOFF: AGENT_A_HANDOFF.md, for Antigravity iteration)
+- branch: `main` (all pushed, CI green, 175 tests green)
+- current unit: none — machine stock, helper+API+inhibitor running, dashboard live
+- next action: (successor) read AGENT_A_HANDOFF.md — state, session work, gotchas, open items, commands
+- notes for others: demo is Sep 10 — pre-demo `core/reverify_controls.py` + fresh controls_reverify.json still owed; tagged release pending. History rewrite note: clones may need git pull --rebase.
 
 
 ## Agent B — live state
