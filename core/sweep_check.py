@@ -28,6 +28,7 @@ from typing import Optional
 
 C1_SCHEMA = "joulectrl.calibration_c1/1"
 C2_SCHEMA = "joulectrl.calibration_c2/1"
+C2E_SCHEMA = "joulectrl.calibration_c2_effective/1"
 # Throughput may exceed a lower cap's by up to this fraction before we flag it.
 MONOTONICITY_TOLERANCE = 0.10
 
@@ -160,6 +161,74 @@ def check_calibration_c2(
     return report
 
 
+def check_calibration_c2_effective(doc: dict) -> SweepCheckReport:
+    """Check the C2-effective fixture (the real 8-point control space).
+
+    Rows carry (class, control in {stock, base}, workers in {1, 4}, rep).
+    Rules: runtime/energy present and positive per row; a single kernel
+    checksum *per worker count* (w1 and w4 do different total work, so two
+    checksums are expected — but never more); every class/control/workers
+    cell has >= 2 reps; medians in summary match the rows; w4 runtime must
+    be <= w1 runtime for the same class+control (parallelism cannot slow
+    fixed work through 4x more cores beyond tolerance).
+    """
+    report = SweepCheckReport()
+    if doc.get("schema") != C2E_SCHEMA:
+        report.problem(f"C2-effective schema {doc.get('schema')!r} != {C2E_SCHEMA!r}")
+        return report
+    rows = doc.get("rows") or []
+    if not rows:
+        report.problem("C2-effective has no rows")
+        return report
+
+    checksums_by_workers: dict[int, set[str]] = {}
+    for row in rows:
+        if not row.get("runtime_s") or row["runtime_s"] <= 0:
+            report.problem(f"{row.get('class')}/{row.get('control')}/w{row.get('workers')} rep{row.get('rep')}: non-positive runtime")
+        energy = row.get("package_energy_j")
+        if energy is None or energy < 0:
+            report.problem(f"{row.get('class')}/{row.get('control')}/w{row.get('workers')} rep{row.get('rep')}: missing/invalid energy")
+        checksums_by_workers.setdefault(int(row.get("workers", 0)), set()).add(row.get("kernel_checksum", ""))
+    for workers, checksums in checksums_by_workers.items():
+        if len(checksums) > 1:
+            report.problem(f"kernel checksum drift at workers={workers}: {sorted(checksums)}")
+
+    cells: dict[tuple, list[float]] = {}
+    for row in rows:
+        key = (row["class"], row["control"], int(row["workers"]))
+        cells.setdefault(key, []).append(row["runtime_s"])
+    for key, runtimes in sorted(cells.items()):
+        if len(runtimes) < 2:
+            report.warn(f"{key}: only {len(runtimes)} rep(s) — medians are fragile")
+        cname, control, workers = key
+        if workers > 1:
+            single = cells.get((cname, control, 1))
+            if single:
+                if min(runtimes) > min(single) * (1 + MONOTONICITY_TOLERANCE):
+                    report.problem(
+                        f"{cname}/{control}: w{workers} slower than w1 (parallel slowdown beyond tolerance)"
+                    )
+
+    summary = doc.get("summary") or {}
+    for (cname, control, workers), runtimes in sorted(cells.items()):
+        cell_key = f"{control}_w{workers}"
+        entry = (summary.get(cname) or {}).get(cell_key)
+        if not entry:
+            report.problem(f"summary missing {cname}.{cell_key}")
+            continue
+        import statistics as _stats
+
+        row_median = _stats.median(runtimes)
+        if abs(entry.get("median_runtime_s", row_median) - row_median) > 0.05:
+            report.warn(
+                f"{cname}.{cell_key}: summary median runtime {entry.get('median_runtime_s')} "
+                f"!= row median {row_median:.4f}"
+            )
+        if int(entry.get("n", len(runtimes))) != len(runtimes):
+            report.problem(f"{cname}.{cell_key}: summary n={entry.get('n')} != {len(runtimes)} rows")
+    return report
+
+
 def check_calibration_files(
     c2_path: str | Path, c1_path: str | Path | None = None
 ) -> Optional[SweepCheckReport]:
@@ -167,7 +236,10 @@ def check_calibration_files(
     c2_path = Path(c2_path)
     if not c2_path.exists():
         return None
+    doc = json.loads(c2_path.read_text())
+    if doc.get("schema") == C2E_SCHEMA:
+        return check_calibration_c2_effective(doc)
     c1_doc = None
     if c1_path is not None and Path(c1_path).exists():
         c1_doc = json.loads(Path(c1_path).read_text())
-    return check_calibration_c2(json.loads(c2_path.read_text()), c1_doc)
+    return check_calibration_c2(doc, c1_doc)

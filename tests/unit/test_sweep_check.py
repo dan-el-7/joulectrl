@@ -145,3 +145,83 @@ def test_check_files_roundtrip(tmp_path: Path):
     (tmp_path / "c1.json").write_text(json.dumps(C1_DOC))
     report = check_calibration_files(tmp_path / "c2.json", tmp_path / "c1.json")
     assert report is not None and report.ok, report.problems
+
+
+# ---------------------------------------------------------------------------
+# C2-effective (real 8-point control space) checks
+# ---------------------------------------------------------------------------
+
+from core.sweep_check import C2E_SCHEMA, check_calibration_c2_effective
+
+
+def c2e_row(cls, control, workers, runtime_s, energy_j=80.0, rep=1, checksum=None):
+    return {
+        "class": cls, "control": control, "workers": workers, "rep": rep,
+        "runtime_s": runtime_s, "package_energy_j": energy_j,
+        "kernel_checksum": checksum or ("0xc2" if workers == 1 else "0xc4"),
+        "boost": control != "base", "cpus": [0], "chunks": 16384, "boot_id": "b",
+    }
+
+
+def c2e_doc(rows, summary=None):
+    return {"schema": C2E_SCHEMA, "rows": rows, "summary": summary or {}}
+
+
+def c2e_summary(rows):
+    import statistics as st
+    summary = {}
+    for row in rows:
+        key = (row["class"], row["control"], row["workers"])
+        summary.setdefault(key, []).append(row["runtime_s"])
+    out = {}
+    for (cname, control, workers), runtimes in summary.items():
+        out.setdefault(cname, {})[f"{control}_w{workers}"] = {
+            "median_runtime_s": st.median(runtimes), "n": len(runtimes),
+        }
+    return out
+
+
+GOOD_C2E = [
+    c2e_row("fast", "stock", 1, 8.5, rep=r) for r in (1, 2, 3)
+] + [
+    c2e_row("fast", "stock", 4, 4.2, rep=r) for r in (1, 2, 3)
+] + [
+    c2e_row("fast", "base", 4, 10.8, rep=r) for r in (1, 2, 3)
+]
+
+
+def test_c2e_good_passes_with_two_worker_checksums():
+    report = check_calibration_c2_effective(c2e_doc(GOOD_C2E, c2e_summary(GOOD_C2E)))
+    assert report.ok, report.problems
+
+
+def test_c2e_checksum_drift_within_same_worker_count_fails():
+    rows = [dict(r) for r in GOOD_C2E]
+    rows[0]["kernel_checksum"] = "0xdead"
+    report = check_calibration_c2_effective(c2e_doc(rows))
+    assert not report.ok
+    assert any("checksum drift" in p for p in report.problems)
+
+
+def test_c2e_parallel_slowdown_is_a_problem():
+    rows = [
+        c2e_row("fast", "stock", 1, 8.5, rep=1),
+        c2e_row("fast", "stock", 4, 20.0, rep=1),  # w4 slower than w1 -> problem
+    ]
+    report = check_calibration_c2_effective(c2e_doc(rows))
+    assert not report.ok
+    assert any("parallel slowdown" in p for p in report.problems)
+
+
+def test_c2e_missing_energy_is_a_problem():
+    rows = [dict(r) for r in GOOD_C2E]
+    rows[1]["package_energy_j"] = None
+    report = check_calibration_c2_effective(c2e_doc(rows, c2e_summary(rows)))
+    assert not report.ok
+    assert any("missing/invalid energy" in p for p in report.problems)
+
+
+def test_c2e_files_autodetect_by_schema(tmp_path):
+    (tmp_path / "c2e.json").write_text(json.dumps(c2e_doc(GOOD_C2E, c2e_summary(GOOD_C2E))))
+    report = check_calibration_files(tmp_path / "c2e.json")
+    assert report is not None and report.ok, report.problems
