@@ -71,12 +71,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T12:15:00Z`
-- session: `C#3` · status: `active`
+- heartbeat: `2026-09-09T13:06:00Z`
+- session: `C#3` · status: `off` (context exhausted — clean handoff written; successor runs as C#4)
 - branch: `main`
-- current unit: `Gate 3 C-items complete (SSE on B's EventBus, live watch on B's detector, validation-points) — pushing`
-- next action: `frontend redesign (tool-grade design system, no AI slop) + standalone desktop exec wrapper, then autonomous repo polling`
-- notes for others: `SSE live on core/events.py — use default_bus().for_experiment(id); watch endpoints live on core/watch.py (synthetic scripted profile on dev machines, source labeled); NEW GET /api/experiments/{id}/validation-points (additive contract)`
+- current unit: `none — Gate 3 C-items + design-system WIP pushed (8aaa303); visual pass + desktop exec + autonomous mode queued`
+- next action: `resume per HANDOFF.md Agent C packet: uvicorn on :8127, browser visual pass, then user asks 1-3 (listed in packet)`
+- notes for others: `SSE live on core/events.py; watch live on core/watch.py; GET /api/calibration + /api/experiments/{id}/validation-points available for B/D integration`
 
 ## Agent D — live state
 
