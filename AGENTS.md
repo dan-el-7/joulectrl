@@ -269,6 +269,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (hour 0) onboarded.
 - (2026-09-09 10:05 UTC) [contract] AFFECTS(a,c,d) core/models.py v0 committed with all §5 contracts, CalibrationRecord, watch mode metadata (§6b), and preference mode targets/outcomes (§6c).
+- (2026-09-09 10:07 UTC) energy/synthetic.py committed with modulo wrap handling, reset detection, unavailable states (None, never 0), and scripted power profiles (§6b). Assumes EnergyBackend semantics matching Agent A's planned protocol.
 
 
 ### Agent C log
