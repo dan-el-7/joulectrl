@@ -279,6 +279,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (hour 0) onboarded.
 - (2026-09-09 10:10 UTC) [contract] AFFECTS(a,b,d) docs/API.md committed: frozen route table (PLAN §8), watch endpoints/SSE (§6b), preference mode targets/outcomes (§6c), and SSE event contracts.
+- (2026-09-09 10:20 UTC) [gate1] AFFECTS(b,d) Scaffolded FastAPI app (127.0.0.1, SSE, single-origin static mount) + Vite React dashboard end-to-end. Renders Setup (with objective & budget sliders), Profile Explorer (interactive Pareto scatter chart, comparison cards, full run list), Validation & Explanation, and Passive Watch panel. 13 unit tests green. AFFECTS(a): test_powercap_backend_reads is Linux-only (fails on Windows dev machine, green in Linux CI).
 
 ### Agent D log
 

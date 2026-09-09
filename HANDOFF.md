@@ -66,11 +66,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent C — resume packet
 
-- **Done & verified:** `docs/API.md` v1 frozen contract (exact route table from PLAN §8, watch mode endpoints/SSE from §6b, preference mode from §6c, SSE events table, architectural invariants). Aligned with `core/models.py` v0.
-- **In flight:** Scaffolding FastAPI backend (127.0.0.1, one origin, SSE) + Vite React dashboard with fixture data.
-- **Resume here:** Install API dependencies and scaffold FastAPI server in `api/` and Vite React app in `frontend/`.
-- **Gotchas:** Dev machine only; single origin at 127.0.0.1:8000; execute Python directly via uv Python cache on Windows to respect AppControl policy.
-- **Handoffs owed / waiting on:** None blocking. Adopted `core/models.py` v0 from Agent B.
+- **Done & verified:** `docs/API.md` v1 frozen contract; FastAPI backend in `api/app.py` implementing all endpoints per PLAN §8, §6b, §6c; 13 unit tests in `tests/unit/test_api.py` green; Vite React frontend in `frontend/` (TypeScript, ParetoChart, SetupView, ExplorerView, ValidationView, WatchPanel) building cleanly to `frontend/dist`.
+- **In flight:** Gate 1 complete; standing by for Gate 2 integration (runner state machine & live SSE events).
+- **Resume here:** Run `npm --prefix frontend run build` and `pytest tests/unit/test_api.py`.
+- **Gotchas:** Dev machine only; single origin at 127.0.0.1:8000; Windows AppControl requires running Python directly from uv python cache.
+- **Handoffs owed / waiting on:** Ready to ingest live SSE events from Agent B's runner as soon as implemented.
 
 ## Agent D — resume packet
 

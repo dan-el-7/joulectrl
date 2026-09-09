@@ -1,0 +1,186 @@
+export interface MachineInfo {
+  hostname: string;
+  cpu_model: string;
+  boot_id: string;
+  os: string;
+  tuned_active_profile: string;
+  ac_power: boolean;
+}
+
+export interface TopologyInfo {
+  logical_cores: number;
+  physical_cores: number;
+  classes: {
+    fast: number[];
+    efficient: number[];
+  };
+  driver: string;
+  governor: string;
+  cpufreq_policies_count: number;
+}
+
+export interface EnergyInfo {
+  backend: string;
+  domain: string;
+  available: boolean;
+  root_required: boolean;
+  max_energy_uj: number;
+  idle_watts: number;
+  unit: string;
+}
+
+export interface CapabilitiesResponse {
+  machine: MachineInfo;
+  topology: TopologyInfo;
+  energy: EnergyInfo;
+  controls: {
+    boost_toggle: boolean;
+    frequency_caps: boolean;
+    epp_control: boolean;
+    effective_tier: string;
+  };
+  restoration: {
+    supported: boolean;
+    snapshot_present: boolean;
+    status: string;
+  };
+}
+
+export interface WorkloadInfo {
+  id: string;
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+}
+
+export interface Configuration {
+  id: string;
+  layout: string;
+  worker_count: number;
+  cpu_affinity: number[];
+  freq_cap_khz: number | null;
+  boost: boolean | null;
+  epp?: string | null;
+}
+
+export interface ConfigSummary {
+  config_id: string;
+  configuration: Configuration;
+  runtime_samples: number[];
+  energy_samples: number[];
+  median_runtime_s: number;
+  min_runtime_s: number;
+  max_runtime_s: number;
+  guarded_runtime_s: number;
+  median_energy_j: number;
+  min_energy_j: number;
+  max_energy_j: number;
+  median_power_w: number;
+  profile_is_usable: boolean;
+  total_runs: number;
+  is_baseline: boolean;
+}
+
+export interface RunRecord {
+  run_id: string;
+  experiment_id: string;
+  config_id: string;
+  workload_name: string;
+  repetition: number;
+  mode: string;
+  phase: string;
+  runtime_s: number;
+  package_energy_j: number | null;
+  avg_power_w?: number | null;
+  status: string;
+  exit_code: number;
+  output_verified: boolean;
+  configuration?: Configuration;
+}
+
+export interface Selection {
+  config_id: string;
+  selected_config_id?: string;
+  objective: string;
+  status: string;
+  status_message?: string;
+  runtime_budget_s?: number | null;
+  target_met?: boolean;
+  savings_vs_baseline_pct?: number;
+  runtime_vs_baseline_pct?: number;
+  energy_reduction_pct?: number;
+  runtime_increase_pct?: number;
+  deadline_s?: number;
+  selected_median_energy_j?: number;
+  selected_median_runtime_s?: number;
+  selected_guarded_runtime_s?: number;
+  baseline_config_id?: string;
+  baseline_median_energy_j?: number;
+  baseline_median_runtime_s?: number;
+  frontier_config_ids?: string[];
+  metrics?: {
+    median_runtime_s: number;
+    guarded_runtime_s: number;
+    median_energy_j: number;
+    energy_savings_pct: number;
+  };
+  preference_outcomes?: {
+    energy_target_met: boolean;
+    perf_floor_met: boolean;
+    closest_energy_config_id: string;
+    closest_perf_config_id: string;
+  };
+}
+
+export interface ValidationPair {
+  pair_index: number;
+  baseline_run: RunRecord;
+  selected_run: RunRecord;
+  runtime_difference_pct: number;
+  energy_reduction_pct: number;
+  met_budget: boolean;
+  both_succeeded: boolean;
+}
+
+export interface Profile {
+  experiment_id: string;
+  workload_name: string;
+  baseline_config_id: string;
+  configurations: Record<string, ConfigSummary>;
+  runs: RunRecord[];
+  validity_state: string;
+  margin: number;
+  suggested_budget_s?: number | null;
+}
+
+export interface Experiment {
+  id: string;
+  state: string;
+  created_at: string;
+  workload_id: string;
+  objective: string;
+  runtime_budget_s?: number | null;
+  preference?: {
+    energy_target_pct: number;
+    perf_floor_pct: number;
+  };
+  profile: Profile;
+  selection: Selection;
+  validation: {
+    status: string;
+    pairs: ValidationPair[];
+    verified_savings_pct: number;
+    verified_runtime_delta_s: number;
+  };
+  restoration_status: string;
+}
+
+export interface WatchStatus {
+  active: boolean;
+  state: string;
+  current_power_w: number;
+  baseline_median_w: number;
+  baseline_spread_w: number;
+  active_segment_elapsed_s: number | null;
+  completed_segments_count: number;
+}
