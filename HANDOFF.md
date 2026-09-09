@@ -75,8 +75,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Gate 3 exit met ([gate3]): Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py` with presets ('smoke', 'light', 'standard', 'heavy'), workload registry `workloads/registry.py` with `get_workload`/`list_workloads`, clean-build plugin `workloads/clean_build.py`, explanation layer `explain/` with complete preference mode support (closest perf floor, closest energy target, miss percentages, none feasible, ASCII console safety), unit tests in `tests/unit/test_contrast_workload.py` and `tests/unit/test_explain.py`. 31 tests passing (100% green).
-- **In flight:** Gate 4 preparation: 3 fresh validation pairs, drift check verification, and watch-mode integration testing.
-- **Resume here:** `python -m unittest tests/unit/test_contrast_workload.py tests/unit/test_explain.py`
-- **Gotchas:** Terminal output on Windows cp1252 consoles cannot encode unicode mathematical symbols like ≤ / ≥ — use ASCII <= and >= in all explanation strings.
-- **Handoffs owed / waiting on:** Gate 3 exit met for Agent D (`[gate3]` posted). Unblocks Agent B and C CLI/API workload dynamic loading and preference explanation rendering.
+- **Done & verified:** Gate 4 exit met ([gate4]): Compute kernel `workloads/kernel/fixed_compute.c`, workload plugins `clean_build` & `fixed_compute` with presets & registry, explanation layer `explain/` with deterministic templates & local LLM mock verification, 3 fresh validation pairs with drift check and JSON export verification in `tests/integration/test_validation_export.py`, passive watch-mode auto-detection integration in `tests/integration/test_watch_mode.py`, and interactive demo script with watch mode in `demo/run_demo.py`. 37 tests passing (100% green).
+- **In flight:** Complete through Gate 4. Standing by for cross-agent integration and live demonstration execution.
+- **Resume here:** `python -m unittest discover -s tests -p "test_*.py"` or run full suite via `python demo/run_demo.py`
+- **Gotchas:** Terminal output on Windows cp1252 consoles cannot encode unicode mathematical symbols like ≤ / ≥ — use ASCII <= and >= in all explanation strings. In `energy/synthetic.py` advance_uj returns before updating simulated time when energy is unavailable.
+- **Handoffs owed / waiting on:** Gate 4 deliverables complete (`[gate4]` posted). Ready for live demo on Fedora demo laptop.

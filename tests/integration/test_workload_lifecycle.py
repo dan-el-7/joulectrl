@@ -113,6 +113,7 @@ class TestWorkloadLifecycleIntegration(unittest.TestCase):
         self.assertIn("48.0s runtime rule", explanation)
         self.assertIn("44.6%", explanation)
         self.assertIn("3 of 3 validation runs finished within the budget", explanation)
+        store.close()
 
     def test_state_machine_lifecycle_and_restoration(self):
         """Test full experiment state machine lifecycle through completion and restoration."""
@@ -177,6 +178,7 @@ class TestWorkloadLifecycleIntegration(unittest.TestCase):
         sm.transition("RESTORING", "Trigger cleanup")
         sm.transition("RESTORED", "Cleanup verified")
         self.assertEqual(sm.state, "RESTORED")
+        store.close()
 
 
 if __name__ == "__main__":

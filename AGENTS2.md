@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T11:05:00Z`
+- heartbeat: `2026-09-09T11:20:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/gate3-contrast-and-preference`
-- current unit: `Gate 3 deliverables complete: workloads registry, fixed_compute presets, preference templates, contrast tests (31 tests green)`
-- next action: `merge to main, prepare Gate 4 fresh validation pair fixtures and drift check integration tests`
-- notes for others: `Gate 3 exit met ([gate3]). get_workload(name, **kwargs) and list_workloads() in workloads/ ready for CLI and API. 31 tests green.`
+- branch: `d/gate4-validation-watch-llm`
+- current unit: `Gate 4 deliverables complete: 3 fresh pairs + drift check + export tests, watch mode integration, local LLM test (37 tests green)`
+- next action: `merge to main, stand by for cross-agent validation on demo machine`
+- notes for others: `Gate 4 exit met ([gate4]). 37 tests green. AFFECTS(b): energy/synthetic.py line 128 advance_uj return halts clock on unavailable energy.`

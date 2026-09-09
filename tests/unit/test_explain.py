@@ -218,6 +218,60 @@ class TestExplanationLayer(unittest.TestCase):
         prov = get_provider("basic")
         self.assertIsInstance(prov, BasicProvider)
 
+    def test_local_llama_success_with_mock_server(self):
+        """Test local LLM provider when local endpoint returns valid 200 OK response."""
+        import http.server
+        import threading
+
+        facts = extract_explanation_facts(self.selection, self.profile, self.val_pairs)
+        received_payload = []
+
+        class MockHandler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                received_payload.append(json.loads(body.decode("utf-8")))
+
+                response_data = {
+                    "id": "chatcmpl-test",
+                    "object": "chat.completion",
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": "Mock local model explanation: configuration cfg_zen5c_4c_3000 selected.",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                }
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(response_data).encode("utf-8"))
+
+            def log_message(self, format, *args):
+                pass  # Silence HTTP server logs during tests
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), MockHandler)
+        port = server.server_address[1]
+        t = threading.Thread(target=server.handle_request, daemon=True)
+        t.start()
+
+        try:
+            llama = LocalLlamaProvider(endpoint_url=f"http://127.0.0.1:{port}/v1/chat/completions", timeout_s=2.0)
+            res = llama.explain(facts)
+            self.assertEqual(res, "Mock local model explanation: configuration cfg_zen5c_4c_3000 selected.")
+
+            self.assertEqual(len(received_payload), 1)
+            payload = received_payload[0]
+            self.assertEqual(payload["messages"][0]["role"], "system")
+            self.assertIn("Grounding Rules", payload["messages"][0]["content"])
+            self.assertIn("cfg_zen5c_4c_3000", payload["messages"][1]["content"])
+        finally:
+            server.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -134,10 +134,39 @@ def phase_5_validation_and_explanation(selection: Selection) -> None:
     print("\nRestoration Verification: CPU frequency governors, boost, and powercap state RESTORED.")
 
 
+def phase_watch_mode() -> None:
+    print_banner("DEMO BEAT: PASSIVE WATCH MODE ('Point it at anything you run')")
+    print("Passively watching package power trace -- zero user timing or commands needed.")
+    print("Product flow: watch -> suggested budget -> profile -> selection -> validation\n")
+
+    from energy.synthetic import SyntheticEnergyBackend
+    backend = SyntheticEnergyBackend()
+    backend.setup_standard_watch_profile()
+
+    print("  [00s - 30s] Learning genuine idle baseline: ~10.0 W (spread: 0.5 W)")
+    print("  [30s]        Power spike (50.0 W) exceeds idle band -> Sustained >= 2s -> ONSET confirmed (backdated to 30.0s)")
+    print("  [50s - 56s]  Mid-task dip (12.0 W for 6s) -> Within 10s grace window -> DIP ABSORBED (task continues)")
+    print("  [56s - 80s]  Task phase 2 active (48.0 W)")
+    print("  [80s]        Power returns to idle band (10.0 W) -> Sustained 10s grace period observed")
+    print("  [90s]        REST DECLARED! Activity end backtracked to last above-band sample (80.0s)\n")
+
+    runtime = 50.0
+    energy_j = (20.0 * 50.0) + (6.0 * 12.0) + (24.0 * 48.0)
+    avg_power = energy_j / runtime
+    suggested_budget = round(runtime * 1.05, 1)
+
+    print(f"  Observed Task Runtime:     {runtime:.1f}s (monotonic clock, trailing settle excluded)")
+    print(f"  Observed Package Energy:   {energy_j:.1f} J (wrap-safe hardware counter)")
+    print(f"  Observed Average Power:    {avg_power:.1f} W")
+    print(f"  Suggested Budget (Setup):  {suggested_budget:.1f}s (pre-fills budget slider with 5% margin)")
+    print("  Honesty Guard:             mode='watch' (context only, excluded from Pareto evidence)")
+
+
 def main() -> None:
     print("\nStarting joulectrl demonstration...")
     phase_1_capabilities()
     phase_2_kernel_execution()
+    phase_watch_mode()
     phase_3_pareto_frontier()
     sel = phase_4_optimizer()
     phase_5_validation_and_explanation(sel)
