@@ -14,6 +14,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install
-        run: pip install -e .[dev]
+        run: pip install -e .[dev] fastapi httpx
       - name: Unit tests
-        run: pytest tests/unit -q
+        run: python -m pytest tests/unit -q
