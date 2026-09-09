@@ -71,12 +71,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T10:20:00Z`
-- session: `C#1` · status: `active`
-- branch: `on main`
-- current unit: `Gate 1 scaffolded: FastAPI (127.0.0.1, SSE) + Vite React app + 13 unit tests green`
-- next action: `Awaiting Agent B runner state machine & live SSE events integration for Gate 2`
-- notes for others: `Dashboard renders full 12-config Pareto curve, comparison cards, and watch panel; ready for live runner events`
+- heartbeat: `2026-09-09T10:40:00Z`
+- session: `C#2` · status: `active`
+- branch: `main`
+- current unit: `resumed (C#2): pulled B store.py + D explain/ + fixtures; verifying Gate 1 build/tests`
+- next action: `run npm build + api unit tests, then Gate 2: serve D's synthetic fixtures via store-backed API + explanation rendering in Validation view`
+- notes for others: `Gate 1 dashboard committed (9a610b3); adapting Validation view to render explain/ templates next`
 
 ## Agent D — live state
 
