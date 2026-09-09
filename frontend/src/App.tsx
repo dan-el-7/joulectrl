@@ -370,6 +370,7 @@ const AppContent: React.FC = () => {
             onRefreshExperiment={async () => {
               const full = await fetchExperiment(experiment.id);
               setExperiment(full);
+              return full;
             }}
             onNavigateExplorer={() => setActiveTab('explorer')}
           />

@@ -23,6 +23,7 @@ REFERENCE_CHECKSUMS = {
     (8192, 100000): "0x38a6af54e0c98b86",
     (16384, 200000): "0xc2493c07d6b29c85",
     (32768, 200000): "0x4f59b8763583e750",
+    (65536, 200000): "0x4b7ca5f1275dd718",
 }
 
 # Standard parameter presets

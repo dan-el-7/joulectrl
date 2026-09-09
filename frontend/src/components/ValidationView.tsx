@@ -6,7 +6,7 @@ import { useTheme } from '../ThemeContext';
 
 interface ValidationViewProps {
   experiment: Experiment;
-  onRefreshExperiment?: () => Promise<void>;
+  onRefreshExperiment?: () => Promise<any>;
   onNavigateExplorer?: () => void;
   theme?: ThemeMode;
 }
@@ -120,6 +120,28 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
     };
   }, [experiment?.id]);
 
+  // Synchronize isValidating with experiment validation state (from SSE or refresh)
+  useEffect(() => {
+    const valStatus = validation?.status;
+    const expState = experiment?.state?.toLowerCase();
+    const pairsCount = pairs.length;
+
+    if (
+      valStatus === 'verified' ||
+      valStatus === 'partial' ||
+      valStatus === 'failed' ||
+      valStatus === 'complete' ||
+      (pairsCount >= 3 && expState !== 'validating')
+    ) {
+      setIsValidating(false);
+      setValidationMsg('');
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    }
+  }, [validation?.status, experiment?.state, pairs.length]);
+
   // Cleanup polling timer on unmount
   useEffect(() => {
     return () => {
@@ -147,11 +169,23 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       pollTimerRef.current = setInterval(async () => {
         attempts++;
         try {
+          let refreshedExp: any = null;
           if (onRefreshExperiment) {
-            await onRefreshExperiment();
+            refreshedExp = await onRefreshExperiment();
           }
 
-          if (experiment?.state === 'COMPLETE' || experiment?.state === 'complete' || attempts >= maxAttempts) {
+          const currentStatus = refreshedExp?.validation?.status;
+          const currentState = refreshedExp?.state?.toLowerCase();
+          const currentPairs = refreshedExp?.validation?.pairs?.length || 0;
+
+          if (
+            currentStatus === 'verified' ||
+            currentStatus === 'partial' ||
+            currentStatus === 'failed' ||
+            currentStatus === 'complete' ||
+            (currentPairs >= 3 && currentState !== 'validating') ||
+            attempts >= maxAttempts
+          ) {
             if (pollTimerRef.current) {
               clearInterval(pollTimerRef.current);
               pollTimerRef.current = null;

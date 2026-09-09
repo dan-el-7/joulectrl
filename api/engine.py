@@ -341,7 +341,7 @@ class LiveEngine:
                 if has_helper:
                     base_run = self._run_one(helper, runner, workload_id, exp_id, base_cfg, repetition=rep, phase="validation")
                 else:
-                    wl = get_workload(workload_id, chunks=8192 * base_cfg.worker_count, iters=200000)
+                    wl = get_workload(workload_id, chunks=65536, iters=200000)
                     base_run = runner.run(wl, exp_id, base_cfg, repetition=rep, phase="validation")
                 base_run.phase = "validation"
                 base_run.run_id = f"val_base_r{rep}_{int(time.time()*1000)}"
@@ -363,7 +363,7 @@ class LiveEngine:
                 if has_helper:
                     sel_run = self._run_one(helper, runner, workload_id, exp_id, cand_cfg, repetition=rep, phase="validation")
                 else:
-                    wl = get_workload(workload_id, chunks=8192 * cand_cfg.worker_count, iters=200000)
+                    wl = get_workload(workload_id, chunks=65536, iters=200000)
                     sel_run = runner.run(wl, exp_id, cand_cfg, repetition=rep, phase="validation")
                 sel_run.phase = "validation"
                 sel_run.run_id = f"val_sel_r{rep}_{int(time.time()*1000)}"
@@ -787,13 +787,14 @@ class LiveEngine:
         from workloads.registry import get_workload
 
         # UI workload ids map to runnable plugins; unknown ids fall back to the
-        # fixed-compute kernel. Work size scales with worker count (8192 chunks
-        # per worker, 200k iters) so per-point runs take ~4-11 s — long enough
-        # for a reliable energy reading (same shape as the verified C2 sweep).
+        # fixed-compute kernel. Workload size is CONSTANT across all configurations
+        # (65536 chunks, 200k iters) so every point processes the exact same total
+        # computational work regardless of worker thread count, ensuring true
+        # energy and runtime comparisons with invariant verification checksums.
         try:
-            wl = get_workload(workload_id, chunks=8192 * cfg.worker_count, iters=200000)
+            wl = get_workload(workload_id, chunks=65536, iters=200000)
         except (KeyError, TypeError):
-            wl = get_workload("fixed_compute", chunks=8192 * cfg.worker_count, iters=200000)
+            wl = get_workload("fixed_compute", chunks=65536, iters=200000)
         # Check clock holdability and adapt controls automatically (<1ms check, on by default)
         from core.clock_checker import check_clock_holdable
 

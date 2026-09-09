@@ -248,3 +248,53 @@ def test_live_engine_validation_resolution_with_candidate_summaries(tmp_path):
     assert len(overlays["exp_summaries_val"]["validation"]["pairs"]) == 1
 
 
+def test_validation_uses_invariant_fixed_chunks_across_workers():
+    from workloads.fixed_compute import REFERENCE_CHECKSUMS
+    from workloads.registry import get_workload
+    from api.engine import LiveEngine
+    from unittest.mock import MagicMock, patch
+
+    assert (65536, 200000) in REFERENCE_CHECKSUMS
+    assert REFERENCE_CHECKSUMS[(65536, 200000)] == "0x4b7ca5f1275dd718"
+
+    engine = LiveEngine(MagicMock(), MagicMock(), overlays={}, store=None)
+    captured_wls = []
+
+    def fake_run(self, workload, exp_id, cfg, repetition=1, phase="profiling", **kwargs):
+        captured_wls.append(workload)
+        return RunRecord(
+            run_id="r", experiment_id=exp_id, config_id=cfg.id,
+            workload_name=workload.name, repetition=repetition, phase=phase,
+            runtime_s=1.0, package_energy_j=10.0, status="success",
+        )
+
+    runner = MagicMock()
+    runner.run.side_effect = fake_run
+
+    base_cfg = Configuration(id="cfg_base_16", layout="A", worker_count=16, cpu_affinity=list(range(16)))
+    cand_cfg = Configuration(id="cfg_cand_4", layout="A", worker_count=4, cpu_affinity=[0, 2, 4, 6])
+
+    with patch.object(engine, "_helper", side_effect=Exception("no helper")):
+        engine._overlays["exp_test_fixed"] = {
+            "id": "exp_test_fixed",
+            "state": "complete",
+            "profile": {
+                "configurations": {
+                    "cfg_base_16": {"configuration": base_cfg.to_dict(), "is_baseline": True},
+                    "cfg_cand_4": {"configuration": cand_cfg.to_dict()},
+                }
+            },
+            "selection": {"selected_config_id": "cfg_cand_4", "baseline_config_id": "cfg_base_16"},
+        }
+        with patch("core.runner.WorkloadRunner.run", fake_run):
+            engine._run_validation("exp_test_fixed", repetitions=1)
+
+    assert len(captured_wls) == 2
+    # Both baseline (16w) and candidate (4w) must compute the EXACT same chunk count
+    assert captured_wls[0].chunks == 65536
+    assert captured_wls[1].chunks == 65536
+    assert captured_wls[0].iters == 200000
+    assert captured_wls[1].iters == 200000
+
+
+
