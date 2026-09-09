@@ -30,6 +30,8 @@ export interface EnergyInfo {
 }
 
 export interface CapabilitiesResponse {
+  source?: 'live' | 'fixture';
+  note?: string;
   machine: MachineInfo;
   topology: TopologyInfo;
   energy: EnergyInfo;

@@ -142,8 +142,74 @@ class WatchStartRequest(BaseModel):
 
 @app.get("/api/capabilities")
 def get_capabilities() -> dict[str, Any]:
-    """Discovered hardware capabilities, verified energy counters, and control tier."""
-    return get_fixture_capabilities()
+    """Discovered hardware capabilities, verified energy counters, and control tier.
+
+    Live discovery FIRST (A's core/discovery.py, read-only, cross-platform):
+    on a real Linux machine this reports THAT machine. If live discovery is
+    unusable (no core classes and no readable energy counter — e.g. Windows or
+    a VM), fall back to the committed demo-laptop fixture, clearly labeled so
+    the UI never presents fixture data as the local machine's.
+    """
+    try:
+        from core.discovery import capability_report as live_report
+
+        raw = live_report()
+        cpu = raw.get("cpu", {})
+        classes = raw.get("core_classes", {}) or {}
+        energy = raw.get("energy", {}) or {}
+        cpufreq = raw.get("cpufreq", {}) or {}
+        energy_usable = energy.get("readable") in ("unprivileged", "permission_required")
+        classes_usable = bool(classes.get("classes"))
+        if energy_usable or classes_usable:
+            cls_map = classes.get("classes") or {}
+            fast = max(
+                cls_map,
+                key=lambda k: (classes.get("hw_max_freq", {}) or {}).get(k, 0),
+                default="",
+            )
+            return {
+                "source": "live",
+                "machine": {
+                    "hostname": raw.get("machine"),
+                    "cpu_model": cpu.get("model"),
+                    "boot_id": raw.get("boot_id"),
+                    "os": raw.get("os"),
+                    "tuned_active_profile": raw.get("pm_daemons", {}).get("tuned_profile"),
+                    "ac_power": raw.get("ac_power"),
+                },
+                "topology": {
+                    "logical_cores": cpu.get("ncpu"),
+                    "physical_cores": cpu.get("n_cores"),
+                    "classes": dict(cls_map),
+                    "driver": (cpufreq.get("drivers") or [None])[0],
+                    "governor": (cpufreq.get("governors") or [None])[0],
+                    "cpufreq_policies_count": cpufreq.get("n_policies"),
+                },
+                "energy": {
+                    "backend": (energy.get("package_paths") or [None])[0],
+                    "domain": "package",
+                    "available": energy_usable,
+                    "root_required": energy.get("readable") == "permission_required",
+                },
+                "controls": {
+                    "boost_toggle": bool(cpufreq.get("boost_knob")),
+                    "frequency_caps": classes_usable,
+                    "epp_control": bool(raw.get("epp", {}).get("available")),
+                    "effective_tier": "full" if classes_usable and energy_usable else "reduced",
+                },
+                "restoration": {"supported": True, "snapshot_present": False, "status": "restored"},
+                "note": "Live discovery on this machine (read-only).",
+            }
+    except Exception as exc:  # pragma: no cover - degraded environments
+        logging.warning("live capability discovery failed: %s", exc)
+
+    fallback = get_fixture_capabilities()
+    fallback["source"] = "fixture"
+    fallback.setdefault(
+        "note",
+        "Live discovery unavailable on this machine — showing the committed demo-laptop fixture (labeled).",
+    )
+    return fallback
 
 
 @app.get("/api/workloads")

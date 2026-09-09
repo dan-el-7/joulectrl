@@ -246,6 +246,37 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
         {capabilities ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
+            {/* data provenance — never present fixture data as this machine */}
+            {capabilities.source === 'fixture' && (
+              <div
+                style={{
+                  background: 'rgba(245,158,11,0.10)',
+                  border: `1px solid ${colors.amber}`,
+                  borderRadius: '0.5rem',
+                  padding: '0.6rem 0.75rem',
+                  fontSize: '0.78rem',
+                  color: colors.amber,
+                }}
+              >
+                <strong>Demo-laptop fixture data — not discovered on this machine.</strong>{' '}
+                {capabilities.note ??
+                  'Live hardware discovery is unavailable here (needs Linux sysfs); the values below come from the committed reference fixture.'}
+              </div>
+            )}
+            {capabilities.source === 'live' && (
+              <div
+                style={{
+                  background: 'rgba(16,185,129,0.10)',
+                  border: `1px solid ${colors.emerald}`,
+                  borderRadius: '0.5rem',
+                  padding: '0.6rem 0.75rem',
+                  fontSize: '0.78rem',
+                  color: colors.emerald,
+                }}
+              >
+                <strong>Live discovery</strong> — hardware read from this machine.
+              </div>
+            )}
             <div style={{ background: colors.surfaceElevated, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ color: colors.textTertiary, fontSize: '0.75rem' }}>Processor / Topology</div>
               <div style={{ fontWeight: 600, color: colors.textPrimary, marginTop: '0.2rem' }}>
