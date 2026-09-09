@@ -293,6 +293,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 2) [gate1] AFFECTS(c) explain/ layer committed (facts extraction, deterministic templates for deadline/preference/frontier & edge states, provider interface with Basic guaranteed default and local/cloud adapters). fixtures/synthetic/ JSON datasets generated (profile, selection, validation, calibration). Unit tests green (17 tests passing).
 - (hour 2) tests/integration/test_workload_lifecycle.py committed: E2E workload execution + verification with invariant checksum, and Store + synthetic profile/selection roundtrip with grounded explanations. 19 tests green.
 - (hour 2) demo/run_demo.py and demo/README.md committed: end-to-end 5-phase live presentation script executing capabilities, live kernel execution with invariant checksum, Pareto frontier, deterministic optimizer, fresh validation, and grounded explanation with restoration. All 19 tests passing.
+- (hour 2) AFFECTS(b) core/runner.py and test_runner.py use os.killpg and POSIX process-group creation which error on Windows dev machines (os.killpg does not exist on win32). Green on Linux CI.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
