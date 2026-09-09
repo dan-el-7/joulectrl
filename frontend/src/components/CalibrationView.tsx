@@ -90,12 +90,15 @@ function ScatterChart({
   yUnit,
   height = 240,
   onHover,
+  connectSeries,
 }: {
   points: Point[];
   /** per-series color: map seriesKey -> css color */
   series: Record<string, string>;
   /** which series a point belongs to */
   seriesKey: (p: Point) => string;
+  /** draw a connected line per series (efficiency curve) */
+  connectSeries?: boolean;
   xLabel: string;
   yLabel: string;
   xUnit?: string;
@@ -156,6 +159,33 @@ function ScatterChart({
       >
         {yLabel}{yUnit ? ` (${yUnit})` : ''}
       </text>
+
+      {connectSeries &&
+        // one sorted polyline per series so the curve reads as a curve
+        Object.entries(
+          points.reduce<Record<string, Point[]>>((acc, p) => {
+            const k = seriesKey(p);
+            (acc[k] ||= []).push(p);
+            return acc;
+          }, {}),
+        ).map(([k, pts]) => {
+          const sorted = [...pts].sort((a, b) => a.x - b.x);
+          if (sorted.length < 2) return null; // a single point has no line — dot only
+          const d = sorted
+            .map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.x)} ${sy(p.y)}`)
+            .join(' ');
+          return (
+            <path
+              key={`line-${k}`}
+              d={d}
+              fill="none"
+              stroke={series[k] ?? colors.textTertiary}
+              strokeWidth={1.75}
+              opacity={0.65}
+              pointerEvents="none"
+            />
+          );
+        })}
 
       {points.map((p, i) => {
         const col = series[seriesKey(p)] ?? colors.textTertiary;
@@ -422,6 +452,7 @@ export const CalibrationView: React.FC = () => {
               )}
               <ScatterChart
                 points={pts}
+                connectSeries
                 series={seriesColors}
                 seriesKey={(p) => (p as Point & { series?: string }).series ?? ''}
                 xLabel="avg package power"

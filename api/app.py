@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
@@ -67,6 +68,8 @@ store_bridge.seed_store(_STORE)
 # Runtime overlay for fixture experiments created via POST /api/experiments
 # (no runner on the dev machine; replaced by live runner state in Gate 3).
 _OVERLAY: dict[str, dict[str, Any]] = {}
+_CAPS_CACHE: dict[str, Any] = {}
+_CAPS_CACHE_AT: float = 0.0
 
 
 def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
@@ -139,6 +142,19 @@ class WatchStartRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # API Routes (per docs/API.md)
 # ---------------------------------------------------------------------------
+
+def _live_capabilities_cached() -> dict[str, Any]:
+    """Live capability report for the engine (cached briefly per process)."""
+    global _CAPS_CACHE, _CAPS_CACHE_AT
+    now = time.time()
+    if _CAPS_CACHE is None or now - _CAPS_CACHE_AT > 30:
+        try:
+            _CAPS_CACHE = get_capabilities()
+            _CAPS_CACHE_AT = now
+        except Exception:
+            _CAPS_CACHE = {}
+    return _CAPS_CACHE
+
 
 @app.get("/api/capabilities")
 def get_capabilities() -> dict[str, Any]:
@@ -245,6 +261,26 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
     row = store_bridge.persist_experiment_dict(_STORE, exp)
     _OVERLAY[exp_id] = store_bridge.experiment_to_api(row)
     _OVERLAY[exp_id]["_selection_model"] = row.get("selection")
+
+    # Live path: on machines with the privileged helper, run the REAL pipeline
+    # (calibration-informed profiling -> deterministic selection -> restore)
+    # in a background thread, emitting SSE progress. Dev machines keep the
+    # fixture-seeded behavior above.
+    try:
+        from api.engine import LiveEngine
+
+        engine = LiveEngine(default_bus(), store_bridge_mod=store_bridge, overlays=_OVERLAY)
+        seeded = dict(_OVERLAY[exp_id])
+        seeded["_live_capabilities"] = _live_capabilities_cached()
+        if engine.start_experiment(exp_id, {
+            "workload_id": req.workload_id, "objective": req.objective,
+            "runtime_budget_s": req.runtime_budget_s,
+            "preference": req.preference.model_dump() if req.preference else None,
+        }, seeded):
+            _OVERLAY[exp_id]["state"] = "profiling"
+    except Exception as exc:  # pragma: no cover - stay on fixture path
+        logging.warning("live engine unavailable, using fixture mode: %s", exc)
+
     return {
         "id": exp_id,
         "state": _OVERLAY[exp_id]["state"],

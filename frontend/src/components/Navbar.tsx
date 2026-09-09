@@ -9,6 +9,7 @@ interface NavbarProps {
   isRestoring: boolean;
   experimentState?: string | null;
   experimentStateMessage?: string | null;
+  runProgress?: { index: number; total: number; configId?: string } | null;
 }
 
 const TABS = [
@@ -42,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isRestoring,
   experimentState,
   experimentStateMessage,
+  runProgress,
 }) => {
   const restored = restorationStatus === 'restored' || restorationStatus === 'not_required';
   const isRunning = !!experimentState && RUNNING_STATES[experimentState] !== undefined;
@@ -105,6 +107,48 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* run progress — N of M during profiling */}
+        {runProgress && runProgress.total > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '3px 10px',
+              borderRadius: radii.full,
+              border: `1px solid ${colors.border}`,
+              ...type.micro,
+              color: colors.textSecondary,
+              fontFamily: fonts.mono,
+            }}
+            title={runProgress.configId ? `Measuring: ${runProgress.configId}` : 'Measuring'}
+          >
+            <span>
+              run {runProgress.index}/{runProgress.total}
+            </span>
+            <span
+              style={{
+                width: 64,
+                height: 4,
+                borderRadius: radii.full,
+                background: colors.borderSubtle,
+                overflow: 'hidden',
+                display: 'inline-block',
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: `${Math.round((runProgress.index / runProgress.total) * 100)}%`,
+                  height: '100%',
+                  background: colors.accentHover,
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </span>
+          </div>
+        )}
+
         {/* live experiment state — running indicator */}
         {stateLabel && (
           <div

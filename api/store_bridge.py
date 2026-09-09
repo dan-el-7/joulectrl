@@ -242,3 +242,34 @@ def experiment_summary_to_api(row: dict[str, Any]) -> dict[str, Any]:
         "selected_runtime_s": sel.get("selected_median_runtime_s"),
         "energy_saved_pct": sel.get("savings_vs_baseline_pct"),
     }
+
+
+def apply_live_profile(
+    overlay: dict[str, Any],
+    exp_id: str,
+    runs: list[dict[str, Any]],
+    configurations: dict[str, dict[str, Any]],
+    selection: Any,
+    profile_source: str,
+) -> None:
+    """Merge live-engine results into an experiment overlay dict (in place).
+
+    The overlay is the API-shaped experiment returned by GET /experiments/{id};
+    this swaps its fixture profile/selection for measured values, labeled with
+    profile_source ("calibration" | "fresh_runs"), and reuses selection_to_api
+    for the contract shape.
+    """
+    sel_dict = selection
+    if hasattr(selection, "model_dump"):
+        sel_dict = selection.model_dump()
+    elif hasattr(selection, "_asdict"):
+        sel_dict = selection._asdict()
+
+    profile = overlay.setdefault("profile", {})
+    profile["configurations"] = configurations
+    profile["runs"] = runs
+    profile["baseline_config_id"] = next(iter(configurations), None)
+    overlay["selection"] = selection_to_api(sel_dict)
+    overlay["_selection_model"] = sel_dict
+    overlay["state"] = "selected"
+    overlay["profile_source"] = profile_source

@@ -34,6 +34,7 @@ export const App: React.FC = () => {
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
   const [restorationStatus, setRestorationStatus] = useState<string>('restored');
   const [experimentState, setExperimentState] = useState<string | null>(null);
+  const [runProgress, setRunProgress] = useState<{ index: number; total: number; configId?: string } | null>(null);
   const [experimentStateMessage, setExperimentStateMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,15 +64,34 @@ export const App: React.FC = () => {
 
     const eventSource = new EventSource(`/api/experiments/${experiment.id}/events`);
 
+    eventSource.addEventListener('run_progress', (e: MessageEvent) => {
+      try {
+        const d = JSON.parse(e.data);
+        setRunProgress({ index: d.run_index ?? 0, total: d.total_runs ?? 0, configId: d.config_id });
+      } catch { /* ignore malformed */ }
+    });
+
+    eventSource.addEventListener('run_complete', (e: MessageEvent) => {
+      try {
+        const d = JSON.parse(e.data);
+        setRunProgress({ index: d.run_index ?? 0, total: d.total_runs ?? 0, configId: d.config_id });
+        // refresh the experiment so the explorer picks up live run rows as they land
+        fetchExperiment(experiment.id)
+          .then((full) => setExperiment(full))
+          .catch(() => { /* transient */ });
+      } catch { /* ignore malformed */ }
+    });
+
     eventSource.addEventListener('experiment_state', (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data);
-        console.log('[SSE] experiment_state:', data);
+        if (data.state && data.state !== 'profiling') setRunProgress(null);
         if (data.state) setExperimentState(data.state);
         setExperimentStateMessage(data.message ?? data.reason ?? null);
-      } catch (err) {
-        console.error(err);
-      }
+        if (data.state === 'selected' || data.state === 'failed') {
+          fetchExperiment(experiment.id).then((full) => setExperiment(full)).catch(() => {});
+        }
+      } catch { /* ignore malformed */ }
     });
 
     eventSource.addEventListener('restore_status', (e: MessageEvent) => {
@@ -154,6 +174,7 @@ export const App: React.FC = () => {
         isRestoring={isRestoring}
         experimentState={experimentState}
         experimentStateMessage={experimentStateMessage}
+        runProgress={runProgress}
       />
 
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: '1300px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
