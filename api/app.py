@@ -468,9 +468,26 @@ def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
     profile = exp.get("profile") or {}
     configs_raw = profile.get("configurations") or {}
     configs = [ConfigSummary.from_dict(v) for v in configs_raw.values()]
+    baseline_id = profile.get("baseline_config_id", "")
+
+    if not configs:
+        sel_model = _resolve_selection_model(id) or exp.get("selection") or {}
+        cand_sums = sel_model.get("candidate_summaries") or sel_model.get("candidates") or []
+        if cand_sums:
+            configs = [ConfigSummary.from_dict(c) for c in cand_sums]
+            if not baseline_id:
+                baseline_id = sel_model.get("baseline_config_id", "")
+
+    if not baseline_id and configs:
+        for c in configs:
+            if c.is_baseline or "stock" in c.config_id:
+                baseline_id = c.config_id
+                break
+        if not baseline_id:
+            baseline_id = configs[0].config_id
+
     if not configs:
         raise HTTPException(status_code=400, detail="Profile has no measured configurations")
-    baseline_id = profile.get("baseline_config_id", "")
     margin = req.headroom_pct / 100.0
 
     if req.objective == "preference":
@@ -492,19 +509,24 @@ def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
         sel = select_deadline(configs, budget, baseline_id, margin=margin, experiment_id=id)
 
     # Persist the re-selection so every reader (UI, export, explain) sees the same evidence
+    api_sel = store_bridge.selection_to_api(sel.to_dict())
     if _STORE.get_experiment(id) is not None:
         _STORE.save_selection(sel)
+        if id in _OVERLAY:
+            _OVERLAY[id]["_selection_model"] = sel.to_dict()
+            _OVERLAY[id]["selection"] = api_sel
     else:
         _OVERLAY[id]["_selection_model"] = sel.to_dict()
+        _OVERLAY[id]["selection"] = api_sel
 
     # Live event: B's bus (emission point assigned to C per AFFECTS(c) 11:47)
     default_bus().publish(
         id,
         "selection_updated",
-        {"experiment_id": id, "selection": store_bridge.selection_to_api(sel.to_dict())},
+        {"experiment_id": id, "selection": api_sel},
     )
 
-    return store_bridge.selection_to_api(sel.to_dict())
+    return api_sel
 
 
 @app.post("/api/experiments/{id}/validate", status_code=status.HTTP_202_ACCEPTED)

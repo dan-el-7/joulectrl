@@ -259,7 +259,7 @@ const AppContent: React.FC = () => {
         preference: experiment.preference,
         headroom_pct: 5.0,
       });
-      setExperiment((prev) => (prev ? { ...prev, selection: updatedSel } : null));
+      setExperiment((prev) => (prev ? { ...prev, selection: updatedSel, runtime_budget_s: budgetS } : null));
     } catch (e) {
       console.error('Failed to reselect:', e);
     }

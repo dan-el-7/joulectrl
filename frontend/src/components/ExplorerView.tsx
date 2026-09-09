@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ConfigSummary, Experiment, Selection } from '../types';
 import { fetchValidationPoints } from '../api';
 import { ParetoChart } from './ParetoChart';
@@ -32,10 +32,29 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 }) => {
   const { profile } = experiment;
   const selection = experiment.selection as Partial<Selection> | null | undefined;
-  const [tempBudget, setTempBudget] = useState<number>(selection?.runtime_budget_s ?? 45.0);
+  const initialBudget = selection?.runtime_budget_s ?? experiment?.runtime_budget_s ?? 45.0;
+  const [tempBudget, setTempBudget] = useState<number>(initialBudget);
   const [candidates, setCandidates] = useState<ValidationPointCandidate[] | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
+  const debounceTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    const budget = selection?.runtime_budget_s ?? experiment?.runtime_budget_s;
+    if (budget != null && Number.isFinite(budget) && budget > 0) {
+      setTempBudget(budget);
+    }
+  }, [experiment.id, selection?.runtime_budget_s, experiment?.runtime_budget_s]);
+
+  const handleSliderChange = (val: number) => {
+    setTempBudget(val);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      onReselect(val);
+    }, 120);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -165,10 +184,15 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               value={Math.min(Math.max(tempBudget, 1), 300)}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
-                setTempBudget(val);
-                onReselect(val);
+                if (Number.isFinite(val)) handleSliderChange(val);
               }}
-              style={{ width: '140px', accentColor: colors.emerald }}
+              onPointerUp={() => {
+                if (debounceTimerRef.current) {
+                  clearTimeout(debounceTimerRef.current);
+                }
+                onReselect(tempBudget);
+              }}
+              style={{ width: '140px', accentColor: colors.emerald, cursor: 'pointer' }}
             />
             <input
               type="text"
@@ -176,14 +200,28 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               value={tempBudget}
               onChange={(e) => {
                 const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && v > 0) setTempBudget(v);
+                if (Number.isFinite(v) && v > 0) {
+                  setTempBudget(v);
+                  if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                  debounceTimerRef.current = setTimeout(() => onReselect(v), 300);
+                }
               }}
               onBlur={(e) => {
                 const v = parseFloat(e.target.value);
-                if (Number.isFinite(v) && v > 0) onReselect(v);
+                if (Number.isFinite(v) && v > 0) {
+                  setTempBudget(v);
+                  onReselect(v);
+                }
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Enter') {
+                  const v = parseFloat((e.target as HTMLInputElement).value);
+                  if (Number.isFinite(v) && v > 0) {
+                    setTempBudget(v);
+                    onReselect(v);
+                  }
+                  (e.target as HTMLInputElement).blur();
+                }
               }}
               style={{
                 width: 64, padding: '2px 6px', borderRadius: 4,

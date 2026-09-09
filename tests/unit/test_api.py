@@ -632,4 +632,67 @@ def test_live_engine_cancellation_registry():
     assert LiveEngine.is_cancelled(test_exp) is True
 
 
+def test_select_configuration_with_candidate_summaries(client):
+    import uuid
+    from api.app import _STORE
+    from core.models import Configuration, Selection
+
+    exp_id = f"exp_test_reselect_{uuid.uuid4().hex[:8]}"
+    _STORE.create_experiment(exp_id, "fixed_compute", "deadline", 45.0)
+
+    cfg1 = Configuration(id="cfg_fast", layout="A", worker_count=4, cpu_affinity=[0, 2, 4, 6], boost=True)
+    cfg2 = Configuration(id="cfg_eco", layout="A", worker_count=4, cpu_affinity=[0, 2, 4, 6], boost=False)
+
+    cand1 = {
+        "config_id": "cfg_fast",
+        "configuration": cfg1.to_dict(),
+        "runtime_samples": [5.0],
+        "energy_samples": [100.0],
+        "median_runtime_s": 5.0,
+        "guarded_runtime_s": 5.25,
+        "median_energy_j": 100.0,
+        "profile_is_usable": True,
+        "is_baseline": True,
+    }
+    cand2 = {
+        "config_id": "cfg_eco",
+        "configuration": cfg2.to_dict(),
+        "runtime_samples": [10.0],
+        "energy_samples": [60.0],
+        "median_runtime_s": 10.0,
+        "guarded_runtime_s": 10.5,
+        "median_energy_j": 60.0,
+        "profile_is_usable": True,
+        "is_baseline": False,
+    }
+
+    sel = Selection(
+        experiment_id=exp_id,
+        objective_mode="deadline",
+        status="selected",
+        status_message="Candidate selected",
+        selected_config_id="cfg_eco",
+        selected_configuration=cfg2,
+        baseline_config_id="cfg_fast",
+        deadline_s=45.0,
+        candidate_summaries=[cand1, cand2],
+    )
+    _STORE.save_selection(sel)
+
+    # Dynamic budget 8.0s should select cfg_fast because cfg_eco (10.5s) exceeds 8.0s
+    res = client.post(f"/api/experiments/{exp_id}/select", json={"runtime_budget_s": 8.0})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["config_id"] == "cfg_fast"
+    assert data["runtime_budget_s"] == 8.0
+
+    # Dynamic budget 20.0s should select cfg_eco for lower energy
+    res2 = client.post(f"/api/experiments/{exp_id}/select", json={"runtime_budget_s": 20.0})
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["config_id"] == "cfg_eco"
+    assert data2["runtime_budget_s"] == 20.0
+
+
+
 
