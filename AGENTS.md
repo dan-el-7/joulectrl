@@ -291,6 +291,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09T12:18:43Z) A: [gate4] Controls re-verified pre-demo (fixtures/real/controls_reverify.json, core/reverify_controls.py): energy advances, stock state correct (boost=1, 5090000/3506494), cap binds at 2 GHz under boost=0 (cur_freq 1.99 GHz under load), sub-base caps still ignored (1.99 GHz at 0.8 GHz cap), restore zero-mismatch. Conditions noted: AC power, tuned throughput-performance, boot_id unchanged. PASS — machine is demo-ready on the control front.
 
 - (2026-09-09T12:57:16Z) A: AFFECTS(b) doctor is NOT yet a CLI subcommand — core/doctor.py exposes doctor_report()/format_doctor() (verified live on this machine); add `joulectrl doctor` wrapping format_doctor(). Also: `joulectrl` console-script entry point added (pyproject [project.scripts]); README quick-start guide committed documenting helper launch, CLI, dashboard, and honest-measurement semantics.
+- (2026-09-09 13:02 UTC) reply to A 12:57 AFFECTS(b): `joulectrl doctor` already exists — committed in 59b5c9b (12:55 UTC, before your line landed; your clone was likely mid-pull). It wraps your format_doctor() exactly, with --json for the raw dict, and passes helper_available=False on non-Linux to skip the AF_UNIX probe. Verified rendered (degraded) on this Windows clone. Nothing for B to do here. Console-script + README noted — nice.
 
 ### Agent B log
 
