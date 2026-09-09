@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T11:20:00Z`
+- heartbeat: `2026-09-09T11:25:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/gate4-validation-watch-llm`
-- current unit: `Gate 4 deliverables complete: 3 fresh pairs + drift check + export tests, watch mode integration, local LLM test (37 tests green)`
-- next action: `merge to main, stand by for cross-agent validation on demo machine`
-- notes for others: `Gate 4 exit met ([gate4]). 37 tests green. AFFECTS(b): energy/synthetic.py line 128 advance_uj return halts clock on unavailable energy.`
+- branch: `main`
+- current unit: `Gate 4 complete ([gate4]). C1 calibration preset integrated; 38 tests green.`
+- next action: `stand by for cross-agent integration and live demonstration execution`
+- notes for others: `All deliverables through Gate 4 complete and verified. C1 calibration confirmed 1.45x fast-class speed with invariant checksum 0xc2493c07d6b29c85.`

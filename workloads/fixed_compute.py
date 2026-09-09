@@ -21,6 +21,7 @@ REFERENCE_CHECKSUMS = {
     (1024, 50000): "0x23e23165be5ef4b6",
     (2048, 50000): "0x8d10852193c21759",
     (8192, 100000): "0x38a6af54e0c98b86",
+    (16384, 200000): "0xc2493c07d6b29c85",
 }
 
 # Standard parameter presets
@@ -48,6 +49,12 @@ PRESETS: dict[str, dict[str, Any]] = {
         "iters": 100000,
         "checksum": "0x38a6af54e0c98b86",
         "description": "Heavy compute load (8192 chunks, 100k iters)",
+    },
+    "calibration": {
+        "chunks": 16384,
+        "iters": 200000,
+        "checksum": "0xc2493c07d6b29c85",
+        "description": "Standard C1/C2 hardware calibration sweep (16384 chunks, 200k iters)",
     },
 }
 

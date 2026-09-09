@@ -311,6 +311,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 3.5) [gate3] D: Gate 3 deliverables complete — workloads/registry.py (central plugin factory + listing with category/characteristics metadata), workloads/fixed_compute.py presets ('smoke', 'light', 'standard', 'heavy' with verified checksums), explain/facts.py + templates.py preference mode (§6c) reporting (closest_perf_floor, closest_energy_target, miss percentages, none_feasible, ASCII console-safe formatting), and tests/unit/test_contrast_workload.py + test_explain.py tests. 31 tests green. AFFECTS(b,c): get_workload(name, **kwargs) and list_workloads() in workloads/ ready for CLI and API integration.
 - (hour 4) [gate4] D: Gate 4 deliverables complete — 3 fresh validation pairs with drift checking and full JSON export verification in tests/integration/test_validation_export.py; passive watch-mode auto-detection integration test in tests/integration/test_watch_mode.py; live local-LLM completions + grounding prompt test with mock server in tests/unit/test_explain.py; watch mode demo beat in demo/run_demo.py. 37 tests green (100% passing).
 - (hour 4) AFFECTS(b) energy/synthetic.py: in advance_uj (line 128), 'if not self._available: return' early-returns before advancing self._simulated_time_s += dt_s, which freezes simulated monotonic time in step() during simulated counter outages. Recommend moving time advancement before the early return.
+- (hour 4) workloads/fixed_compute.py updated with 'calibration' preset (16384 chunks, 200k iters) matching Agent A's real hardware C1 calibration run (checksum 0xc2493c07d6b29c85).
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
@@ -320,6 +321,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
   `cpuinfo_max_freq` (Zen 5 = even CPUs 5.09 GHz, Zen 5c = odd CPUs 3.51 GHz); 16 per-CPU
   cpufreq policies; caps honored only with global boost=0; EPP dead (single preference value);
   tuned `throughput-performance` active. All touched settings restored and verified.
+- (hour 4, Agent A+D) C1 calibration on Fedora demo laptop confirmed (fixtures/real/calibration_c1.json): kernel binary workloads/kernel/fixed_compute produced invariant checksum 0xc2493c07d6b29c85 across all 10 runs on fast (Zen 5, cpu 0) and efficient (Zen 5c, cpu 1) cores, confirming fast class throughput is 1.45x efficient class (1935 vs 1334 chunks/s). Single-core energy is 75 J (fast) vs 79 J (efficient).
 
 ## 10. CI (A owns the workflow file; it protects everyone)
 
