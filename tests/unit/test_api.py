@@ -572,3 +572,51 @@ def test_system_quiet_endpoint(client):
     assert "remaining_noise" in data
 
 
+def test_calibration_endpoint_aggregates_store(client):
+    res = client.get("/api/calibration")
+    assert res.status_code == 200
+    data = res.json()
+    assert "classes" in data
+    assert len(data["classes"]) >= 2
+    # Verify points have score and averaging
+    all_points = [p for c in data["classes"] for p in c["points"]]
+    assert len(all_points) > 0
+    for p in all_points:
+        assert "watts" in p and p["watts"] > 0
+        assert "score" in p and p["score"] > 0
+        assert "runtime_s" in p and p["runtime_s"] > 0
+        assert "n" in p and p["n"] >= 1
+    # Check experiment filtering
+    if data.get("experiments"):
+        exp_id = data["experiments"][0]["id"]
+        res_exp = client.get(f"/api/calibration?experiment_id={exp_id}")
+        assert res_exp.status_code == 200
+        assert res_exp.json()["current_experiment_id"] == exp_id
+
+
+def test_system_processes_and_priority_endpoints(client):
+    res = client.get("/api/system/processes")
+    assert res.status_code == 200
+    data = res.json()
+    assert "processes" in data
+    assert "total" in data
+
+    # Test process priority with current pid
+    import os
+    pid = os.getpid()
+    res_prio = client.post(
+        "/api/system/process-priority",
+        json={"pid": pid, "policy": "deprioritize_eco"},
+    )
+    assert res_prio.status_code == 200
+    assert res_prio.json()["ok"] is True
+    assert "Zen 5c" in res_prio.json()["affinity_label"] or "Eco" in res_prio.json()["affinity_label"]
+
+    res_restore = client.post(
+        "/api/system/process-priority",
+        json={"pid": pid, "policy": "restore_normal"},
+    )
+    assert res_restore.status_code == 200
+    assert res_restore.json()["ok"] is True
+
+

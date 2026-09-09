@@ -15,10 +15,11 @@ import { Navbar } from './components/Navbar';
 import { SetupView } from './components/SetupView';
 import { ValidationView } from './components/ValidationView';
 import { WatchPanel } from './components/WatchPanel';
+import { TaskManagerView } from './components/TaskManagerView';
 import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch'>('explorer');
+  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks'>('explorer');
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [workloads, setWorkloads] = useState<WorkloadInfo[]>([]);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
@@ -309,6 +310,7 @@ export const App: React.FC = () => {
             hasCalibration={hasCalibration}
             latestWatchedSegment={latestWatchedSegment}
             onOpenWatchTab={() => setActiveTab('watch')}
+            onOpenTasksTab={() => setActiveTab('tasks')}
           />
         )}
 
@@ -329,6 +331,8 @@ export const App: React.FC = () => {
         {activeTab === 'watch' && (
           <WatchPanel onApplySuggestedBudget={handleApplySuggestedBudget} />
         )}
+
+        {activeTab === 'tasks' && <TaskManagerView />}
       </main>
     </div>
   );

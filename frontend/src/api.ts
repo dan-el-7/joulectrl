@@ -93,8 +93,11 @@ export async function fetchValidationPoints(experimentId: string): Promise<any> 
   return res.json();
 }
 
-export async function fetchCalibration(): Promise<any> {
-  const res = await fetch(`${API_BASE}/calibration`);
+export async function fetchCalibration(experimentId?: string): Promise<any> {
+  const url = experimentId
+    ? `${API_BASE}/calibration?experiment_id=${encodeURIComponent(experimentId)}`
+    : `${API_BASE}/calibration`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch calibration: ${res.statusText}`);
   return res.json();
 }
@@ -183,6 +186,44 @@ export interface SystemThermalStatus {
 export async function fetchSystemThermal(): Promise<SystemThermalStatus> {
   const res = await fetch(`${API_BASE}/system/thermal`);
   if (!res.ok) throw new Error(`Failed to fetch thermal status: ${res.statusText}`);
+  return res.json();
+}
+
+export interface UserProcess {
+  pid: number;
+  ppid: number;
+  user: string;
+  name: string;
+  cmdline: string;
+  cpu_pct: number;
+  mem_pct: number;
+  nice: number;
+  affinity: string;
+  affinity_label: string;
+}
+
+export interface UserProcessesResponse {
+  processes: UserProcess[];
+  total: number;
+}
+
+export async function fetchUserProcesses(limit = 100): Promise<UserProcessesResponse> {
+  const res = await fetch(`${API_BASE}/system/processes?limit=${limit}`);
+  if (!res.ok) throw new Error(`Failed to fetch processes: ${res.statusText}`);
+  return res.json();
+}
+
+export async function setProcessPriority(params: {
+  pid?: number;
+  pattern?: string;
+  policy: 'deprioritize_eco' | 'prioritize_fast' | 'restore_normal';
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/system/process-priority`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Failed to set process priority: ${res.statusText}`);
   return res.json();
 }
 

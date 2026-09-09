@@ -1,7 +1,14 @@
 import React from 'react';
 import { CapabilitiesResponse, WorkloadInfo, classCpus } from '../types';
 import { colors } from '../design';
-import { fetchSystemNoise, quietSystem, SystemNoiseStatus, fetchSystemThermal, SystemThermalStatus } from '../api';
+import {
+  fetchSystemNoise,
+  quietSystem,
+  SystemNoiseStatus,
+  fetchSystemThermal,
+  SystemThermalStatus,
+  setProcessPriority,
+} from '../api';
 
 
 /** Numeric text input synced with a slider — free typing, no artificial caps. */
@@ -85,6 +92,7 @@ interface SetupViewProps {
     suggested_budget_s: number;
   } | null;
   onOpenWatchTab?: () => void;
+  onOpenTasksTab?: () => void;
 }
 
 export const SetupView: React.FC<SetupViewProps> = ({
@@ -114,10 +122,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
   hasCalibration = true,
   latestWatchedSegment,
   onOpenWatchTab,
+  onOpenTasksTab,
 }) => {
   const [noiseStatus, setNoiseStatus] = React.useState<SystemNoiseStatus | null>(null);
   const [thermalStatus, setThermalStatus] = React.useState<SystemThermalStatus | null>(null);
   const [isQuieting, setIsQuieting] = React.useState<boolean>(false);
+  const [isDeprioritizing, setIsDeprioritizing] = React.useState<boolean>(false);
   const [quietSuccessMsg, setQuietSuccessMsg] = React.useState<string | null>(null);
   const [showNoiseModal, setShowNoiseModal] = React.useState<boolean>(false);
   const [selectedAppsToQuiet, setSelectedAppsToQuiet] = React.useState<Record<string, boolean>>({});
@@ -139,8 +149,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
       if (therm) {
         setThermalStatus(therm);
       }
-    } catch (e) {
-      console.warn('Failed to fetch system state', e);
+    } catch {
+      // transient
     }
   }, []);
 
@@ -162,6 +172,24 @@ export const SetupView: React.FC<SetupViewProps> = ({
       console.error('Failed to quiet system', e);
     } finally {
       setIsQuieting(false);
+    }
+  };
+
+  const handleDeprioritizeNoise = async () => {
+    if (!noiseStatus) return;
+    try {
+      setIsDeprioritizing(true);
+      for (const app of noiseStatus.detected_apps) {
+        await setProcessPriority({ pattern: app.key, policy: 'deprioritize_eco' });
+      }
+      const names = noiseStatus.detected_apps.map((a) => a.name).join(', ');
+      setQuietSuccessMsg(`Deprioritized ${names} to Zen 5c Eco Cores. Fast cores are clear!`);
+      setTimeout(() => setQuietSuccessMsg(null), 6000);
+      await refreshNoise();
+    } catch (e) {
+      console.error('Failed to deprioritize apps', e);
+    } finally {
+      setIsDeprioritizing(false);
     }
   };
 
@@ -511,25 +539,65 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
             </div>
             {!noiseStatus?.is_quiet && (
-              <button
-                type="button"
-                disabled={isQuieting}
-                onClick={() => handleQuiet()}
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '0.375rem',
-                  backgroundColor: 'rgba(245,158,11,0.18)',
-                  border: '1px solid rgba(245,158,11,0.4)',
-                  color: '#f59e0b',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  cursor: isQuieting ? 'wait' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {isQuieting ? 'Quieting...' : '🧹 Close Extra Apps'}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  disabled={isDeprioritizing || isQuieting}
+                  onClick={handleDeprioritizeNoise}
+                  title="Move running apps to Zen 5c Eco Cores without closing them"
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                    border: '1px solid rgba(52, 211, 153, 0.4)',
+                    color: '#34d399',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: isDeprioritizing ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {isDeprioritizing ? 'Moving to Eco…' : '🌿 Deprioritize to Eco'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isQuieting || isDeprioritizing}
+                  onClick={() => handleQuiet()}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    backgroundColor: 'rgba(245,158,11,0.18)',
+                    border: '1px solid rgba(245,158,11,0.4)',
+                    color: '#f59e0b',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: isQuieting ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {isQuieting ? 'Quieting...' : '🧹 Close Extra Apps'}
+                </button>
+                {onOpenTasksTab && (
+                  <button
+                    type="button"
+                    onClick={onOpenTasksTab}
+                    style={{
+                      padding: '0.35rem 0.65rem',
+                      borderRadius: '0.375rem',
+                      backgroundColor: 'transparent',
+                      border: `1px solid ${colors.border}`,
+                      color: colors.textSecondary,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Tasks Tab →
+                  </button>
+                )}
+              </div>
             )}
           </div>
           {quietSuccessMsg && (

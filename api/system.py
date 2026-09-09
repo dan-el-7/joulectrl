@@ -280,3 +280,194 @@ def get_thermal_status() -> dict[str, Any]:
         "source": source,
     }
 
+
+FAST_CORE_IDS = {0, 2, 4, 6, 8, 10, 12, 14}
+ECO_CORE_IDS = {1, 3, 5, 7, 9, 11, 13, 15}
+
+
+def _parse_cpu_list(cpus_str: str) -> set[int]:
+    """Parse string like '0-15' or '1,3,5,7' or '0-3,8-11' into a set of ints."""
+    result = set()
+    for part in cpus_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            try:
+                start, end = part.split("-", 1)
+                result.update(range(int(start), int(end) + 1))
+            except ValueError:
+                pass
+        else:
+            try:
+                result.add(int(part))
+            except ValueError:
+                pass
+    return result
+
+
+def _get_process_affinity(pid: int) -> tuple[str, str]:
+    """Read CPU affinity of process via taskset. Return (raw_affinity_str, label)."""
+    try:
+        out = subprocess.check_output(
+            ["taskset", "-cp", str(pid)],
+            text=True,
+            timeout=1.0,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        # output format: "pid 1234's current affinity list: 0-15"
+        if ":" in out:
+            affinity_str = out.split(":", 1)[1].strip()
+            cpus = _parse_cpu_list(affinity_str)
+            if not cpus:
+                return affinity_str, "Unknown"
+            if cpus.issubset(ECO_CORE_IDS):
+                return affinity_str, "Zen 5c (Eco)"
+            if cpus.issubset(FAST_CORE_IDS):
+                return affinity_str, "Zen 5 (Fast)"
+            if len(cpus) >= 16:
+                return affinity_str, "All Cores"
+            return affinity_str, f"Cores {affinity_str}"
+        return "Unknown", "Unknown"
+    except Exception:
+        return "Unknown", "Unknown"
+
+
+def list_user_processes(limit: int = 100) -> list[dict[str, Any]]:
+    """List running processes for current user with CPU, memory, nice, and core affinity."""
+    try:
+        current_user = os.environ.get("USER", "")
+        cmd = ["ps", "-eo", "pid,ppid,user,%cpu,%mem,ni,comm,args", "--sort=-%cpu", "--no-headers"]
+        out = subprocess.check_output(cmd, text=True, timeout=3.0)
+    except Exception as exc:
+        logger.warning("Failed to list user processes: %s", exc)
+        return []
+
+    processes = []
+    for line in out.strip().split("\n"):
+        parts = line.strip().split(None, 7)
+        if len(parts) < 8:
+            continue
+        pid_s, ppid_s, user, cpu_s, mem_s, ni_s, comm, args = parts
+        try:
+            pid = int(pid_s)
+            ppid = int(ppid_s)
+            cpu = float(cpu_s)
+            mem = float(mem_s)
+            ni = int(ni_s)
+        except ValueError:
+            continue
+
+        # Filter out kernel threads and root processes if not current user
+        if pid <= 2 or ppid == 2 or comm.startswith("kworker") or comm.startswith("irq/"):
+            continue
+        if current_user and user != current_user:
+            continue
+
+        affinity_str, affinity_label = _get_process_affinity(pid)
+
+        processes.append({
+            "pid": pid,
+            "ppid": ppid,
+            "user": user,
+            "name": comm,
+            "cmdline": args[:120],
+            "cpu_pct": cpu,
+            "mem_pct": mem,
+            "nice": ni,
+            "affinity": affinity_str,
+            "affinity_label": affinity_label,
+        })
+        if len(processes) >= limit:
+            break
+
+    return processes
+
+
+def set_process_priority(
+    pid: int,
+    policy: str,
+    custom_cpus: Optional[str] = None,
+    custom_nice: Optional[int] = None,
+) -> dict[str, Any]:
+    """Set CPU affinity and nice level of a process.
+
+    Policies:
+      - 'deprioritize_eco': Pin all threads to Zen 5c eco cores (1,3,5,7,9,11,13,15), nice +15.
+        Frees Zen 5 fast cores completely so primary work / benchmarks run without contention.
+      - 'prioritize_fast': Pin all threads to Zen 5 fast cores (0,2,4,6,8,10,12,14), nice 0.
+      - 'restore_normal': Reset affinity to all cores (0-15), nice 0.
+      - 'custom': Use custom_cpus and custom_nice.
+    """
+    if pid <= 2:
+        return {"ok": False, "error": "Cannot modify system init/kernel process", "pid": pid}
+
+    if policy == "deprioritize_eco":
+        cpus = "1,3,5,7,9,11,13,15"
+        nice_val = 15
+    elif policy == "prioritize_fast":
+        cpus = "0,2,4,6,8,10,12,14"
+        nice_val = 0
+    elif policy == "restore_normal":
+        cpus = "0-15"
+        nice_val = 0
+    elif policy == "custom":
+        cpus = custom_cpus or "0-15"
+        nice_val = custom_nice if custom_nice is not None else 0
+    else:
+        return {"ok": False, "error": f"Unknown policy: {policy}", "pid": pid}
+
+    # Apply affinity to all threads using -a
+    try:
+        subprocess.check_call(
+            ["taskset", "-acp", cpus, str(pid)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as exc:
+        logger.warning("taskset failed on PID %d: %s", pid, exc)
+        return {"ok": False, "error": f"Failed to set affinity: {exc}", "pid": pid}
+
+    # Apply nice
+    try:
+        subprocess.check_call(
+            ["renice", str(nice_val), "-p", str(pid)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as exc:
+        logger.warning("renice failed on PID %d: %s", pid, exc)
+
+    updated_affinity, updated_label = _get_process_affinity(pid)
+    return {
+        "ok": True,
+        "pid": pid,
+        "policy": policy,
+        "affinity": updated_affinity,
+        "affinity_label": updated_label,
+        "nice": nice_val,
+    }
+
+
+def apply_policy_to_pattern(pattern: str, policy: str) -> dict[str, Any]:
+    """Find all running processes matching pattern and apply priority policy."""
+    pat = pattern.strip().lower()
+    if not pat:
+        return {"ok": False, "error": "Pattern cannot be empty", "applied_pids": []}
+
+    procs = list_user_processes(limit=200)
+    matching = [p for p in procs if pat in p["name"].lower() or pat in p["cmdline"].lower()]
+    applied = []
+    for p in matching:
+        res = set_process_priority(p["pid"], policy)
+        if res.get("ok"):
+            applied.append(p["pid"])
+
+    return {
+        "ok": True,
+        "pattern": pattern,
+        "policy": policy,
+        "matching_count": len(matching),
+        "applied_pids": applied,
+    }
+

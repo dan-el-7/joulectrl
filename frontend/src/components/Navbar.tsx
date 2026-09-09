@@ -2,8 +2,8 @@ import React from 'react';
 import { colors, fonts, fontFeatures, type, radii, sectionLabel } from '../design';
 
 interface NavbarProps {
-  activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch';
-  onSelectTab: (tab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch') => void;
+  activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks';
+  onSelectTab: (tab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks') => void;
   restorationStatus: string;
   onEmergencyRestore: () => void;
   isRestoring: boolean;
@@ -21,6 +21,7 @@ const TABS = [
   { id: 'calibration', label: 'Calibration' },
   { id: 'validation', label: 'Validation' },
   { id: 'watch', label: 'Watch' },
+  { id: 'tasks', label: 'Tasks' },
 ] as const;
 
 /** Terminal states — experiment finished, no longer "running". */

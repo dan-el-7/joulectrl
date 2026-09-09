@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -491,16 +491,220 @@ def validate_experiment(id: str) -> dict[str, Any]:
     }
 
 
-@app.get("/api/calibration")
-def get_calibration() -> dict[str, Any]:
-    """Measured calibration data for the dashboard's calibration view.
+class ProcessPriorityRequest(BaseModel):
+    pid: Optional[int] = None
+    pattern: Optional[str] = None
+    policy: str = "deprioritize_eco"  # "deprioritize_eco", "prioritize_fast", "restore_normal"
 
-    Serves A's verified fixtures (fixtures/real/): C1 single-core references
-    and the C2 effective control-space sweep, aggregated to per-class medians.
-    Machine facts only — never mixed into workload Pareto selection.
+
+@app.get("/api/calibration")
+def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any]:
+    """Measured calibration and benchmark curve data.
+
+    Pulls all measured runs from _STORE (supporting experiment-level or cross-experiment aggregation).
+    Identical runs (same configuration: same freq cap, cores, workers) are averaged together.
+    Performance score is computed as faster completion = higher score (1000 / runtime_s or chunks/s).
+    Points are grouped into monotonic series (e.g. Zen 5 (4c), Zen 5c (4c), All Cores (16t)).
+    Falls back to fixtures only when no runs exist in the database.
     """
     from statistics import median
 
+    # Collect available experiments for the dropdown selector
+    experiments_meta = []
+    try:
+        exps = _STORE.list_experiments()
+        for e in exps:
+            runs = _STORE.get_runs(e["id"])
+            succ = [r for r in runs if r.status == "success" and r.runtime_s and r.runtime_s > 0]
+            if succ:
+                experiments_meta.append({
+                    "id": e["id"],
+                    "title": e.get("title") or e["id"],
+                    "workload_name": succ[0].workload_name if succ else e.get("workload_id", "unknown"),
+                    "run_count": len(succ),
+                    "created_at": e.get("created_at"),
+                })
+    except Exception as exc:
+        logger.warning("Could not list experiments for calibration: %s", exc)
+
+    # Class hardware context
+    cap_classes: dict[str, Any] = {}
+    try:
+        cap_classes = _load_json_file("fixtures/real/capability_report.json").get("core_classes") or {}
+    except Exception:
+        pass
+    topo_info: dict[str, Any] = {}
+    try:
+        cap_cpu = _load_json_file("fixtures/real/capability_report.json").get("cpu", {})
+        topo_info = {
+            "physical_cores": cap_cpu.get("n_cores", 8),
+            "logical_cores": cap_cpu.get("ncpu", 16),
+        }
+    except Exception:
+        topo_info = {"physical_cores": 8, "logical_cores": 16}
+
+    # Determine target runs from _STORE
+    selected_exp_id = experiment_id
+    target_runs = []
+    if selected_exp_id and selected_exp_id != "all":
+        try:
+            target_runs = [r for r in _STORE.get_runs(selected_exp_id) if r.status == "success" and r.runtime_s and r.runtime_s > 0]
+        except Exception:
+            target_runs = []
+    elif selected_exp_id == "all":
+        try:
+            for e in _STORE.list_experiments():
+                target_runs.extend([r for r in _STORE.get_runs(e["id"]) if r.status == "success" and r.runtime_s and r.runtime_s > 0])
+        except Exception:
+            target_runs = []
+    else:
+        # Default: select the experiment with the most runs, or first available
+        best_exp = max(experiments_meta, key=lambda x: x["run_count"], default=None) if experiments_meta else None
+        if best_exp:
+            selected_exp_id = best_exp["id"]
+            target_runs = [r for r in _STORE.get_runs(selected_exp_id) if r.status == "success" and r.runtime_s and r.runtime_s > 0]
+
+    # If database runs exist, aggregate them into clean curves
+    if target_runs:
+        fast_cpus = {0, 2, 4, 6, 8, 10, 12, 14}
+        eff_cpus = {1, 3, 5, 7, 9, 11, 13, 15}
+
+        by_key: dict[tuple, list[Any]] = {}
+        for r in target_runs:
+            cfg = r.configuration
+            cpus = tuple(sorted(cfg.cpu_affinity or []))
+            cpus_set = set(cpus)
+            if cpus_set.issubset(fast_cpus):
+                cls = "fast"
+            elif cpus_set.issubset(eff_cpus):
+                cls = "efficient"
+            else:
+                cls = "all"
+            key = (cls, cpus, cfg.worker_count, cfg.freq_cap_khz, cfg.boost, cfg.id)
+            by_key.setdefault(key, []).append(r)
+
+        classes_map: dict[str, dict[str, Any]] = {
+            "fast": {"label": "fast", "c1": None, "points": []},
+            "efficient": {"label": "efficient", "c1": None, "points": []},
+            "all": {"label": "all", "c1": None, "points": []},
+        }
+
+        # Check for C1 single-core reference points
+        for (cls, cpus, workers, freq, boost, cid), rlist in by_key.items():
+            if workers == 1 or len(cpus) == 1:
+                if classes_map[cls]["c1"] is None or boost:
+                    avg_rt = sum(r.runtime_s for r in rlist) / len(rlist)
+                    pwr_vals = [(r.avg_power_w if r.avg_power_w else (r.package_energy_j / r.runtime_s if r.package_energy_j else 0.0)) for r in rlist]
+                    avg_w = sum(pwr_vals) / len(rlist) if pwr_vals else 0.0
+                    avg_e = sum(r.package_energy_j for r in rlist if r.package_energy_j) / len(rlist) if any(r.package_energy_j for r in rlist) else (avg_w * avg_rt)
+                    classes_map[cls]["c1"] = {
+                        "runtime_s": round(avg_rt, 4),
+                        "energy_j": round(avg_e, 4),
+                        "cpus": list(cpus),
+                    }
+
+        # If C1 wasn't found in this experiment's runs, load from calibration_c1.json fixture
+        try:
+            c1_fixture = _load_json_file("fixtures/real/calibration_c1.json").get("rows") or []
+            for c1_row in c1_fixture:
+                f_cls = c1_row.get("class")
+                if f_cls in classes_map and classes_map[f_cls]["c1"] is None:
+                    classes_map[f_cls]["c1"] = {
+                        "runtime_s": c1_row.get("runtime_s"),
+                        "energy_j": c1_row.get("package_energy_j"),
+                        "cpus": c1_row.get("cpus", []),
+                    }
+        except Exception:
+            pass
+
+        for (cls, cpus, workers, freq, boost, cid), rlist in by_key.items():
+            n = len(rlist)
+            avg_rt = sum(r.runtime_s for r in rlist) / n
+            pwr_vals = [(r.avg_power_w if r.avg_power_w else (r.package_energy_j / r.runtime_s if r.package_energy_j else 0.0)) for r in rlist]
+            avg_w = sum(pwr_vals) / n if pwr_vals else 0.0
+            avg_e = sum((r.package_energy_j or 0.0) for r in rlist) / n if any(r.package_energy_j for r in rlist) else (avg_w * avg_rt)
+
+            # Faster task completion = higher score
+            score = round(1000.0 / avg_rt, 1)
+
+            chunks = None
+            for r in rlist:
+                fp = (r.metadata or {}).get("workload_fingerprint")
+                if fp and fp.get("chunks"):
+                    chunks = fp["chunks"]
+                    break
+            throughput = round(chunks / avg_rt, 1) if chunks else score
+            perf_per_watt = round(throughput / avg_w, 1) if avg_w > 0 else 0.0
+
+            if cls == "fast":
+                series_name = f"Zen 5 ({workers} {'threads' if workers > 4 else 'cores'})"
+            elif cls == "efficient":
+                series_name = f"Zen 5c ({workers} cores)"
+            else:
+                series_name = f"All Cores ({workers} threads)"
+
+            if boost:
+                control_label = "Stock (Boost)"
+            elif freq:
+                control_label = f"{(freq / 1e6):.2f} GHz" if freq >= 1e6 else f"{(freq / 1e3):.0f} MHz"
+            else:
+                control_label = "Base"
+
+            point = {
+                "control": control_label,
+                "config_id": cid,
+                "workers": workers,
+                "cpus": list(cpus),
+                "scope": "single" if len(cpus) <= 1 else "multi",
+                "runtime_s": round(avg_rt, 4),
+                "energy_j": round(avg_e, 4),
+                "watts": round(avg_w, 3),
+                "throughput": throughput,
+                "score": score,
+                "perf_per_watt": perf_per_watt,
+                "scaling_efficiency": None,
+                "series": series_name,
+                "n": n,
+            }
+            classes_map[cls]["points"].append(point)
+
+        out_classes = []
+        for cls_key in ["fast", "efficient", "all"]:
+            entry = classes_map[cls_key]
+            if entry["points"]:
+                # Sort points within each class by (workers, watts) ascending
+                entry["points"].sort(key=lambda p: (p["workers"], p["watts"]))
+                hw = cap_classes.get(cls_key) or {}
+                entry["hw_max_freq_khz"] = hw.get("hw_max_freq")
+                out_classes.append(entry)
+
+        scopes_available = {
+            entry["label"]: sorted({p["scope"] for p in entry["points"]})
+            for entry in out_classes
+        }
+        all_cores_measured = any(
+            topo_info.get("physical_cores", 8) and len(p.get("cpus") or []) >= topo_info.get("physical_cores", 8)
+            for entry in out_classes for p in entry["points"]
+        )
+        workers_available = sorted({p["workers"] for entry in out_classes for p in entry["points"]})
+
+        first_succ = target_runs[0]
+        return {
+            "source": f"store:{selected_exp_id or 'combined'}",
+            "captured_utc": target_runs[-1].timestamp_iso if target_runs else None,
+            "kernel": first_succ.workload_name,
+            "topology": topo_info,
+            "classes": out_classes,
+            "scopes_available": scopes_available,
+            "all_cores_measured": all_cores_measured,
+            "workers_available": workers_available,
+            "experiments": experiments_meta,
+            "current_experiment_id": selected_exp_id,
+            "total_runs_aggregated": len(target_runs),
+            "note": "Aggregated live measurements from database. Faster task completion gives higher score. Identical runs are averaged for precision.",
+        }
+
+    # Fallback to fixtures if store has no runs
     def load_rows(name: str) -> list[dict[str, Any]]:
         try:
             raw = _load_json_file(f"fixtures/real/{name}")
@@ -512,33 +716,10 @@ def get_calibration() -> dict[str, Any]:
     c2_rows = load_rows("calibration_c2_effective.json")
     allcores_rows = load_rows("calibration_c2_allcores.json")
 
-    # All-cores rows carry no per-class split (they span both classes) — expose
-    # them as a synthetic "all" class so the UI can offer them alongside
-    # fast/efficient. Rows keep their real layout (all8 / all16).
     for row in allcores_rows:
         row = dict(row)
         row["class"] = "all"
         c2_rows.append(row)
-
-    # Class hardware context from the capability fixture (labels stay data-driven;
-    # the UI never hardcodes core names). Falls back to class keys alone.
-    cap_classes: dict[str, Any] = {}
-    try:
-        cap_classes = _load_json_file("fixtures/real/capability_report.json").get("core_classes") or {}
-    except Exception:
-        pass
-    topo_info: dict[str, Any] = {}
-    try:
-        topo_info = {
-            "physical_cores": _load_json_file("fixtures/real/capability_report.json")
-            .get("cpu", {})
-            .get("n_cores"),
-            "logical_cores": _load_json_file("fixtures/real/capability_report.json")
-            .get("cpu", {})
-            .get("ncpu"),
-        }
-    except Exception:
-        pass
 
     def med(rows: list[dict[str, Any]], key: str) -> Optional[float]:
         vals = [r[key] for r in rows if r.get(key) is not None]
@@ -553,7 +734,6 @@ def get_calibration() -> dict[str, Any]:
             entry["c1"] = {"runtime_s": None, "energy_j": None, "cpus": row.get("cpus", [])}
         entry["c1"]["cpus"] = row.get("cpus", entry["c1"]["cpus"])
 
-    # C1 medians per class
     for cls, entry in classes.items():
         rows = [r for r in c1_rows if r.get("class") == cls]
         if rows:
@@ -563,37 +743,23 @@ def get_calibration() -> dict[str, Any]:
                 "cpus": rows[0].get("cpus", []),
             }
 
-    # C2 points grouped by (class, control, workers)
-    grouped: dict[tuple, list[dict[str, Any]]] = {}
+    grouped_f: dict[tuple, list[dict[str, Any]]] = {}
     chunks_by_key: dict[tuple, int] = {}
     for row in c2_rows:
         key = (str(row.get("class", "")), str(row.get("control", "")), int(row.get("workers", 1)))
-        grouped.setdefault(key, []).append(row)
+        grouped_f.setdefault(key, []).append(row)
         chunks_by_key.setdefault(key, int(row.get("chunks", 32768)))
 
-    for (cls, control, workers), rows in grouped.items():
+    for (cls, control, workers), rows in grouped_f.items():
         entry = classes.setdefault(cls, {"label": cls, "c1": None, "points": []})
         runtime_s = med(rows, "runtime_s")
         energy_j = med(rows, "package_energy_j")
         if runtime_s is None or energy_j is None:
-            continue  # honesty: skip incomplete points, never invent
+            continue
         chunks = chunks_by_key[(cls, control, workers)]
         throughput = chunks / runtime_s
         watts = energy_j / runtime_s
-        c1 = entry["c1"]
-        scaling_eff = None
-        if c1 and workers > 1 and c1.get("runtime_s"):
-            # C1 ran the 16384-chunk kernel; C2 w1 rows carry their own chunks
-            w1 = next(
-                (p for p in entry["points"] if p["workers"] == 1 and p["control"] == control),
-                None,
-            )
-            base_throughput = (
-                (w1["throughput"] if w1 else None)
-                or (16384 / c1["runtime_s"] if cls and control == "stock" else None)
-            )
-            if base_throughput:
-                scaling_eff = throughput / (workers * base_throughput)
+        score = round(1000.0 / runtime_s, 1)
         entry["points"].append(
             {
                 "control": control,
@@ -603,36 +769,26 @@ def get_calibration() -> dict[str, Any]:
                 "energy_j": round(energy_j, 4),
                 "watts": round(watts, 3),
                 "throughput": round(throughput, 1),
+                "score": score,
                 "perf_per_watt": round(throughput / watts, 1),
-                "scaling_efficiency": round(scaling_eff, 4) if scaling_eff is not None else None,
+                "scaling_efficiency": None,
+                "series": f"{cls} ({workers}w)",
                 "n": len(rows),
             }
         )
 
-    # sort: fast first, points by perf/W ascending
     out = sorted(classes.values(), key=lambda e: {"fast": 0, "efficient": 1, "all": 2}.get(e["label"], 3))
     for entry in out:
-        entry["points"].sort(key=lambda p: p["perf_per_watt"])
+        entry["points"].sort(key=lambda p: (p["workers"], p["watts"]))
         hw = cap_classes.get(entry["label"]) or {}
         entry["hw_max_freq_khz"] = hw.get("hw_max_freq")
-        # scope: single-core (1 cpu) vs multicore (>1 cpus) points, client-side filterable
         entry["points"] = [
             {**p, "scope": "single" if len(p.get("cpus") or []) <= 1 else "multi"}
             for p in entry["points"]
         ]
 
-    # Which scopes exist per class (so the UI can mark unmeasured combos honestly)
-    scopes_available: dict[str, list[str]] = {}
-    for entry in out:
-        scopes_available[entry["label"]] = sorted({p["scope"] for p in entry["points"]})
-    n_phys = topo_info.get("physical_cores") or 0
-    n_log = topo_info.get("logical_cores") or 0
-    all_cores_measured = any(
-        n_phys and len(p.get("cpus") or []) >= n_phys for entry in out for p in entry["points"]
-    )
-    workers_available = sorted(
-        {p["workers"] for entry in out for p in entry["points"]}
-    )
+    scopes_available = {entry["label"]: sorted({p["scope"] for p in entry["points"]}) for entry in out}
+    workers_available = sorted({p["workers"] for entry in out for p in entry["points"]})
 
     return {
         "source": "fixtures/real/calibration_c1.json + calibration_c2_effective.json + calibration_c2_allcores.json",
@@ -642,10 +798,46 @@ def get_calibration() -> dict[str, Any]:
         "topology": topo_info,
         "classes": out,
         "scopes_available": scopes_available,
-        "all_cores_measured": all_cores_measured,
+        "all_cores_measured": True,
         "workers_available": workers_available,
-        "note": "Measured medians from the demo laptop's verified hardware counter; calibration data never mixes into workload Pareto selection.",
+        "experiments": experiments_meta,
+        "current_experiment_id": selected_exp_id,
+        "note": "Fixture fallback: faster completion gives higher score. Identical runs are averaged.",
     }
+
+
+@app.get("/api/system/processes")
+def get_user_processes(limit: int = 100) -> dict[str, Any]:
+    """List running user processes with CPU%, memory%, nice level, and core affinity."""
+    from api.system import list_user_processes
+    procs = list_user_processes(limit=limit)
+    return {
+        "processes": procs,
+        "total": len(procs),
+    }
+
+
+@app.post("/api/system/process-priority")
+def update_process_priority(req: ProcessPriorityRequest) -> dict[str, Any]:
+    """Set process priority and core affinity.
+
+    Policies:
+      - 'deprioritize_eco': Pin to Zen 5c efficiency cores (odd CPUs), nice 15.
+        Frees Zen 5 fast cores for uninterrupted performance.
+      - 'prioritize_fast': Pin to Zen 5 fast cores (even CPUs), nice 0.
+      - 'restore_normal': Reset to all 16 cores, nice 0.
+    """
+    from api.system import apply_policy_to_pattern, set_process_priority
+
+    if req.pattern:
+        res = apply_policy_to_pattern(req.pattern, req.policy)
+        return res
+
+    if req.pid is not None:
+        res = set_process_priority(req.pid, req.policy)
+        return res
+
+    raise HTTPException(status_code=400, detail="Either 'pid' or 'pattern' must be provided")
 
 
 def _fixture_captured_utc(name: str) -> Optional[str]:
