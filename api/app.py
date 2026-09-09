@@ -974,6 +974,31 @@ async def get_watch_events() -> StreamingResponse:
 
 
 # ---------------------------------------------------------------------------
+# System Noise & Quiet Mode endpoints
+# ---------------------------------------------------------------------------
+
+class QuietSystemRequest(BaseModel):
+    app_keys: Optional[list[str]] = None
+    pids: Optional[list[int]] = None
+
+
+@app.get("/api/system/noise")
+def get_system_noise_endpoint() -> dict[str, Any]:
+    """Scan running processes for non-essential applications and background noise."""
+    from api.system import get_system_noise
+    return get_system_noise()
+
+
+@app.post("/api/system/quiet")
+def quiet_system_endpoint(req: Optional[QuietSystemRequest] = None) -> dict[str, Any]:
+    """Terminate detected noisy background applications to prepare machine for calibration."""
+    from api.system import quiet_system
+    app_keys = req.app_keys if req else None
+    pids = req.pids if req else None
+    return quiet_system(app_keys=app_keys, pids=pids)
+
+
+# ---------------------------------------------------------------------------
 # Single-Origin Frontend Serving (Vite build in frontend/dist)
 # ---------------------------------------------------------------------------
 

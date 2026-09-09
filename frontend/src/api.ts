@@ -123,3 +123,51 @@ export async function stopWatch(): Promise<any> {
   if (!res.ok) throw new Error(`Failed to stop watch: ${res.statusText}`);
   return res.json();
 }
+
+export interface DetectedApp {
+  key: string;
+  name: string;
+  pids: number[];
+  process_count: number;
+  total_cpu_pct: number;
+  total_mem_pct: number;
+}
+
+export interface UnclassifiedProcess {
+  pid: number;
+  name: string;
+  cpu_pct: number;
+  mem_pct: number;
+  cmdline: string;
+}
+
+export interface SystemNoiseStatus {
+  is_quiet: boolean;
+  total_noise_cpu_pct: number;
+  detected_apps: DetectedApp[];
+  unclassified_processes: UnclassifiedProcess[];
+}
+
+export interface QuietSystemResult {
+  ok: boolean;
+  terminated_pids: number[];
+  closed_apps: string[];
+  remaining_noise: SystemNoiseStatus;
+}
+
+export async function fetchSystemNoise(): Promise<SystemNoiseStatus> {
+  const res = await fetch(`${API_BASE}/system/noise`);
+  if (!res.ok) throw new Error(`Failed to fetch system noise: ${res.statusText}`);
+  return res.json();
+}
+
+export async function quietSystem(appKeys?: string[], pids?: number[]): Promise<QuietSystemResult> {
+  const res = await fetch(`${API_BASE}/system/quiet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_keys: appKeys, pids }),
+  });
+  if (!res.ok) throw new Error(`Failed to quiet system: ${res.statusText}`);
+  return res.json();
+}
+

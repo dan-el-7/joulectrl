@@ -546,3 +546,29 @@ def test_engine_profile_rows_repetition_aggregation():
     assert row["median_runtime_s"] == 2.1
     assert row["median_energy_j"] == 10.5
 
+
+def test_system_noise_endpoint(client):
+    res = client.get("/api/system/noise")
+    assert res.status_code == 200
+    data = res.json()
+    assert "is_quiet" in data
+    assert "total_noise_cpu_pct" in data
+    assert "detected_apps" in data
+    assert "unclassified_processes" in data
+    # Ensure protected apps are not in detected_apps
+    detected_keys = [app["key"] for app in data["detected_apps"]]
+    assert "antigravity" not in detected_keys
+    assert "uvicorn" not in detected_keys
+
+
+def test_system_quiet_endpoint(client):
+    # Call quiet with empty/non-existent app key to verify endpoint contract safely
+    res = client.post("/api/system/quiet", json={"app_keys": ["non_existent_app_xyz"]})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+    assert "terminated_pids" in data
+    assert "closed_apps" in data
+    assert "remaining_noise" in data
+
+

@@ -1,6 +1,7 @@
 import React from 'react';
 import { CapabilitiesResponse, WorkloadInfo, classCpus } from '../types';
 import { colors } from '../design';
+import { fetchSystemNoise, quietSystem, SystemNoiseStatus } from '../api';
 
 
 /** Numeric text input synced with a slider — free typing, no artificial caps. */
@@ -111,6 +112,56 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onOpenWatchTab,
 }) => {
   const [showCalibrationSettings, setShowCalibrationSettings] = React.useState<boolean>(false);
+  const [noiseStatus, setNoiseStatus] = React.useState<SystemNoiseStatus | null>(null);
+  const [isQuieting, setIsQuieting] = React.useState<boolean>(false);
+  const [quietSuccessMsg, setQuietSuccessMsg] = React.useState<string | null>(null);
+  const [showNoiseModal, setShowNoiseModal] = React.useState<boolean>(false);
+  const [selectedAppsToQuiet, setSelectedAppsToQuiet] = React.useState<Record<string, boolean>>({});
+
+  const refreshNoise = React.useCallback(async () => {
+    try {
+      const st = await fetchSystemNoise();
+      setNoiseStatus(st);
+      const appSelection: Record<string, boolean> = {};
+      st.detected_apps.forEach((a) => {
+        appSelection[a.key] = true;
+      });
+      setSelectedAppsToQuiet(appSelection);
+    } catch (e) {
+      console.warn('Failed to fetch system noise', e);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    refreshNoise();
+    const interval = setInterval(refreshNoise, 8000);
+    return () => clearInterval(interval);
+  }, [refreshNoise]);
+
+  const handleQuiet = async (appKeys?: string[]) => {
+    setIsQuieting(true);
+    try {
+      const res = await quietSystem(appKeys);
+      setNoiseStatus(res.remaining_noise);
+      const closedNames = res.closed_apps.join(', ');
+      setQuietSuccessMsg(closedNames ? `Closed ${closedNames}. Baseline quieted.` : 'Quiet baseline applied.');
+      setTimeout(() => setQuietSuccessMsg(null), 5000);
+    } catch (e) {
+      console.error('Failed to quiet system', e);
+    } finally {
+      setIsQuieting(false);
+    }
+  };
+
+  const handleStartWithCheck = () => {
+    const isCalibratingOrSweeping =
+      !hasCalibration || (calibrationBudgetS !== null && calibrationBudgetS > 0) || repetitions > 1;
+    if (isCalibratingOrSweeping && noiseStatus && !noiseStatus.is_quiet) {
+      setShowNoiseModal(true);
+      return;
+    }
+    onStartExperiment();
+  };
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Left Column: Workload & Objective Configuration */}
@@ -351,6 +402,65 @@ export const SetupView: React.FC<SetupViewProps> = ({
           </div>
         </div>
 
+        {/* System Noise & Background Activity Card */}
+        <div
+          style={{
+            marginBottom: '1.5rem',
+            background: noiseStatus?.is_quiet ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.08)',
+            border: `1px solid ${noiseStatus?.is_quiet ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.28)'}`,
+            borderRadius: '0.5rem',
+            padding: '0.85rem 1rem',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1, marginRight: '0.75rem' }}>
+              <div
+                style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <span>{noiseStatus?.is_quiet ? '✓ System Baseline Quiet' : '⚠️ Background Noise Detected'}</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem', lineHeight: '1.35' }}>
+                {noiseStatus?.is_quiet
+                  ? 'No extra background applications detected. Clean baseline for calibration & sweep accuracy.'
+                  : `${noiseStatus?.detected_apps.map((a) => a.name).join(', ')} active (${noiseStatus?.total_noise_cpu_pct}% CPU). Extra background load can skew silicon power curves.`}
+              </div>
+            </div>
+            {!noiseStatus?.is_quiet && (
+              <button
+                type="button"
+                disabled={isQuieting}
+                onClick={() => handleQuiet()}
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: 'rgba(245,158,11,0.18)',
+                  border: '1px solid rgba(245,158,11,0.4)',
+                  color: '#f59e0b',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: isQuieting ? 'wait' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {isQuieting ? 'Quieting...' : '🧹 Close Extra Apps'}
+              </button>
+            )}
+          </div>
+          {quietSuccessMsg && (
+            <div style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: colors.emerald, fontWeight: 500 }}>
+              ✓ {quietSuccessMsg}
+            </div>
+          )}
+        </div>
+
         {/* 3. Calibration Status & Optional Sweep Settings */}
         {hasCalibration ? (
           <div style={{
@@ -477,7 +587,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
         {/* Action Button */}
         <button
-          onClick={onStartExperiment}
+          onClick={handleStartWithCheck}
           disabled={isStarting}
           style={{
             width: '100%',
@@ -605,6 +715,164 @@ export const SetupView: React.FC<SetupViewProps> = ({
           <div style={{ color: colors.textTertiary }}>Loading machine capabilities...</div>
         )}
       </div>
+
+      {/* Pre-Calibration / Sweep Background Noise Modal */}
+      {showNoiseModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.78)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            style={{
+              background: colors.surface,
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '0.75rem',
+              padding: '1.5rem',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.6)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.85rem' }}>
+              <span style={{ fontSize: '1.4rem' }}>🧹</span>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: colors.textPrimary, fontWeight: 600 }}>
+                Quiet Background Apps Before Calibrating?
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.84rem', color: colors.textSecondary, lineHeight: '1.45', marginBottom: '1rem' }}>
+              You are about to run a hardware silicon sweep. Active background applications introduce CPU contention and thermal throttling, which can distort your energy and runtime curve.
+            </p>
+
+            <div
+              style={{
+                marginBottom: '1.25rem',
+                background: colors.surfaceElevated,
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                border: '1px solid rgba(255,255,255,0.06)',
+                maxHeight: '180px',
+                overflowY: 'auto',
+              }}
+            >
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.4rem' }}>
+                DETECTED BACKGROUND APPS:
+              </div>
+              {noiseStatus?.detected_apps.map((app) => (
+                <label
+                  key={app.key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.35rem 0',
+                    fontSize: '0.82rem',
+                    color: colors.textPrimary,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAppsToQuiet[app.key] ?? true}
+                      onChange={(e) => setSelectedAppsToQuiet({ ...selectedAppsToQuiet, [app.key]: e.target.checked })}
+                      style={{ accentColor: colors.accent }}
+                    />
+                    <span>{app.name}</span>
+                    <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>({app.process_count} procs)</span>
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 500 }}>
+                    {app.total_cpu_pct}% CPU · {app.total_mem_pct}% RAM
+                  </span>
+                </label>
+              ))}
+              {(noiseStatus?.unclassified_processes?.length ?? 0) > 0 && (
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: colors.textTertiary,
+                    marginTop: '0.4rem',
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    paddingTop: '0.4rem',
+                  }}
+                >
+                  +{noiseStatus?.unclassified_processes.length} other background high-CPU process(es)
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowNoiseModal(false)}
+                style={{
+                  padding: '0.45rem 0.8rem',
+                  borderRadius: '0.375rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: colors.textSecondary,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoiseModal(false);
+                  onStartExperiment();
+                }}
+                style={{
+                  padding: '0.45rem 0.8rem',
+                  borderRadius: '0.375rem',
+                  background: colors.surfaceElevated,
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: colors.textPrimary,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Start Without Closing
+              </button>
+              <button
+                type="button"
+                disabled={isQuieting}
+                onClick={async () => {
+                  const keysToQuiet = Object.entries(selectedAppsToQuiet)
+                    .filter(([_, sel]) => sel)
+                    .map(([k]) => k);
+                  await handleQuiet(keysToQuiet.length > 0 ? keysToQuiet : undefined);
+                  setShowNoiseModal(false);
+                  onStartExperiment();
+                }}
+                style={{
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '0.375rem',
+                  background: colors.accentBg,
+                  border: 'none',
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  cursor: isQuieting ? 'wait' : 'pointer',
+                }}
+              >
+                {isQuieting ? 'Closing Apps...' : '🧹 Close Apps & Calibrate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
