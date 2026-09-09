@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import os
 import tempfile
 import uuid
@@ -15,9 +16,10 @@ from pathlib import Path
 from typing import Optional
 
 from core.experiment import ExperimentStateMachine
-from core.models import Configuration
+from core.models import Configuration, CoreClassMap
 from core.runner import WorkloadRunner
 from core.store import Store
+from core.validation import dedupe_configurations, layout_configurations
 from helper.client import HelperClient
 from workloads.fixed_compute import FixedComputeWorkload
 
@@ -40,6 +42,68 @@ class HelperEnergyBackend:
 def _capability(path: Path) -> dict:
     with path.open(encoding="utf-8") as stream:
         return json.load(stream)
+
+
+def class_map_from_topology(doc: dict) -> CoreClassMap:
+    """Convert A's topology fixture (core_classes block) to a CoreClassMap."""
+    classes_block = doc.get("core_classes") or {}
+    raw = classes_block.get("classes") or {}
+    classes: dict[str, list[int]] = {}
+    label_by_class: dict[str, str] = {}
+    for key, entry in raw.items():
+        label = entry.get("label") or key
+        classes[label] = list(entry.get("cpus") or [])
+        label_by_class[key] = label
+    fast = ""
+    efficient = ""
+    # Fast class = highest hardware max frequency among labeled classes.
+    def hw_max(entry: dict) -> int:
+        return int(entry.get("hw_max_freq") or 0)
+
+    labeled = sorted(raw.values(), key=hw_max, reverse=True)
+    if labeled:
+        fast = labeled[0].get("label") or ""
+        if len(labeled) > 1:
+            efficient = labeled[-1].get("label") or ""
+    # Layout masks from smt groups: B = one CPU per physical core, C = all logical.
+    smt_groups = doc.get("smt_groups") or {}
+    layout_b = sorted(int(first) for first in (g[0] for g in smt_groups.values()) if first is not None) if smt_groups else []
+    layout_c = sorted(
+        cpu for cpus in (doc.get("sockets") or {}).values() for cpu in cpus
+    )
+    layouts: dict[str, list[int]] = {}
+    if layout_b:
+        layouts["B"] = layout_b
+    if layout_c:
+        layouts["C"] = layout_c
+    return CoreClassMap(
+        classes=classes,
+        layouts=layouts,
+        fast_class=fast,
+        efficient_class=efficient,
+        is_heterogeneous=bool(fast and efficient and fast != efficient),
+        details={"source": classes_block.get("source", "")},
+    )
+
+
+def list_layouts(args: argparse.Namespace) -> int:
+    path = Path(args.topology)
+    if not path.exists():
+        print(f"topology fixture not found: {path}", file=sys.stderr)
+        return 2
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    class_map = class_map_from_topology(doc)
+    configs = dedupe_configurations(layout_configurations(class_map))
+    if args.json:
+        print(json.dumps([c.to_dict() for c in configs], indent=2))
+        return 0
+    print(f"class map: fast={class_map.fast_class!r} efficient={class_map.efficient_class!r} "
+          f"heterogeneous={class_map.is_heterogeneous}")
+    for config in configs:
+        cpus = ",".join(str(c) for c in config.cpu_affinity)
+        description = config.metadata.get("description", "")
+        print(f"{config.id:<28} layout={config.layout} workers={config.worker_count:<3} cpus=[{cpus}]  {description}")
+    return 0
 
 
 def run_fixed_compute(args: argparse.Namespace) -> int:
@@ -97,6 +161,12 @@ def run_fixed_compute(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="joulectrl")
     sub = parser.add_subparsers(dest="command", required=True)
+    layouts = sub.add_parser(
+        "layouts", help="list execution-layout validation points from the class map"
+    )
+    layouts.add_argument("--topology", default="fixtures/real/topology.json")
+    layouts.add_argument("--json", action="store_true", help="emit JSON instead of a table")
+    layouts.set_defaults(handler=list_layouts)
     run = sub.add_parser("run-fixed", help="measure the approved fixed-compute workload")
     run.add_argument("--capabilities", default="fixtures/real/capability_report.json")
     run.add_argument("--socket", default="/run/joulectrl-helper.sock")
