@@ -7,6 +7,7 @@ import {
   reselectConfiguration,
   restoreSettings,
 } from './api';
+import { CalibrationView } from './components/CalibrationView';
 import { ExplorerView } from './components/ExplorerView';
 import { Navbar } from './components/Navbar';
 import { SetupView } from './components/SetupView';
@@ -15,7 +16,7 @@ import { WatchPanel } from './components/WatchPanel';
 import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'validation' | 'watch'>('explorer');
+  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch'>('explorer');
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [workloads, setWorkloads] = useState<WorkloadInfo[]>([]);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
@@ -175,6 +176,8 @@ export const App: React.FC = () => {
             onNavigateValidation={() => setActiveTab('validation')}
           />
         )}
+
+        {activeTab === 'calibration' && <CalibrationView />}
 
         {activeTab === 'validation' && experiment && (
           <ValidationView experiment={experiment} />

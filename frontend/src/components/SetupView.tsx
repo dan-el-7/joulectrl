@@ -41,14 +41,14 @@ export const SetupView: React.FC<SetupViewProps> = ({
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Left Column: Workload & Objective Configuration */}
-      <div style={{ background: '#111827', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #1f2937' }}>
-        <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: '#f3f4f6', fontWeight: 600 }}>
+      <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #191a1b' }}>
+        <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: '#f7f8f8', fontWeight: 600 }}>
           Experiment Setup
         </h2>
 
         {/* 1. Workload Selection */}
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem' }}>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#8a8f98', marginBottom: '0.5rem' }}>
             Workload Plugin
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -61,16 +61,16 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   style={{
                     padding: '0.75rem',
                     borderRadius: '0.5rem',
-                    border: `1.5px solid ${isSelected ? '#3b82f6' : '#374151'}`,
-                    backgroundColor: isSelected ? '#1e3a8a25' : '#1f2937',
+                    border: `1.5px solid ${isSelected ? '#7170ff' : 'rgba(255,255,255,0.08)'}`,
+                    backgroundColor: isSelected ? 'rgba(113,112,255,0.14)25' : '#191a1b',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: isSelected ? '#93c5fd' : '#e5e7eb' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: isSelected ? '#828fff' : '#d0d6e0' }}>
                     {w.name}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#8a8f98', marginTop: '0.25rem' }}>
                     {w.description}
                   </div>
                 </div>
@@ -81,7 +81,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
         {/* 2. Objective Selection */}
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#9ca3af', marginBottom: '0.5rem' }}>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#8a8f98', marginBottom: '0.5rem' }}>
             Optimization Objective
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -97,9 +97,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   flex: 1,
                   padding: '0.5rem',
                   borderRadius: '0.375rem',
-                  border: `1.5px solid ${objective === obj.id ? '#10b981' : '#374151'}`,
-                  backgroundColor: objective === obj.id ? '#064e3b33' : '#1f2937',
-                  color: objective === obj.id ? '#6ee7b7' : '#d1d5db',
+                  border: `1.5px solid ${objective === obj.id ? '#10b981' : 'rgba(255,255,255,0.08)'}`,
+                  backgroundColor: objective === obj.id ? 'rgba(16,185,129,0.12)33' : '#191a1b',
+                  color: objective === obj.id ? '#10b981' : '#d0d6e0',
                   fontSize: '0.8rem',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -113,9 +113,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
           {/* Conditional inputs based on Objective */}
           {objective === 'deadline' && (
-            <div style={{ background: '#1f2937', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #374151' }}>
+            <div style={{ background: '#191a1b', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.85rem', color: '#d1d5db' }}>Runtime Budget:</span>
+                <span style={{ fontSize: '0.85rem', color: '#d0d6e0' }}>Runtime Budget:</span>
                 <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#10b981' }}>
                   {runtimeBudgetS === null ? 'Unlimited' : `${runtimeBudgetS}s`}
                 </span>
@@ -131,7 +131,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   onChange={(e) => onChangeRuntimeBudget(parseFloat(e.target.value))}
                   style={{ flex: 1, accentColor: '#10b981' }}
                 />
-                <label style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <label style={{ fontSize: '0.75rem', color: '#8a8f98', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <input
                     type="checkbox"
                     checked={runtimeBudgetS === null}
@@ -140,16 +140,16 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   Unlimited
                 </label>
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '0.4rem' }}>
+              <div style={{ fontSize: '0.72rem', color: '#8a8f98', marginTop: '0.4rem' }}>
                 Rule: lowest-energy measured configuration meeting the empirical runtime rule (with 5% guard margin).
               </div>
             </div>
           )}
 
           {objective === 'preference' && (
-            <div style={{ background: '#1f2937', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #374151', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <div style={{ background: '#191a1b', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#d1d5db', marginBottom: '0.3rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#d0d6e0', marginBottom: '0.3rem' }}>
                   <span>Energy Target:</span>
                   <span style={{ fontWeight: 700, color: '#f59e0b' }}>≤ {energyTargetPct}% of baseline</span>
                 </div>
@@ -165,9 +165,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
 
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#d1d5db', marginBottom: '0.3rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#d0d6e0', marginBottom: '0.3rem' }}>
                   <span>Performance Floor:</span>
-                  <span style={{ fontWeight: 700, color: '#3b82f6' }}>≥ {perfFloorPct}% baseline speed (runtime ≤ {Math.round(10000 / perfFloorPct)}%)</span>
+                  <span style={{ fontWeight: 700, color: '#7170ff' }}>≥ {perfFloorPct}% baseline speed (runtime ≤ {Math.round(10000 / perfFloorPct)}%)</span>
                 </div>
                 <input
                   type="range"
@@ -176,10 +176,10 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   step="5"
                   value={perfFloorPct}
                   onChange={(e) => onChangePerfFloor(parseInt(e.target.value))}
-                  style={{ width: '100%', accentColor: '#3b82f6' }}
+                  style={{ width: '100%', accentColor: '#7170ff' }}
                 />
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>
+              <div style={{ fontSize: '0.72rem', color: '#8a8f98' }}>
                 Spec §6c: Reports closest honest outcome explicitly if no single candidate satisfies both constraints.
               </div>
             </div>
@@ -188,9 +188,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
         {/* 3. Calibration Budget */}
         <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#9ca3af', marginBottom: '0.4rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#8a8f98', marginBottom: '0.4rem' }}>
             <span>Calibration Sweep Budget (C2 ladder):</span>
-            <span style={{ color: '#e5e7eb', fontWeight: 600 }}>
+            <span style={{ color: '#d0d6e0', fontWeight: 600 }}>
               {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS}s`}
             </span>
           </div>
@@ -203,9 +203,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
               value={calibrationBudgetS ?? 120}
               disabled={calibrationBudgetS === null}
               onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
-              style={{ flex: 1, accentColor: '#6366f1' }}
+              style={{ flex: 1, accentColor: '#7170ff' }}
             />
-            <label style={{ fontSize: '0.75rem', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.75rem', color: '#8a8f98', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <input
                 type="checkbox"
                 checked={calibrationBudgetS === null}
@@ -224,7 +224,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             width: '100%',
             padding: '0.75rem',
             borderRadius: '0.5rem',
-            backgroundColor: '#2563eb',
+            backgroundColor: '#5e6ad2',
             color: '#ffffff',
             fontSize: '0.95rem',
             fontWeight: 600,
@@ -238,23 +238,23 @@ export const SetupView: React.FC<SetupViewProps> = ({
       </div>
 
       {/* Right Column: Hardware Discovery Card */}
-      <div style={{ background: '#111827', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #1f2937' }}>
-        <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: '#f3f4f6', fontWeight: 600 }}>
+      <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid #191a1b' }}>
+        <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: '#f7f8f8', fontWeight: 600 }}>
           Hardware Discovery & Capabilities
         </h2>
 
         {capabilities ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
-            <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #374151' }}>
-              <div style={{ color: '#9ca3af', fontSize: '0.75rem' }}>Processor / Topology</div>
-              <div style={{ fontWeight: 600, color: '#f3f4f6', marginTop: '0.2rem' }}>
+            <div style={{ background: '#191a1b', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ color: '#8a8f98', fontSize: '0.75rem' }}>Processor / Topology</div>
+              <div style={{ fontWeight: 600, color: '#f7f8f8', marginTop: '0.2rem' }}>
                 {capabilities.machine.cpu_model}
               </div>
-              <div style={{ color: '#9ca3af', marginTop: '0.2rem', fontSize: '0.75rem' }}>
+              <div style={{ color: '#8a8f98', marginTop: '0.2rem', fontSize: '0.75rem' }}>
                 {capabilities.topology.logical_cores} logical CPUs ({capabilities.topology.physical_cores} physical cores)
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <span style={{ background: '#064e3b', color: '#6ee7b7', padding: '0.15rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.7rem' }}>
+                <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '0.15rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.7rem' }}>
                   Zen 5: CPUs {capabilities.topology.classes.fast.join(', ')}
                 </span>
                 <span style={{ background: '#78350f', color: '#fcd34d', padding: '0.15rem 0.4rem', borderRadius: '0.25rem', fontSize: '0.7rem' }}>
@@ -283,7 +283,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Tuned PM Profile</span>
-                <span style={{ color: '#93c5fd', fontWeight: 600 }}>{capabilities.machine.tuned_active_profile}</span>
+                <span style={{ color: '#828fff', fontWeight: 600 }}>{capabilities.machine.tuned_active_profile}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>AC Power Supply</span>
@@ -293,12 +293,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
             </div>
 
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem', padding: '0.6rem', fontSize: '0.72rem', color: '#94a3b8' }}>
+            <div style={{ background: '#191a1b', border: '1px solid #334155', borderRadius: '0.5rem', padding: '0.6rem', fontSize: '0.72rem', color: '#94a3b8' }}>
               <strong>Non-negotiable rule:</strong> Package energy measured directly from verified hardware counter. Missing energy is never relabeled as zero.
             </div>
           </div>
         ) : (
-          <div style={{ color: '#9ca3af' }}>Loading machine capabilities...</div>
+          <div style={{ color: '#8a8f98' }}>Loading machine capabilities...</div>
         )}
       </div>
     </div>

@@ -123,10 +123,10 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       {/* Header */}
       <div
         style={{
-          background: '#111827',
+          background: '#141516',
           padding: '1.25rem',
           borderRadius: '0.75rem',
-          border: '1px solid #1f2937',
+          border: '1px solid #191a1b',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -134,7 +134,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#f3f4f6', fontWeight: 600 }}>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#f7f8f8', fontWeight: 600 }}>
               Passive Watch Mode (Idle → Activity → Idle Detection)
             </h2>
             <span
@@ -143,14 +143,14 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
                 fontWeight: 600,
                 padding: '0.15rem 0.4rem',
                 borderRadius: '0.25rem',
-                backgroundColor: '#374151',
-                color: '#9ca3af',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                color: '#8a8f98',
               }}
             >
               Estimate Tier (§6b)
             </span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.8rem', color: '#8a8f98', marginTop: '0.25rem' }}>
             Watches package power passively (0.5–1 Hz) while you run your own task. Automatically suggests a runtime budget.
             {status?.source?.synthetic && (
               <span style={{ color: '#f59e0b' }}> · demo source: synthetic scripted profile (no readable package counter on this machine)</span>
@@ -178,9 +178,9 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
 
       {/* Live Metrics Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-        <div style={{ background: '#111827', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #1f2937' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>Current Package Power</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#f3f4f6', marginTop: '0.3rem' }}>
+        <div style={{ background: '#141516', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #191a1b' }}>
+          <div style={{ fontSize: '0.75rem', color: '#8a8f98', textTransform: 'uppercase' }}>Current Package Power</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#f7f8f8', marginTop: '0.3rem' }}>
             {power != null ? `${power.toFixed ? power.toFixed(1) : power} W` : '—'}
           </div>
           {status?.active && sparkline()}
@@ -189,22 +189,22 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           </div>
         </div>
 
-        <div style={{ background: '#111827', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #1f2937' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>Learned Idle Baseline</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#60a5fa', marginTop: '0.3rem' }}>
+        <div style={{ background: '#141516', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #191a1b' }}>
+          <div style={{ fontSize: '0.75rem', color: '#8a8f98', textTransform: 'uppercase' }}>Learned Idle Baseline</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#828fff', marginTop: '0.3rem' }}>
             {baseline != null ? `${baseline.toFixed ? baseline.toFixed(1) : baseline} W` : 'learning…'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: '#8a8f98', marginTop: '0.25rem' }}>
             Spread: ±{status?.baseline_spread_w ?? '—'} W (median over baseline window)
           </div>
         </div>
 
-        <div style={{ background: '#111827', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #1f2937' }}>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase' }}>Detection State</div>
+        <div style={{ background: '#141516', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #191a1b' }}>
+          <div style={{ fontSize: '0.75rem', color: '#8a8f98', textTransform: 'uppercase' }}>Detection State</div>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.5rem', textTransform: 'capitalize' }}>
             {String(stateLabel).replace('_', ' ')}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: '#8a8f98', marginTop: '0.25rem' }}>
             {status?.active ? 'Monitoring power trace' : 'Watcher inactive'}
           </div>
         </div>
@@ -214,8 +214,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       {latestSegment && (
         <div
           style={{
-            background: '#064e3b18',
-            border: '1.5px solid #059669',
+            background: 'rgba(16,185,129,0.12)18',
+            border: '1.5px solid #10b981',
             borderRadius: '0.75rem',
             padding: '1.25rem',
             display: 'flex',
@@ -227,7 +227,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, textTransform: 'uppercase' }}>
               Detected Task Observation (Idle-to-Idle Window) — {latestSegment.segment_id}
             </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f3f4f6', marginTop: '0.25rem' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f7f8f8', marginTop: '0.25rem' }}>
               Observed Duration: {latestSegment.duration_s}s ·{' '}
               {latestSegment.estimated_energy_j != null
                 ? `Est. Energy: ${latestSegment.estimated_energy_j} J`
@@ -243,7 +243,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             style={{
               padding: '0.6rem 1.2rem',
               borderRadius: '0.375rem',
-              backgroundColor: '#059669',
+              backgroundColor: '#10b981',
               color: '#ffffff',
               fontSize: '0.85rem',
               fontWeight: 600,
@@ -258,8 +258,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       )}
 
       {/* Rules Notice */}
-      <div style={{ background: '#1f2937', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #374151', fontSize: '0.78rem', color: '#9ca3af' }}>
-        <strong style={{ color: '#d1d5db' }}>Honesty Guard (§6b):</strong> Watch observations carry <code>mode="watch"</code> and are strictly excluded from Pareto/selection evidence by default. They inform the budget slider; the actual optimizer selection runs only on verified harness profiling runs.
+      <div style={{ background: '#191a1b', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.78rem', color: '#8a8f98' }}>
+        <strong style={{ color: '#d0d6e0' }}>Honesty Guard (§6b):</strong> Watch observations carry <code>mode="watch"</code> and are strictly excluded from Pareto/selection evidence by default. They inform the budget slider; the actual optimizer selection runs only on verified harness profiling runs.
       </div>
     </div>
   );

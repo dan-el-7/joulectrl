@@ -315,6 +315,116 @@ def validate_experiment(id: str) -> dict[str, Any]:
     }
 
 
+@app.get("/api/calibration")
+def get_calibration() -> dict[str, Any]:
+    """Measured calibration data for the dashboard's calibration view.
+
+    Serves A's verified fixtures (fixtures/real/): C1 single-core references
+    and the C2 effective control-space sweep, aggregated to per-class medians.
+    Machine facts only — never mixed into workload Pareto selection.
+    """
+    from statistics import median
+
+    def load_rows(name: str) -> list[dict[str, Any]]:
+        try:
+            raw = _load_json_file(f"fixtures/real/{name}")
+            return raw.get("rows") or []
+        except Exception:
+            return []
+
+    c1_rows = load_rows("calibration_c1.json")
+    c2_rows = load_rows("calibration_c2_effective.json")
+
+    def med(rows: list[dict[str, Any]], key: str) -> Optional[float]:
+        vals = [r[key] for r in rows if r.get(key) is not None]
+        return median(vals) if vals else None
+
+    classes: dict[str, dict[str, Any]] = {}
+    for row in c1_rows:
+        cls = str(row.get("class", ""))
+        classes.setdefault(cls, {"label": cls, "c1": None, "points": []})
+        entry = classes[cls]
+        if entry["c1"] is None:
+            entry["c1"] = {"runtime_s": None, "energy_j": None, "cpus": row.get("cpus", [])}
+        entry["c1"]["cpus"] = row.get("cpus", entry["c1"]["cpus"])
+
+    # C1 medians per class
+    for cls, entry in classes.items():
+        rows = [r for r in c1_rows if r.get("class") == cls]
+        if rows:
+            entry["c1"] = {
+                "runtime_s": med(rows, "runtime_s"),
+                "energy_j": med(rows, "package_energy_j"),
+                "cpus": rows[0].get("cpus", []),
+            }
+
+    # C2 points grouped by (class, control, workers)
+    grouped: dict[tuple, list[dict[str, Any]]] = {}
+    chunks_by_key: dict[tuple, int] = {}
+    for row in c2_rows:
+        key = (str(row.get("class", "")), str(row.get("control", "")), int(row.get("workers", 1)))
+        grouped.setdefault(key, []).append(row)
+        chunks_by_key.setdefault(key, int(row.get("chunks", 32768)))
+
+    for (cls, control, workers), rows in grouped.items():
+        entry = classes.setdefault(cls, {"label": cls, "c1": None, "points": []})
+        runtime_s = med(rows, "runtime_s")
+        energy_j = med(rows, "package_energy_j")
+        if runtime_s is None or energy_j is None:
+            continue  # honesty: skip incomplete points, never invent
+        chunks = chunks_by_key[(cls, control, workers)]
+        throughput = chunks / runtime_s
+        watts = energy_j / runtime_s
+        c1 = entry["c1"]
+        scaling_eff = None
+        if c1 and workers > 1 and c1.get("runtime_s"):
+            # C1 ran the 16384-chunk kernel; C2 w1 rows carry their own chunks
+            w1 = next(
+                (p for p in entry["points"] if p["workers"] == 1 and p["control"] == control),
+                None,
+            )
+            base_throughput = (
+                (w1["throughput"] if w1 else None)
+                or (16384 / c1["runtime_s"] if cls and control == "stock" else None)
+            )
+            if base_throughput:
+                scaling_eff = throughput / (workers * base_throughput)
+        entry["points"].append(
+            {
+                "control": control,
+                "workers": workers,
+                "cpus": rows[0].get("cpus", []),
+                "runtime_s": round(runtime_s, 4),
+                "energy_j": round(energy_j, 4),
+                "watts": round(watts, 3),
+                "throughput": round(throughput, 1),
+                "perf_per_watt": round(throughput / watts, 1),
+                "scaling_efficiency": round(scaling_eff, 4) if scaling_eff is not None else None,
+                "n": len(rows),
+            }
+        )
+
+    # sort: fast first, points by perf/W ascending
+    out = sorted(classes.values(), key=lambda e: 0 if e["label"] == "fast" else 1)
+    for entry in out:
+        entry["points"].sort(key=lambda p: p["perf_per_watt"])
+
+    return {
+        "source": "fixtures/real/calibration_c1.json + calibration_c2_effective.json",
+        "captured_utc": _fixture_captured_utc("calibration_c2_effective.json"),
+        "kernel": "workloads/kernel/fixed_compute",
+        "classes": out,
+        "note": "Measured medians from the demo laptop's verified hardware counter; calibration data never mixes into workload Pareto selection.",
+    }
+
+
+def _fixture_captured_utc(name: str) -> Optional[str]:
+    try:
+        return _load_json_file(f"fixtures/real/{name}").get("captured_utc")
+    except Exception:
+        return None
+
+
 @app.get("/api/experiments/{id}/validation-points")
 def get_validation_points(id: str) -> dict[str, Any]:
     """Validation-point candidates: B's layout configurations + measured
