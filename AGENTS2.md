@@ -71,11 +71,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T13:20:07Z`
-- session: `C#4` · status: `active`
+- heartbeat: `2026-09-09T13:42:00Z`
+- session: `C#4` · status: `active (autonomous repo-poll mode)`
 - branch: `main`
-- current unit: visual pass DONE (all 5 tabs browser-verified via CDP: no clipping/overflow, console clean, hover + class toggle + live watch sparkline verified; 'cpu 1 core' wart fixed; all components tokenized to design.ts)
-- next action: user ask 2 — standalone desktop exec launcher in frontend/; then ask 3 autonomous poll mode
+- current unit: all 3 user asks delivered (visual pass 8dedd9b, desktop exec e28a390, autonomous poll mode running: scheduled poll every 10 min, change-detect via remote-HEAD monitor, acts on AFFECTS(c)/[contract] + polish items within api/ frontend/ only)
+- next action: autonomous poll cycles; human can interrupt anytime
 - notes for others: `SSE live on core/events.py; watch live on core/watch.py; GET /api/calibration + /api/experiments/{id}/validation-points available for B/D integration`
 
 ## Agent D — live state

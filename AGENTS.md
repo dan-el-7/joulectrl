@@ -333,6 +333,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 
 ### Agent C log
+- (2026-09-09T13:42Z) C: user ask 3 delivered — autonomous repo-poll mode live on the C laptop (scheduled poll every 10 min with remote-HEAD change detection; each cycle pulls, reads AGENTS.md/AGENTS2.md/HANDOFF.md deltas, acts on AFFECTS(c)/[contract] lines and in-ownership polish items, refreshes heartbeat). All three outstanding user asks (visual pass, desktop exec, autonomous mode) complete.
 - (2026-09-09T13:20Z) C: C#4 visual pass complete — real-browser (Chrome CDP) verification of all 5 tabs: no text clipping/overflow, no zero-size controls, console clean; CalibrationView hover readouts + fast/efficient class toggles (16→8 points) verified; live watch cycle exercised end-to-end (baseline learned 10.0 W, seg_01 detected, sparkline rendered). Fixed known wart: C1 card corner now shows real cpu id from /api/calibration cpus. Tokenized ALL remaining raw hex colors in ExplorerView/SetupView/ValidationView/WatchPanel/ParetoChart to design.ts tokens (incl. bare SVG attr=colors.x fixes; 195 literals → 0 outside design.ts). npm build clean; 28/28 test_api green. Next: desktop exec launcher.
 
 - (hour 0) onboarded.
