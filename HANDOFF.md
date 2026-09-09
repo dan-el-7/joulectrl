@@ -45,11 +45,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent A — resume packet
 
-- **Done & verified:** repo dan-el-7/joulectrl bootstrapped (docs/PLAN.md, AGENTS*.md, HANDOFF.md, LICENSE, .gitattributes/.gitignore, pyproject). Hour-0 hardware checklist re-verified with root via pkexec: energy_uj advances (~8.6 mJ/s idle), class map even=Zen5 5.09GHz/odd=Zen5c 3.51GHz, cap honored only with boost=0 (1.98 GHz at 2 GHz cap), tuned=throughput-performance, AC=1, boot_id=6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2. energy/base.py + core/topology.py + core/discovery.py + 12 unit tests green. fixtures/real/{topology,capability_report,energy_trace_idle}.json. CI workflow committed.
-- **In flight:** first commit+push of the above (this commit).
-- **Resume here:**  — then start helper/ skeleton: docs/HELPER.md + helper op set (begin_session, read_energy, apply_configuration, heartbeat, restore, end_session), Unix socket + peer-cred auth.
-- **Gotchas:** energy reads root-only (pkexec works, GUI prompt). boost=1 makes caps silent no-ops — always (boost, cap) pairs on this machine. policy0 min is 623377, not what cpuinfo says. Never run heavy loops while a [measuring] window is open.
-- **Handoffs owed / waiting on:** D's kernel [contract] line by h2 (calibration C1/C2 driver). Invited collaborators should push under own accounts.
+- **Done & verified:** repo dan-el-7/joulectrl bootstrapped. Hour-0 hardware checklist re-verified with root via pkexec (commit 73ed1b1): energy_uj advances (~8.6 mJ/s idle), class map even=Zen5 5.09GHz / odd=Zen5c 3.51GHz, cap honored only with boost=0 (cur_freq 1.98 GHz at 2 GHz cap vs 5.04 GHz boost=1), tuned=throughput-performance, AC=1, boot_id=6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2. energy/base.py (EnergyBackend + wrap-safe EnergyAccumulator), core/topology.py, core/discovery.py, 12 unit tests green. fixtures/real/{topology,capability_report,energy_trace_idle}.json. CI workflow on every push.
+- **In flight:** adapting to B's models v0 (landed on main); then helper/ skeleton.
+- **Resume here:** `cd ~/joulectrl-a && git pull --rebase origin main && .venv/bin/python -m pytest tests/unit -q` — then write helper/ skeleton: docs/HELPER.md + op set (begin_session, read_energy, apply_configuration, heartbeat, restore, end_session), Unix socket + peer-cred auth.
+- **Gotchas:** energy reads root-only (pkexec works, GUI prompt). boost=1 makes caps silent no-ops — always (boost, cap) pairs here. policy0 scaling_min_freq=623377. Never run heavy loops while a [measuring] window is open. AGENTS2/HANDOFF edits: quote heredocs — bash eats backticks.
+- **Handoffs owed / waiting on:** D's kernel [contract] line by h2 (drives C1/C2 calibration).
 
 
 ## Agent B — resume packet

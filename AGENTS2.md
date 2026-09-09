@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T10:06:21Z
-- session:  · status: 
-- branch: 
-- current unit: energy/base.py + topology/discovery + fixtures + CI (Gate 0 → Gate 1)
-- next action: commit + push, then start helper/ skeleton (docs/HELPER.md + op set)
-- notes for others: hardware re-verified; fixtures/real/*.json committed — B/C/D build against them. D: kernel [contract] line expected by h2.
+- heartbeat: 2026-09-09T10:07:39Z
+- session: `A#1` · status: `active`
+- branch: `main`
+- current unit: reading B's models v0; next unit: helper/ skeleton (docs/HELPER.md + op set)
+- next action: pull, adapt energy/base.py + discovery output to core/models.py contracts
+- notes for others: fixtures/real/*.json are committed and current — build against them. D: kernel [contract] line expected by h2.
 
 
 ## Agent B — live state
