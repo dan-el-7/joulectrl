@@ -43,14 +43,15 @@ pull --rebase before editing, push immediately after).
 
 ---
 
-## Agent A — resume packet
+## Agent A — resume packet (A#2 clean shutdown 2026-09-09T14:22:07Z — Antigravity successor: start here)
 
-- **Done & verified:** ALL Agent A gate items [gate0]-[gate4] complete (see AGENTS.md Agent A log). Repo dan-el-7/joulectrl; helper daemon (apply/restore/watchdog/governors, 8 tests); C1 + C2 + C2_effective + controls_reverify fixtures; watch co-sign PASSED; doctor library (core/doctor.py); CI; README guide + console-script entry point. 169 unit tests green on main.
-- **In flight:** none.
-- **Resume here:** read `~/joulectrl-a/SESSION_START_A.md` (the complete new-session brief) — it supersedes this packet.
-- **Gotchas:** helper restart is passwordless (polkit rule scoped to daemon.py path only). Machine facts: boost=0 clamps cpuinfo_max to 2.0 GHz; sub-base caps ignored; amd-pstate readback async (retry); watchdog needs heartbeats from any lease-holder loop. Machine must stay on AC; systemd-inhibit sleep block dies on reboot — re-run if rebooted (command in SESSION_START_A.md).
-- **Handoffs owed / waiting on:** none open. B wired `joulectrl doctor` (done, 12:55 UTC); A#2 added sys.platform guard inside doctor_report() so non-Linux callers get the degraded report without the CLI workaround. Polish-phase: tagged release when team's API/CLI surface settles.
-
+- **Done & verified (A#2 session):** (1) doctor_report() sys.platform-guard for helper probe (B's CLI workaround now optional); (2) CI fixed green 3-layer (fastapi/httpx install, python -m pytest, hardware-bound tests CI-safe via real tmp_path fake-sysfs + boot_id gate); (3) scripts/launch_dashboard.sh committed + verified E2E (venv → pkexec helper if down → npm build if missing → uvicorn 127.0.0.1:8000 → xdg-open; UI 200, real capabilities, /docs 200); (4) all-cores C2 calibration fixtures/real/calibration_c2_allcores.json (all8/all16 x stock/base x 3 reps, checksum-invariant, clean restore) + core/run_c2_allcores.py — answers C's 13:42Z question. ALL A gates [gate0]-[gate4] complete; 170 unit tests green locally.
+- **Key results for demo:** canonical fixture = fixtures/real/calibration_c2_effective.json (fast/base/w4: -30% energy at 2.55x runtime). All-cores: all8 base -52% energy at 1.92x runtime vs stock; all16 STRICTLY DOMINATED by all8 (SMT adds nothing for fixed_compute — UI must show all8 as best all-cores point, all16 as caveat). Control space is genuinely 2 pts/class (stock/base, Gate B) — present as measured reality, not missing data.
+- **In flight:** NONE. No [measuring] window open. Machine left in STOCK state (verify: boost=1, p0=5090000, p1=3506494).
+- **Resume here:** (a) `cd ~/joulectrl-a && git pull --rebase origin main`, re-read AGENTS.md §8/§9 tail + AGENTS2.md; (b) verify machine: helper read_energy OK, stock freqs, `AC=1`, `systemd-inhibit --list | grep joulectrl` (re-run sleep-inhibit cmd in SESSION_START_A.md §"Current machine state" if absent — dies on reboot); (c) run `core/reverify_controls.py` ~30 min before demo, commit fresh controls_reverify.json; (d) tagged release via `~/.local/bin/gh release create` once API/CLI surface settles; then post your own heartbeat/off.
+- **Gotchas (bit A#1/A#2, do not repeat):** quote heredocs with backticks; pkexec ONLY for helper/daemon.py (exact path — polkit rule); pkill patterns can match own shell; long loops MUST c.heartbeat() (30 s watchdog); restore to TRUE stock between classes; bracket energy reads around runs; `pip install` commands get misdetected as servers by this sandbox — run them backgrounded or via execute_code.
+- **Handoffs owed / waiting on:** B parked (wake via human only). D shut down clean (99692ec). C active-idle on autonomous poll mode. AFFECTS(c) 04672ee follow-up CLOSED (C integrated + browser-verified).
+- **⚠ CI RED on main as of this handoff:** C's 7afcb52 broke tests/unit/test_api.py::test_capabilities — it asserts `energy.available is True`, but C's live-first discovery reports live on CI runners (no RAPL/helper → False). C's test + C's commit → C owns the fix (likely: assert fixture-fallback shape when live unavailable, or gate on live source flag). AFFECTS(c) line for this is already drafted in the AGENTS.md log below — I did NOT push it as a separate line; C's poll will see it here. Do NOT "fix" by touching api/ or tests (not A's files).
 
 ## Agent B — resume packet
 

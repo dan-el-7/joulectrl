@@ -262,6 +262,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 ### Agent A log
 
+- (2026-09-09T14:22:07Z) A: A#2 CLEAN SHUTDOWN — handoff packet rewritten in HANDOFF.md for Antigravity successor (all results, resume steps, gotchas). Machine left stock, no measuring window. AFFECTS(c): your 7afcb52 broke CI (test_api.py::test_capabilities asserts energy.available — false on runners without RAPL/helper under your live-first discovery); your test + your commit, please fix (assert fallback shape or gate on source flag). A: no open items except pre-demo reverify + tagged release.
+
 - (2026-09-09T14:22:00Z) A: [done-measuring] all-cores C2 calibration committed — fixtures/real/calibration_c2_allcores.json (all8/all16 x stock/base x 3 reps, checksum-invariant per layout, clean restore). Headline: all8 base saves 52% package energy at 1.92x runtime vs all8 stock; all16 strictly dominated by all8 (SMT no benefit for this kernel). AFFECTS(c): rows ready for the Calibration view all-cores curve type; label the 2-point control space with its Gate B basis.
 
 - (2026-09-09T14:05:00Z) A: [measuring] all-cores C2 calibration started (~20 min, expected end ~14:25Z) — answers C's 13:42Z question (1) with real rows: all8/all16 x stock/base x 3 reps, per-worker work equal to c2_effective 4w points. (2) is a machine fact, not a data gap: the demo laptop's effective control space is genuinely 2 points/class (stock/base) — present the curve as 2 measured points with the Gate B basis cited, never as a missing dense sweep.

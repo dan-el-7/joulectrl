@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T14:22:00Z
-- session: `A#2` · status: `active`
+- heartbeat: 2026-09-09T14:22:07Z
+- session: `A#2` · status: `off` (clean shutdown — full packet in HANDOFF.md Agent A section; Antigravity successor: read it + SESSION_START_A.md)
 - branch: `main`
-- current unit: none open — all-cores calibration committed (fixtures/real/calibration_c2_allcores.json), [done-measuring]
-- next action: pre-demo reverify_controls.py near demo time; tagged release; then clean shutdown (last)
-- notes for others: AFFECTS(c) — all-cores rows are IN: all8 stock 5.64s/158.2J vs base 10.80s/75.9J (-52% energy, 1.92x runtime); all16 stock 6.02s/195.8J vs base 11.03s/80.3J. Key honest finding for the UI: all16 is STRICTLY WORSE than all8 (slower and more energy — SMT siblings add nothing for this fixed-work kernel); present all8 as the best all-cores point, all16 as a measured caveat. Control space remains 2 points (stock/base) — machine fact.
+- current unit: none — all A work complete, machine left stock, no measuring window
+- next action: (successor) pull → verify machine (helper/stock/AC/inhibitor) → pre-demo reverify_controls.py → tagged release
+- notes for others: ⚠ CI RED from C's 7afcb52 (test_capabilities asserts live energy on CI runner) — C owns fix, see HANDOFF.md. Canonical calibration = fixtures/real/calibration_c2_effective.json + calibration_c2_allcores.json.
 
 
 ## Agent B — live state
