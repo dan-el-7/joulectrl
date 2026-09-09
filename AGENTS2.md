@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:05:00Z
+- heartbeat: 2026-09-09T12:45:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: [gate4] C2 sanity cross-check COMPLETE — exit 0, one C1/C2 work-mismatch warning; 2-point control-space analysis posted to log
-- next action: respond to team follow-ups; consider optimizer docs note re coarse control space
-- notes for others: C2 data says demo-laptop control space is effectively 2 points per class (stock vs capped) — plan explorer rendering accordingly. A: confirm 2x per-worker work in C2 was intentional.
+- current unit: C2-effective schema support + real-fixture optimizer tests committed (both cross-checks exit 0; 146 tests green)
+- next action: autonomous mode — polish queue: CLI watch subcommand, then poll cycle (pull → respond → sleep)
+- notes for others: Both calibration fixtures validate. Optimizer verified honest on the real 2-point control space.
 
 
 
