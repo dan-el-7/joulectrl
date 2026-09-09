@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { fetchWatchStatus, startWatch, stopWatch } from '../api';
 import { WatchStatus } from '../types';
+import { colors } from '../design';
 
 interface WatchSegmentResult {
   segment_id: string;
@@ -113,7 +114,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       .join(' ');
     return (
       <svg viewBox="0 0 100 28" preserveAspectRatio="none" style={{ width: '100%', height: '44px', marginTop: '0.5rem' }}>
-        <polyline points={pts} fill="none" stroke="#10b981" strokeWidth="1" />
+        <polyline points={pts} fill="none" stroke={colors.emerald} strokeWidth="1" />
       </svg>
     );
   };
@@ -123,10 +124,10 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       {/* Header */}
       <div
         style={{
-          background: '#141516',
+          background: colors.surface,
           padding: '1.25rem',
           borderRadius: '0.75rem',
-          border: '1px solid #191a1b',
+          border: colors.border,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -134,7 +135,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#f7f8f8', fontWeight: 600 }}>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', color: colors.textPrimary, fontWeight: 600 }}>
               Passive Watch Mode (Idle → Activity → Idle Detection)
             </h2>
             <span
@@ -144,16 +145,16 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
                 padding: '0.15rem 0.4rem',
                 borderRadius: '0.25rem',
                 backgroundColor: 'rgba(255,255,255,0.08)',
-                color: '#8a8f98',
+                color: colors.textTertiary,
               }}
             >
               Estimate Tier (§6b)
             </span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#8a8f98', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.8rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
             Watches package power passively (0.5–1 Hz) while you run your own task. Automatically suggests a runtime budget.
             {status?.source?.synthetic && (
-              <span style={{ color: '#f59e0b' }}> · demo source: synthetic scripted profile (no readable package counter on this machine)</span>
+              <span style={{ color: colors.amber }}> · demo source: synthetic scripted profile (no readable package counter on this machine)</span>
             )}
           </div>
         </div>
@@ -164,8 +165,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           style={{
             padding: '0.5rem 1.25rem',
             borderRadius: '0.375rem',
-            backgroundColor: status?.active ? '#ef4444' : '#10b981',
-            color: '#ffffff',
+            backgroundColor: status?.active ? colors.red : colors.emerald,
+            color: colors.textPrimary,
             fontSize: '0.85rem',
             fontWeight: 600,
             border: 'none',
@@ -178,33 +179,33 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
 
       {/* Live Metrics Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-        <div style={{ background: '#141516', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #191a1b' }}>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98', textTransform: 'uppercase' }}>Current Package Power</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#f7f8f8', marginTop: '0.3rem' }}>
+        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: colors.border }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Current Package Power</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.3rem' }}>
             {power != null ? `${power.toFixed ? power.toFixed(1) : power} W` : '—'}
           </div>
           {status?.active && sparkline()}
-          <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.emerald, marginTop: '0.25rem' }}>
             {status?.active ? `● Featherweight polling (${status?.poll_hz ?? 1} Hz)` : '○ Standby'}
           </div>
         </div>
 
-        <div style={{ background: '#141516', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #191a1b' }}>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98', textTransform: 'uppercase' }}>Learned Idle Baseline</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#828fff', marginTop: '0.3rem' }}>
+        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: colors.border }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Learned Idle Baseline</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: colors.accentHover, marginTop: '0.3rem' }}>
             {baseline != null ? `${baseline.toFixed ? baseline.toFixed(1) : baseline} W` : 'learning…'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
             Spread: ±{status?.baseline_spread_w ?? '—'} W (median over baseline window)
           </div>
         </div>
 
-        <div style={{ background: '#141516', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #191a1b' }}>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98', textTransform: 'uppercase' }}>Detection State</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.5rem', textTransform: 'capitalize' }}>
+        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: colors.border }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Detection State</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 700, color: colors.amber, marginTop: '0.5rem', textTransform: 'capitalize' }}>
             {String(stateLabel).replace('_', ' ')}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
             {status?.active ? 'Monitoring power trace' : 'Watcher inactive'}
           </div>
         </div>
@@ -215,7 +216,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         <div
           style={{
             background: 'rgba(16,185,129,0.12)18',
-            border: '1.5px solid #10b981',
+            border: '1.5px solid ' + colors.emerald,
             borderRadius: '0.75rem',
             padding: '1.25rem',
             display: 'flex',
@@ -224,16 +225,16 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           }}
         >
           <div>
-            <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '0.8rem', color: colors.emerald, fontWeight: 600, textTransform: 'uppercase' }}>
               Detected Task Observation (Idle-to-Idle Window) — {latestSegment.segment_id}
             </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f7f8f8', marginTop: '0.25rem' }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.25rem' }}>
               Observed Duration: {latestSegment.duration_s}s ·{' '}
               {latestSegment.estimated_energy_j != null
                 ? `Est. Energy: ${latestSegment.estimated_energy_j} J`
                 : 'Energy unavailable (never reported as zero)'}
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#a7f3d0', marginTop: '0.25rem' }}>
+            <div style={{ fontSize: '0.8rem', color: colors.emerald, marginTop: '0.25rem' }}>
               Suggested runtime budget: <strong>{latestSegment.suggested_budget_s}s</strong> ({latestSegment.note})
             </div>
           </div>
@@ -243,8 +244,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             style={{
               padding: '0.6rem 1.2rem',
               borderRadius: '0.375rem',
-              backgroundColor: '#10b981',
-              color: '#ffffff',
+              backgroundColor: colors.emerald,
+              color: colors.textPrimary,
               fontSize: '0.85rem',
               fontWeight: 600,
               border: 'none',
@@ -258,8 +259,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       )}
 
       {/* Rules Notice */}
-      <div style={{ background: '#191a1b', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.78rem', color: '#8a8f98' }}>
-        <strong style={{ color: '#d0d6e0' }}>Honesty Guard (§6b):</strong> Watch observations carry <code>mode="watch"</code> and are strictly excluded from Pareto/selection evidence by default. They inform the budget slider; the actual optimizer selection runs only on verified harness profiling runs.
+      <div style={{ background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.78rem', color: colors.textTertiary }}>
+        <strong style={{ color: colors.textSecondary }}>Honesty Guard (§6b):</strong> Watch observations carry <code>mode="watch"</code> and are strictly excluded from Pareto/selection evidence by default. They inform the budget slider; the actual optimizer selection runs only on verified harness profiling runs.
       </div>
     </div>
   );

@@ -17,7 +17,7 @@ interface CalRow {
 
 interface ClassSummary {
   label: string;          // "fast" | "efficient"
-  c1?: { runtime_s: number; energy_j: number };        // single-core stock reference
+  c1?: { runtime_s: number; energy_j: number; cpus?: number[] };        // single-core stock reference
   points: {               // multicore (C2) points
     control: string;
     workers: number;
@@ -327,7 +327,9 @@ export const CalibrationView: React.FC = () => {
                     <span style={{ color: col, marginRight: 8 }}>●</span>
                     {c.label}
                   </div>
-                  <span style={{ ...type.micro, color: colors.textQuaternary, fontFamily: fonts.mono }}>cpu {c.points[0] ? '' : ''}1 core</span>
+                  <span style={{ ...type.micro, color: colors.textQuaternary, fontFamily: fonts.mono }}>
+                    {c.c1?.cpus?.length === 1 ? `cpu ${c.c1.cpus[0]}` : c.c1?.cpus ? `cpus ${c.c1.cpus.join(',')}` : 'single core'}
+                  </span>
                 </div>
                 {c.c1 ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 14 }}>

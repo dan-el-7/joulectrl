@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ConfigSummary } from '../types';
+import { colors } from '../design';
 
 interface ParetoChartProps {
   configurations: Record<string, ConfigSummary>;
@@ -11,10 +12,10 @@ interface ParetoChartProps {
 }
 
 const LAYOUT_COLORS: Record<string, { bg: string; border: string; name: string }> = {
-  A: { bg: '#10b981', border: '#10b981', name: 'Layout A: Zen 5 (Physical)' },
-  B: { bg: '#7170ff', border: '#5e6ad2', name: 'Layout B: Zen 5 (SMT)' },
-  C: { bg: '#f59e0b', border: '#d97706', name: 'Layout C: Zen 5c (Dense)' },
-  D: { bg: '#828fff', border: '#7170ff', name: 'Layout D: Mixed / All' },
+  A: { bg: colors.emerald, border: colors.emerald, name: 'Layout A: Zen 5 (Physical)' },
+  B: { bg: colors.accent, border: colors.accentBg, name: 'Layout B: Zen 5 (SMT)' },
+  C: { bg: colors.amber, border: colors.amber, name: 'Layout C: Zen 5c (Dense)' },
+  D: { bg: colors.accentHover, border: colors.accent, name: 'Layout D: Mixed / All' },
 };
 
 export const ParetoChart: React.FC<ParetoChartProps> = ({
@@ -29,7 +30,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
 
   const configsList = Object.values(configurations);
   if (configsList.length === 0) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: '#8a8f98' }}>No configuration data available</div>;
+    return <div style={{ padding: '2rem', textAlign: 'center', color: colors.textTertiary }}>No configuration data available</div>;
   }
 
   // Calculate bounds with padding
@@ -70,14 +71,14 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
   const hoveredConfig = hoveredId ? configurations[hoveredId] : null;
 
   return (
-    <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1rem', border: '1px solid #191a1b' }}>
+    <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: colors.border }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <h3 style={{ margin: 0, fontSize: '1rem', color: '#d0d6e0', fontWeight: 600 }}>
+        <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textSecondary, fontWeight: 600 }}>
           Package Energy vs. Runtime (Pareto Frontier)
         </h3>
         <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
           {Object.entries(LAYOUT_COLORS).map(([key, info]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#8a8f98' }}>
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: colors.textTertiary }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: info.bg }} />
               <span>{info.name}</span>
             </div>
@@ -93,8 +94,8 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             const energyVal = Math.round(maxY - ratio * (maxY - minY));
             return (
               <g key={`y-grid-${ratio}`}>
-                <line x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke="#191a1b" strokeDasharray="3 3" />
-                <text x={padLeft - 8} y={y + 4} fill="#8a8f98" fontSize="10" textAnchor="end">
+                <line x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke={colors.surfaceElevated} strokeDasharray="3 3" />
+                <text x={padLeft - 8} y={y + 4} fill={colors.textTertiary} fontSize="10" textAnchor="end">
                   {energyVal} J
                 </text>
               </g>
@@ -106,8 +107,8 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             const timeVal = (minX + ratio * (maxX - minX)).toFixed(1);
             return (
               <g key={`x-grid-${ratio}`}>
-                <line x1={x} y1={padTop} x2={x} y2={padTop + chartH} stroke="#191a1b" strokeDasharray="3 3" />
-                <text x={x} y={padTop + chartH + 18} fill="#8a8f98" fontSize="10" textAnchor="middle">
+                <line x1={x} y1={padTop} x2={x} y2={padTop + chartH} stroke={colors.surfaceElevated} strokeDasharray="3 3" />
+                <text x={x} y={padTop + chartH + 18} fill={colors.textTertiary} fontSize="10" textAnchor="middle">
                   {timeVal}s
                 </text>
               </g>
@@ -118,14 +119,14 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
           <line x1={padLeft} y1={padTop + chartH} x2={width - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
           <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
 
-          <text x={padLeft + chartW / 2} y={height - 10} fill="#8a8f98" fontSize="11" textAnchor="middle">
+          <text x={padLeft + chartW / 2} y={height - 10} fill={colors.textTertiary} fontSize="11" textAnchor="middle">
             Runtime (seconds) — Monotonic Clock
           </text>
           <text
             x={-height / 2}
             y={20}
             transform="rotate(-90)"
-            fill="#8a8f98"
+            fill={colors.textTertiary}
             fontSize="11"
             textAnchor="middle"
           >
@@ -140,11 +141,11 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                 y1={padTop}
                 x2={scaleX(deadlineS)}
                 y2={padTop + chartH}
-                stroke="#ef4444"
+                stroke={colors.red}
                 strokeWidth="1.5"
                 strokeDasharray="4 4"
               />
-              <text x={scaleX(deadlineS) + 4} y={padTop + 14} fill="#ef4444" fontSize="10" fontWeight="bold">
+              <text x={scaleX(deadlineS) + 4} y={padTop + 14} fill={colors.red} fontSize="10" fontWeight="bold">
                 Budget {deadlineS}s
               </text>
             </g>
@@ -155,7 +156,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             <path
               d={frontierPath}
               fill="none"
-              stroke="#828fff"
+              stroke={colors.accentHover}
               strokeWidth="2"
               strokeDasharray="4 2"
               opacity="0.75"
@@ -167,7 +168,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             const cx = scaleX(cfg.median_runtime_s);
             const cy = scaleY(cfg.median_energy_j);
             const layoutKey = cfg.configuration.layout || 'D';
-            const color = LAYOUT_COLORS[layoutKey] || { bg: '#8a8f98', border: '#8a8f98' };
+            const color = LAYOUT_COLORS[layoutKey] || { bg: colors.textTertiary, border: colors.textTertiary };
             const isSelected = cfg.config_id === selectedConfigId;
             const isBaseline = cfg.config_id === baselineConfigId;
             const isHovered = cfg.config_id === hoveredId;
@@ -207,7 +208,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                     cy={cy}
                     r={isSelected ? 11 : 9}
                     fill="none"
-                    stroke={isSelected ? '#10b981' : '#828fff'}
+                    stroke={isSelected ? colors.emerald : colors.accentHover}
                     strokeWidth="2"
                     strokeDasharray={isSelected ? 'none' : '2 2'}
                   />
@@ -218,19 +219,19 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                   cx={cx}
                   cy={cy}
                   r={isBaseline ? 7 : 6}
-                  fill={isBaseline ? '#f4586e' : color.bg}
-                  stroke={isBaseline ? '#be123c' : color.border}
+                  fill={isBaseline ? colors.red : color.bg}
+                  stroke={isBaseline ? colors.red : color.border}
                   strokeWidth="1.5"
                 />
 
                 {/* Marker text for baseline / selected */}
                 {isBaseline && (
-                  <text x={cx} y={cy - 10} fill="#f4586e" fontSize="9" fontWeight="bold" textAnchor="middle">
+                  <text x={cx} y={cy - 10} fill={colors.red} fontSize="9" fontWeight="bold" textAnchor="middle">
                     Baseline
                   </text>
                 )}
                 {isSelected && !isBaseline && (
-                  <text x={cx} y={cy - 14} fill="#10b981" fontSize="9" fontWeight="bold" textAnchor="middle">
+                  <text x={cx} y={cy - 14} fill={colors.emerald} fontSize="9" fontWeight="bold" textAnchor="middle">
                     Selected ★
                   </text>
                 )}
@@ -246,18 +247,18 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
               position: 'absolute',
               top: '10px',
               right: '15px',
-              background: '#191a1b',
+              background: colors.surfaceElevated,
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: '0.5rem',
               padding: '0.6rem 0.8rem',
               fontSize: '0.75rem',
-              color: '#f7f8f8',
+              color: colors.textPrimary,
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.4)',
               pointerEvents: 'none',
               maxWidth: '260px',
             }}
           >
-            <div style={{ fontWeight: 600, color: '#828fff', marginBottom: '0.25rem' }}>
+            <div style={{ fontWeight: 600, color: colors.accentHover, marginBottom: '0.25rem' }}>
               {hoveredConfig.config_id}
             </div>
             <div>Layout: {LAYOUT_COLORS[hoveredConfig.configuration.layout]?.name ?? hoveredConfig.configuration.layout}</div>

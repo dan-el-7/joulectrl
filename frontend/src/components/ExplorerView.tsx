@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Experiment } from '../types';
 import { fetchValidationPoints } from '../api';
 import { ParetoChart } from './ParetoChart';
+import { colors } from '../design';
 
 interface ValidationPointCandidate {
   kind: 'layout' | 'calibration';
@@ -80,15 +81,15 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#141516',
+          background: colors.surface,
           padding: '1rem 1.5rem',
           borderRadius: '0.75rem',
-          border: '1px solid #191a1b',
+          border: colors.border,
         }}
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#f7f8f8', fontWeight: 600 }}>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', color: colors.textPrimary, fontWeight: 600 }}>
               Profile Explorer — {experiment.workload_id}
             </h2>
             <span
@@ -97,14 +98,14 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 fontWeight: 600,
                 padding: '0.15rem 0.5rem',
                 borderRadius: '9999px',
-                backgroundColor: '#065f46',
-                color: '#10b981',
+                backgroundColor: colors.emerald,
+                color: colors.emerald,
               }}
             >
               Predicted from profile
             </span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#8a8f98', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '0.8rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
             12 configurations tested across Zen 5 &amp; Zen 5c layouts (3 repetitions each).
           </div>
         </div>
@@ -112,8 +113,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         {/* Live slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.75rem', color: '#8a8f98' }}>Dynamic Budget Slider</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#10b981' }}>{tempBudget}s</div>
+            <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>Dynamic Budget Slider</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: colors.emerald }}>{tempBudget}s</div>
           </div>
           <input
             type="range"
@@ -126,7 +127,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               setTempBudget(val);
               onReselect(val);
             }}
-            style={{ width: '140px', accentColor: '#10b981' }}
+            style={{ width: '140px', accentColor: colors.emerald }}
           />
         </div>
       </div>
@@ -134,75 +135,75 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       {/* Comparison Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         {/* Card 1: Default Baseline */}
-        <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: '0.75rem', color: '#f4586e', fontWeight: 600, textTransform: 'uppercase' }}>
+        <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.red, fontWeight: 600, textTransform: 'uppercase' }}>
             Default Baseline
           </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f7f8f8', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.2rem' }}>
             {baseCfg ? baseCfg.config_id : 'cfg_stock_all'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
             16 threads · Stock boost · All cores
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: '#8a8f98' }}>Runtime:</span>
+            <span style={{ color: colors.textTertiary }}>Runtime:</span>
             <span style={{ fontWeight: 600 }}>{baseCfg?.median_runtime_s}s</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: '#8a8f98' }}>Package Energy:</span>
-            <span style={{ fontWeight: 600, color: '#f4586e' }}>{baseCfg?.median_energy_j} J</span>
+            <span style={{ color: colors.textTertiary }}>Package Energy:</span>
+            <span style={{ fontWeight: 600, color: colors.red }}>{baseCfg?.median_energy_j} J</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: '#8a8f98' }}>Avg Power:</span>
+            <span style={{ color: colors.textTertiary }}>Avg Power:</span>
             <span style={{ fontWeight: 600 }}>{baseCfg?.median_power_w} W</span>
           </div>
         </div>
 
         {/* Card 2: Lowest Energy Overall */}
-        <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: 600, textTransform: 'uppercase' }}>
+        <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.amber, fontWeight: 600, textTransform: 'uppercase' }}>
             Lowest Energy Overall
           </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f7f8f8', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.2rem' }}>
             {lowestEnergyCfg ? lowestEnergyCfg.config_id : 'cfg_zen5c_4c_2000'}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
             4 Zen 5c cores · 2.0 GHz cap
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: '#8a8f98' }}>Runtime:</span>
+            <span style={{ color: colors.textTertiary }}>Runtime:</span>
             <span style={{ fontWeight: 600 }}>{lowestEnergyCfg?.median_runtime_s}s</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: '#8a8f98' }}>Package Energy:</span>
-            <span style={{ fontWeight: 600, color: '#f59e0b' }}>{lowestEnergyCfg?.median_energy_j} J</span>
+            <span style={{ color: colors.textTertiary }}>Package Energy:</span>
+            <span style={{ fontWeight: 600, color: colors.amber }}>{lowestEnergyCfg?.median_energy_j} J</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: '#8a8f98' }}>Energy Delta:</span>
-            <span style={{ fontWeight: 600, color: '#10b981' }}>
+            <span style={{ color: colors.textTertiary }}>Energy Delta:</span>
+            <span style={{ fontWeight: 600, color: colors.emerald }}>
               -{Math.round(100 * (1 - (lowestEnergyCfg?.median_energy_j ?? 1) / (baseCfg?.median_energy_j ?? 1)))}%
             </span>
           </div>
         </div>
 
         {/* Card 3: Selected Within Budget */}
-        <div style={{ background: 'rgba(16,185,129,0.12)22', borderRadius: '0.75rem', padding: '1rem', border: '1.5px solid #10b981' }}>
-          <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, textTransform: 'uppercase' }}>
+        <div style={{ background: 'rgba(16,185,129,0.12)', borderRadius: '0.75rem', padding: '1rem', border: '1.5px solid ' + colors.emerald }}>
+          <div style={{ fontSize: '0.75rem', color: colors.emerald, fontWeight: 600, textTransform: 'uppercase' }}>
             Selected Within Budget ★
           </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: '#10b981', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.emerald, marginTop: '0.2rem' }}>
             {selCfg ? selCfg.config_id : selectedId}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#8a8f98' }}>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
             4 Zen 5c cores · 3.0 GHz cap · Boost off
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: '#8a8f98' }}>Guarded Runtime:</span>
-            <span style={{ fontWeight: 700, color: '#10b981' }}>{selCfg?.guarded_runtime_s}s (≤ {tempBudget}s)</span>
+            <span style={{ color: colors.textTertiary }}>Guarded Runtime:</span>
+            <span style={{ fontWeight: 700, color: colors.emerald }}>{selCfg?.guarded_runtime_s}s (≤ {tempBudget}s)</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: '#8a8f98' }}>Energy Savings:</span>
-            <span style={{ fontWeight: 700, color: '#10b981', fontSize: '1rem' }}>
+            <span style={{ color: colors.textTertiary }}>Energy Savings:</span>
+            <span style={{ fontWeight: 700, color: colors.emerald, fontSize: '1rem' }}>
               -{selection.savings_vs_baseline_pct ?? selection.energy_reduction_pct ?? 44.6}%
             </span>
           </div>
@@ -214,8 +215,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               padding: '0.4rem',
               borderRadius: '0.375rem',
               border: 'none',
-              backgroundColor: '#10b981',
-              color: '#ffffff',
+              backgroundColor: colors.emerald,
+              color: colors.textPrimary,
               fontSize: '0.8rem',
               fontWeight: 600,
               cursor: 'pointer',
@@ -239,17 +240,17 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       />
 
       {/* Validation-Point Candidates (B's layout selector + measured calibration points) */}
-      <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1rem 1.5rem', border: '1px solid #191a1b' }}>
-        <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', color: '#f7f8f8', fontWeight: 600 }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: colors.border }}>
+        <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
           Validation-Point Candidates
         </h3>
-        <div style={{ fontSize: '0.75rem', color: '#8a8f98', marginBottom: '0.75rem' }}>
+        <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginBottom: '0.75rem' }}>
           Execution layouts built from the discovered core-class map plus measured calibration points. Select the
           configurations worth validating with fresh runs — suggestions only; the selector still checks all usable
           configurations. {selectedCandidates.size > 0 && `${selectedCandidates.size} selected.`}
         </div>
         {candidatesError && (
-          <div style={{ fontSize: '0.8rem', color: '#f59e0b' }}>Failed to load candidates: {candidatesError}</div>
+          <div style={{ fontSize: '0.8rem', color: colors.amber }}>Failed to load candidates: {candidatesError}</div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {(candidates ?? []).map((c) => {
@@ -264,41 +265,41 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   gap: '0.4rem',
                   padding: '0.45rem 0.7rem',
                   borderRadius: '0.5rem',
-                  border: `1.5px solid ${selected ? '#10b981' : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: selected ? 'rgba(16,185,129,0.12)33' : '#191a1b',
+                  border: `1.5px solid ${selected ? colors.emerald : 'rgba(255,255,255,0.08)'}`,
+                  backgroundColor: selected ? 'rgba(16,185,129,0.12)33' : colors.surfaceElevated,
                   cursor: 'pointer',
                   fontSize: '0.78rem',
-                  color: selected ? '#10b981' : '#d0d6e0',
+                  color: selected ? colors.emerald : colors.textSecondary,
                 }}
                 title={c.description ?? (c.cpus ? `cpus: ${c.cpus.join(',')}` : c.cpu_mask)}
               >
                 <span style={{ fontWeight: 700 }}>{selected ? '✓' : '＋'}</span>
                 <span style={{ fontFamily: 'monospace' }}>{c.config_id}</span>
                 {c.measured ? (
-                  <span style={{ fontSize: '0.65rem', color: '#828fff' }}>(
+                  <span style={{ fontSize: '0.65rem', color: colors.accentHover }}>(
                     {c.median_energy_j != null ? `${Math.round(c.median_energy_j)} J` : 'energy unavailable'}
                     {c.median_runtime_s != null ? `, ${c.median_runtime_s.toFixed(1)}s` : ''})</span>
                 ) : (
-                  <span style={{ fontSize: '0.65rem', color: '#8a8f98' }}>(unmeasured layout)</span>
+                  <span style={{ fontSize: '0.65rem', color: colors.textTertiary }}>(unmeasured layout)</span>
                 )}
               </button>
             );
           })}
           {candidates !== null && candidates.length === 0 && !candidatesError && (
-            <span style={{ fontSize: '0.8rem', color: '#8a8f98' }}>No candidates available for this machine.</span>
+            <span style={{ fontSize: '0.8rem', color: colors.textTertiary }}>No candidates available for this machine.</span>
           )}
         </div>
       </div>
 
       {/* Complete Run List Table */}
-      <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1rem 1.5rem', border: '1px solid #191a1b' }}>
-        <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: '#f7f8f8', fontWeight: 600 }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: colors.border }}>
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
           Individual Execution Runs ({profile.runs.length} captured)
         </h3>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#8a8f98' }}>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: colors.textTertiary }}>
                 <th style={{ padding: '0.5rem' }}>Run ID</th>
                 <th style={{ padding: '0.5rem' }}>Configuration</th>
                 <th style={{ padding: '0.5rem' }}>Layout</th>
@@ -317,26 +318,26 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   <tr
                     key={r.run_id}
                     style={{
-                      borderBottom: '1px solid #191a1b',
+                      borderBottom: colors.border,
                       backgroundColor: isSelected ? 'rgba(16,185,129,0.12)15' : isBase ? 'rgba(244,88,110,0.10)15' : 'transparent',
                     }}
                   >
                     <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.run_id}</td>
                     <td style={{ padding: '0.5rem', fontWeight: isSelected || isBase ? 600 : 400 }}>
                       {r.config_id}
-                      {isSelected && <span style={{ color: '#10b981', marginLeft: 4 }}>★</span>}
+                      {isSelected && <span style={{ color: colors.emerald, marginLeft: 4 }}>★</span>}
                     </td>
                     <td style={{ padding: '0.5rem' }}>{r.configuration?.layout ?? '-'}</td>
                     <td style={{ padding: '0.5rem' }}>#{r.repetition}</td>
                     <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.runtime_s.toFixed(2)}</td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', color: isSelected ? '#10b981' : '#d0d6e0' }}>
+                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', color: isSelected ? colors.emerald : colors.textSecondary }}>
                       {r.package_energy_j ? `${r.package_energy_j.toFixed(1)} J` : 'unavailable'}
                     </td>
                     <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>
                       {r.package_energy_j ? (r.package_energy_j / r.runtime_s).toFixed(1) : '-'} W
                     </td>
                     <td style={{ padding: '0.5rem' }}>
-                      <span style={{ color: '#10b981', fontWeight: 600 }}>✓ verified</span>
+                      <span style={{ color: colors.emerald, fontWeight: 600 }}>✓ verified</span>
                     </td>
                   </tr>
                 );

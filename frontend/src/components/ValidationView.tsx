@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Experiment } from '../types';
 import { explainSelection, validateExperiment } from '../api';
+import { colors } from '../design';
 
 interface ValidationViewProps {
   experiment: Experiment;
@@ -9,29 +10,29 @@ interface ValidationViewProps {
 const RESTORATION_LABELS: Record<string, { title: string; color: string; bg: string; border: string; icon: string }> = {
   restored: {
     title: 'Restoration Status: Fully Restored',
-    color: '#10b981',
+    color: colors.emerald,
     bg: 'rgba(16,185,129,0.12)15',
-    border: '#10b981',
+    border: colors.emerald,
     icon: '🛡️',
   },
   restoring: {
     title: 'Restoration Status: Restoring…',
-    color: '#fcd34d',
-    bg: '#78350f15',
-    border: '#b45309',
+    color: colors.amber,
+    bg: 'rgba(245,158,11,0.10)',
+    border: colors.amber,
     icon: '⏳',
   },
   recovery_required: {
     title: 'Restoration Status: Recovery Required',
-    color: '#f4586e',
+    color: colors.red,
     bg: 'rgba(244,88,110,0.10)15',
-    border: '#b91c1c',
+    border: colors.red,
     icon: '⚠️',
   },
   not_required: {
     title: 'Restoration Status: No Controls Applied',
-    color: '#8a8f98',
-    bg: '#191a1b15',
+    color: colors.textTertiary,
+    bg: 'rgba(25,26,27,0.15)',
     border: 'rgba(255,255,255,0.08)',
     icon: 'ℹ️',
   },
@@ -98,17 +99,17 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#141516',
+          background: colors.surface,
           padding: '1.25rem',
           borderRadius: '0.75rem',
-          border: '1px solid #191a1b',
+          border: colors.border,
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#f7f8f8', fontWeight: 600 }}>
+          <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textPrimary, fontWeight: 600 }}>
             Validation &amp; Explanation
           </h2>
-          <div style={{ fontSize: '0.8rem', color: '#8a8f98', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.8rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
             Fresh executions of Baseline vs Selected to empirically verify package-energy savings.
           </div>
         </div>
@@ -120,8 +121,8 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
             style={{
               padding: '0.5rem 1rem',
               borderRadius: '0.375rem',
-              backgroundColor: '#5e6ad2',
-              color: '#ffffff',
+              backgroundColor: colors.accentBg,
+              color: colors.textPrimary,
               fontSize: '0.85rem',
               fontWeight: 600,
               border: 'none',
@@ -137,10 +138,10 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
               padding: '0.5rem 1rem',
               borderRadius: '0.375rem',
               backgroundColor: 'rgba(255,255,255,0.08)',
-              color: '#f7f8f8',
+              color: colors.textPrimary,
               fontSize: '0.85rem',
               fontWeight: 600,
-              border: '1px solid #62666d',
+              border: colors.border,
               cursor: 'pointer',
             }}
           >
@@ -150,27 +151,27 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
       </div>
 
       {/* Fresh Validation Pairs Table */}
-      <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1.25rem', border: '1px solid #191a1b' }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.25rem', border: colors.border }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: '#f7f8f8', fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
             Fresh Validation Executions ({validation.pairs.length} Pairs)
           </h3>
           {validation.verified_savings_pct != null && (
-            <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+            <div style={{ fontSize: '0.85rem', color: colors.emerald, fontWeight: 600 }}>
               Observed Energy Savings: {validation.verified_savings_pct.toFixed(1)}%
             </div>
           )}
         </div>
 
         {validation.pairs.length === 0 ? (
-          <div style={{ padding: '1rem 0.5rem', fontSize: '0.85rem', color: '#8a8f98' }}>
+          <div style={{ padding: '1rem 0.5rem', fontSize: '0.85rem', color: colors.textTertiary }}>
             No validation pairs recorded yet. Run fresh validation to compare baseline vs selected.
           </div>
         ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#8a8f98' }}>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: colors.textTertiary }}>
                 <th style={{ padding: '0.5rem' }}>Pair</th>
                 <th style={{ padding: '0.5rem' }}>Baseline (Stock)</th>
                 <th style={{ padding: '0.5rem' }}>Selected Candidate</th>
@@ -189,23 +190,23 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
                 const tDelta = (p.selected_run.runtime_s - p.baseline_run.runtime_s).toFixed(1);
 
                 return (
-                  <tr key={p.pair_index} style={{ borderBottom: '1px solid #191a1b' }}>
+                  <tr key={p.pair_index} style={{ borderBottom: colors.border }}>
                     <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600 }}>Pair #{p.pair_index}</td>
                     <td style={{ padding: '0.6rem 0.5rem' }}>
                       {p.baseline_run.runtime_s.toFixed(1)}s · {eBase != null ? `${eBase.toFixed(1)} J` : 'energy N/A'}
                     </td>
-                    <td style={{ padding: '0.6rem 0.5rem', color: '#10b981', fontWeight: 600 }}>
+                    <td style={{ padding: '0.6rem 0.5rem', color: colors.emerald, fontWeight: 600 }}>
                       {p.selected_run.runtime_s.toFixed(1)}s · {eSel != null ? `${eSel.toFixed(1)} J` : 'energy N/A'}
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem' }}>+{tDelta}s</td>
-                    <td style={{ padding: '0.6rem 0.5rem', color: eSavings != null ? '#10b981' : '#8a8f98', fontWeight: 700 }}>
+                    <td style={{ padding: '0.6rem 0.5rem', color: eSavings != null ? colors.emerald : colors.textTertiary, fontWeight: 700 }}>
                       {eSavings != null ? `-${eSavings}%` : 'N/A'}
                     </td>
                     <td style={{ padding: '0.6rem 0.5rem' }}>
                       {p.both_succeeded ? (
-                        <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Verified output</span>
+                        <span style={{ color: colors.emerald, fontWeight: 600 }}>✓ Verified output</span>
                       ) : (
-                        <span style={{ color: '#f4586e', fontWeight: 600 }}>✗ Failed run retained</span>
+                        <span style={{ color: colors.red, fontWeight: 600 }}>✗ Failed run retained</span>
                       )}
                     </td>
                   </tr>
@@ -218,9 +219,9 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
       </div>
 
       {/* Explanation Card */}
-      <div style={{ background: '#141516', borderRadius: '0.75rem', padding: '1.25rem', border: '1px solid #191a1b' }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.25rem', border: colors.border }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: '#f7f8f8', fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
             Deterministic Explanation &amp; Rationale
           </h3>
 
@@ -235,9 +236,9 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   borderRadius: '0.25rem',
-                  border: `1px solid ${provider === p ? '#7170ff' : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: provider === p ? 'rgba(113,112,255,0.14)33' : '#191a1b',
-                  color: provider === p ? '#828fff' : '#8a8f98',
+                  border: `1px solid ${provider === p ? colors.accent : 'rgba(255,255,255,0.08)'}`,
+                  backgroundColor: provider === p ? 'rgba(113,112,255,0.14)33' : colors.surfaceElevated,
+                  color: provider === p ? colors.accentHover : colors.textTertiary,
                   cursor: isExplaining ? 'wait' : 'pointer',
                   textTransform: 'capitalize',
                 }}
@@ -249,20 +250,20 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
         </div>
 
         {explanation && (
-          <div style={{ background: '#191a1b', borderRadius: '0.5rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ background: colors.surfaceElevated, borderRadius: '0.5rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
             {explanation.fallback && (
-              <div style={{ fontSize: '0.75rem', color: '#fcd34d', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.75rem', color: colors.amber, marginBottom: '0.5rem' }}>
                 ⚠ Requested provider unavailable — degraded to deterministic Basic templates (guaranteed default).
               </div>
             )}
-            <div style={{ fontSize: '0.9rem', color: '#f7f8f8', lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>
+            <div style={{ fontSize: '0.9rem', color: colors.textPrimary, lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>
               {explanation.text}
             </div>
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8a8f98', marginBottom: '0.3rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.3rem' }}>
                 Grounding Facts (Strictly Verified):
               </div>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#d0d6e0', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.78rem', color: colors.textSecondary, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                 {explanation.grounding_facts.map((fact, idx) => (
                   <li key={idx}>{fact}</li>
                 ))}
@@ -289,7 +290,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
           >
             <div>
               <div style={{ fontWeight: 600, color: label.color, fontSize: '0.9rem' }}>{label.title}</div>
-              <div style={{ fontSize: '0.75rem', color: '#a7f3d0' }}>
+              <div style={{ fontSize: '0.75rem', color: colors.emerald }}>
                 {experiment.restoration_status === 'restored'
                   ? 'Stock frequencies, power limits, and boost configurations restored to initial state.'
                   : experiment.restoration_status === 'recovery_required'
@@ -308,8 +309,8 @@ export const ValidationView: React.FC<ValidationViewProps> = ({ experiment }) =>
           textAlign: 'center',
           padding: '1.5rem 0',
           fontSize: '0.75rem',
-          color: '#8a8f98',
-          borderTop: '1px solid #191a1b',
+          color: colors.textTertiary,
+          borderTop: colors.border,
         }}
       >
         CPU-package energy, not whole-system electricity. Best among measured configurations; future runtimes may vary.
