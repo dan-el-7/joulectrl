@@ -63,11 +63,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent C — resume packet
 
-- **Done & verified:** `<...>`
-- **In flight:** `<...>`
-- **Resume here:** `<...>`
-- **Gotchas:** `<...>`
-- **Handoffs owed / waiting on:** `<...>`
+- **Done & verified:** `docs/API.md` v1 frozen contract (exact route table from PLAN §8, watch mode endpoints/SSE from §6b, preference mode from §6c, SSE events table, architectural invariants). Aligned with `core/models.py` v0.
+- **In flight:** Scaffolding FastAPI backend (127.0.0.1, one origin, SSE) + Vite React dashboard with fixture data.
+- **Resume here:** Install API dependencies and scaffold FastAPI server in `api/` and Vite React app in `frontend/`.
+- **Gotchas:** Dev machine only; single origin at 127.0.0.1:8000; execute Python directly via uv Python cache on Windows to respect AppControl policy.
+- **Handoffs owed / waiting on:** None blocking. Adopted `core/models.py` v0 from Agent B.
 
 ## Agent D — resume packet
 

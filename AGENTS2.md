@@ -67,12 +67,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `<UTC timestamp>`
-- session: `C#<n>` · status: `active | blocked(<reason>) | off`
-- branch: `<branch or "on main">`
-- current unit: `<one line>`
-- next action: `<exact next step>`
-- notes for others: `<...>`
+- heartbeat: `2026-09-09T10:10:00Z`
+- session: `C#1` · status: `active`
+- branch: `on main`
+- current unit: `docs/API.md frozen contract committed; scaffolding FastAPI + Vite React app`
+- next action: `scaffold FastAPI backend and Vite React dashboard`
+- notes for others: `Adopted models.py v0 from Agent B; docs/API.md pushed`
 
 ## Agent D — live state
 
