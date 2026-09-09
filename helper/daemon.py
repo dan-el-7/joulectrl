@@ -201,17 +201,25 @@ def op_apply_configuration(args: Dict[str, Any]) -> Dict[str, Any]:
             _write_int(f"{BASE}/boost", 1 if boost else 0)
             applied["boost"] = _read_int(f"{BASE}/boost")
         caps = requested.get("policy_freq_caps_khz") or {}
+        clamp_caps = bool(requested.get("clamp_out_of_range", False))
         for pname, khz in caps.items():
             pd = Path(BASE) / str(pname)
             if not pd.exists():
                 return {"ok": False, "error": f"unknown_policy:{pname}"}
             hw_min = _read_int(f"{pd}/cpuinfo_min_freq")
             hw_max = _read_int(f"{pd}/cpuinfo_max_freq")
-            if hw_max is not None and not (hw_min is None or hw_min <= khz <= hw_max):
-                return {"ok": False, "error": f"cap_out_of_range:{pname}:{khz}"}
-            _write_int(f"{pd}/scaling_max_freq", int(khz))
+            target_khz = int(khz)
+            if hw_max is not None and not (hw_min is None or hw_min <= target_khz <= hw_max):
+                if clamp_caps:
+                    if hw_max is not None and target_khz > hw_max:
+                        target_khz = hw_max
+                    if hw_min is not None and target_khz < hw_min:
+                        target_khz = hw_min
+                else:
+                    return {"ok": False, "error": f"cap_out_of_range:{pname}:{khz}"}
+            _write_int(f"{pd}/scaling_max_freq", target_khz)
             applied[f"{pname}/scaling_max_freq"] = _read_int_retry(
-                f"{pd}/scaling_max_freq", int(khz))
+                f"{pd}/scaling_max_freq", target_khz)
         # optional per-policy governor switch (validated against available list)
         governors = requested.get("policy_governors") or {}
         for pname, gov in governors.items():

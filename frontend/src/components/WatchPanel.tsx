@@ -127,7 +127,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           background: colors.surface,
           padding: '1.25rem',
           borderRadius: '0.75rem',
-          border: colors.border,
+          border: `1px solid ${colors.border}`,
+          boxShadow: colors.cardShadow,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -182,7 +183,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
 
       {/* Live Metrics Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: colors.border }}>
+        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Current Package Power</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.3rem' }}>
             {power != null ? `${power.toFixed ? power.toFixed(1) : power} W` : '—'}
@@ -193,7 +194,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           </div>
         </div>
 
-        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: colors.border }}>
+        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Learned Idle Baseline</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 700, color: colors.accentHover, marginTop: '0.3rem' }}>
             {baseline != null ? `${baseline.toFixed ? baseline.toFixed(1) : baseline} W` : 'learning…'}
@@ -203,7 +204,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
           </div>
         </div>
 
-        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: colors.border }}>
+        <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Detection State</div>
           <div style={{ fontSize: '1.4rem', fontWeight: 700, color: colors.amber, marginTop: '0.5rem', textTransform: 'capitalize' }}>
             {String(stateLabel).replace('_', ' ')}

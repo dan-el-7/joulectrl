@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Experiment } from '../types';
-import { explainSelection, fetchExperiment, fetchValidationPoints, validateExperiment } from '../api';
-import { colors } from '../design';
+import { explainSelection, fetchValidationPoints, validateExperiment } from '../api';
+import { getThemeColors, fonts, fontFeatures, radii, ThemeMode } from '../design';
+import { useTheme } from '../ThemeContext';
 
 interface ValidationViewProps {
   experiment: Experiment;
   onRefreshExperiment?: () => Promise<void>;
   onNavigateExplorer?: () => void;
+  theme?: ThemeMode;
 }
 
 interface LayoutCandidate {
@@ -20,42 +22,16 @@ interface LayoutCandidate {
   source: string;
 }
 
-const RESTORATION_LABELS: Record<string, { title: string; color: string; bg: string; border: string; icon: string }> = {
-  restored: {
-    title: 'Restoration Status: Fully Restored',
-    color: colors.emerald,
-    bg: 'rgba(16,185,129,0.15)',
-    border: colors.emerald,
-    icon: '🛡️',
-  },
-  restoring: {
-    title: 'Restoration Status: Restoring…',
-    color: colors.amber,
-    bg: 'rgba(245,158,11,0.10)',
-    border: colors.amber,
-    icon: '⏳',
-  },
-  recovery_required: {
-    title: 'Restoration Status: Recovery Required',
-    color: colors.red,
-    bg: 'rgba(244,88,110,0.15)',
-    border: colors.red,
-    icon: '⚠️',
-  },
-  not_required: {
-    title: 'Restoration Status: No Controls Applied',
-    color: colors.textTertiary,
-    bg: 'rgba(25,26,27,0.15)',
-    border: 'rgba(255,255,255,0.08)',
-    icon: 'ℹ️',
-  },
-};
-
 export const ValidationView: React.FC<ValidationViewProps> = ({
   experiment,
   onRefreshExperiment,
   onNavigateExplorer,
+  theme: propTheme,
 }) => {
+  const { theme: ctxTheme, themeColors: c } = useTheme();
+  const theme = propTheme || ctxTheme;
+  const isLight = theme === 'light';
+
   const validation = experiment?.validation || { pairs: [], status: 'not_run', verified_savings_pct: null, verified_runtime_delta_s: null };
   const selection = experiment?.selection;
   const pairs = validation.pairs || [];
@@ -68,8 +44,41 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
   const [isExplaining, setIsExplaining] = useState<boolean>(false);
   const [layoutCandidates, setLayoutCandidates] = useState<LayoutCandidate[]>([]);
   const [isLoadingLayouts, setIsLoadingLayouts] = useState<boolean>(false);
+  const [clockHoldInfo, setClockHoldInfo] = useState<{
+    holdable: boolean;
+    effective_khz: number | null;
+    requires_passive_mode: boolean;
+    reason: string;
+  } | null>(null);
 
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const selectedConfigId = selection?.config_id || (selection as any)?.selected_config_id;
+  const selectedConfig =
+    selection?.configuration ||
+    (experiment?.profile?.configurations && selectedConfigId
+      ? experiment.profile.configurations[selectedConfigId]?.configuration
+      : null);
+
+  // Fetch clock holdability check (<1ms)
+  useEffect(() => {
+    if (!selectedConfig) {
+      setClockHoldInfo(null);
+      return;
+    }
+    const cap = selectedConfig.freq_cap_khz;
+    const boost = selectedConfig.boost;
+    const affinity = selectedConfig.cpu_affinity?.join(',');
+    const params = new URLSearchParams();
+    if (cap) params.set('freq_cap_khz', String(cap));
+    if (boost !== undefined && boost !== null) params.set('boost', String(boost));
+    if (affinity) params.set('affinity', affinity);
+
+    fetch(`/api/system/clock-check?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data) => setClockHoldInfo(data))
+      .catch((e) => console.warn('Clock hold check failed:', e));
+  }, [selectedConfig?.freq_cap_khz, selectedConfig?.boost, selectedConfig?.cpu_affinity]);
 
   // Fetch explanation when experiment or selection changes
   useEffect(() => {
@@ -87,7 +96,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [experiment?.id, selection?.config_id, provider]);
+  }, [experiment?.id, selectedConfigId, provider]);
 
   // Fetch validation point candidates (Layout A, B, C, D)
   useEffect(() => {
@@ -140,49 +149,36 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
         try {
           if (onRefreshExperiment) {
             await onRefreshExperiment();
-          } else {
-            await fetchExperiment(experiment.id);
           }
 
-          // Check if experiment has updated validation pairs
-          const updated = await fetchExperiment(experiment.id);
-          const updatedPairs = updated?.validation?.pairs || [];
-          const currentCount = updatedPairs.length;
-
-          if (currentCount > 0) {
-            setValidationMsg(`Measured ${currentCount} of 3 validation pairs on hardware...`);
-          }
-
-          if (currentCount >= 3 || updated.state === 'complete' || updated.validation?.status === 'verified' || attempts >= maxAttempts) {
-            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-            setIsValidating(false);
-            if (currentCount > 0) {
-              setValidationMsg(`Validation completed: ${currentCount} pairs measured and verified.`);
-            } else {
-              setValidationMsg('Validation complete.');
+          if (experiment?.state === 'COMPLETE' || experiment?.state === 'complete' || attempts >= maxAttempts) {
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
             }
+            setIsValidating(false);
+            setValidationMsg('');
           }
-        } catch (pollErr) {
-          console.warn('Validation poll error:', pollErr);
+        } catch {
+          // ignore transient poll error
         }
       }, 1500);
-
     } catch (e: any) {
-      setValidationError(e?.message || 'Failed to start validation');
+      setValidationError(e?.message || 'Failed to trigger validation run');
       setIsValidating(false);
       setValidationMsg('');
     }
   };
 
-  const handleGenerateExplanation = async (p: string) => {
+  const handleGenerateExplanation = async (selectedProvider: string) => {
     if (!experiment?.id) return;
+    setIsExplaining(true);
+    setProvider(selectedProvider);
     try {
-      setIsExplaining(true);
-      setProvider(p);
-      const res = await explainSelection(experiment.id, p);
+      const res = await explainSelection(experiment.id, selectedProvider);
       setExplanation({ text: res.text, grounding_facts: res.grounding_facts, fallback: res.fallback });
     } catch (e: any) {
-      console.warn(`Explanation error: ${e?.message}`);
+      setExplanation({ text: `Explanation unavailable: ${e?.message || e}`, grounding_facts: [], fallback: true });
     } finally {
       setIsExplaining(false);
     }
@@ -193,27 +189,88 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
     window.open(`/api/experiments/${experiment.id}/export`, '_blank');
   };
 
-  const selectedConfigId = selection?.config_id || selection?.selected_config_id;
+  const restorationLabels: Record<string, { title: string; color: string; bg: string; border: string; icon: string }> = {
+    restored: {
+      title: 'Restoration Status: Fully Restored',
+      color: c.emerald,
+      bg: isLight ? '#ecfdf5' : 'rgba(16,185,129,0.15)',
+      border: isLight ? '#a7f3d0' : c.emerald,
+      icon: '🛡️',
+    },
+    restoring: {
+      title: 'Restoration Status: Restoring…',
+      color: c.amber,
+      bg: isLight ? '#fffbeb' : 'rgba(245,158,11,0.10)',
+      border: isLight ? '#fde68a' : c.amber,
+      icon: '⏳',
+    },
+    recovery_required: {
+      title: 'Restoration Status: Recovery Required',
+      color: c.red,
+      bg: isLight ? '#fef2f2' : 'rgba(244,88,110,0.15)',
+      border: isLight ? '#fecaca' : c.red,
+      icon: '⚠️',
+    },
+    not_required: {
+      title: 'Restoration Status: No Controls Applied',
+      color: c.textTertiary,
+      bg: isLight ? '#f8fafc' : 'rgba(25,26,27,0.15)',
+      border: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
+      icon: 'ℹ️',
+    },
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto', fontFamily: fonts.sans }}>
       {/* Header & Controls */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: colors.surface,
+          background: c.surface,
           padding: '1.25rem',
-          borderRadius: '0.75rem',
-          border: colors.border,
+          borderRadius: radii.lg,
+          border: `1px solid ${c.border}`,
+          boxShadow: c.cardShadow,
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textPrimary, fontWeight: 600 }}>
-            Empirical Validation &amp; Explanation
-          </h2>
-          <div style={{ fontSize: '0.8rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', color: c.textPrimary, fontWeight: 600 }}>
+              Empirical Validation &amp; Explanation
+            </h2>
+            {clockHoldInfo && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '2px 8px',
+                  borderRadius: radii.full,
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  fontFamily: fonts.mono,
+                  background: clockHoldInfo.requires_passive_mode
+                    ? (isLight ? 'rgba(99,102,241,0.1)' : 'rgba(113,112,255,0.15)')
+                    : (isLight ? 'rgba(22,163,74,0.1)' : 'rgba(16,185,129,0.15)'),
+                  color: clockHoldInfo.requires_passive_mode ? c.accent : c.emerald,
+                  border: `1px solid ${clockHoldInfo.requires_passive_mode ? (isLight ? '#c7d2fe' : c.accent) : (isLight ? '#bbf7d0' : c.emerald)}`,
+                }}
+                title={clockHoldInfo.reason}
+              >
+                <span>{clockHoldInfo.requires_passive_mode ? '🔄' : '⚡'}</span>
+                <span>
+                  {selectedConfig?.freq_cap_khz
+                    ? `${(selectedConfig.freq_cap_khz / 1000000).toFixed(1)} GHz Target: ${
+                        clockHoldInfo.requires_passive_mode ? 'Holdable (via Passive P-State)' : 'Holdable'
+                      }`
+                    : 'Stock Clock (Boost Active)'}
+                </span>
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: c.textTertiary, marginTop: '0.25rem' }}>
             Fresh executions of Stock Baseline vs Selected Candidate to empirically verify package-energy savings on hardware counters.
           </div>
         </div>
@@ -224,9 +281,9 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             disabled={isValidating || !selectedConfigId}
             style={{
               padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
-              backgroundColor: isValidating ? 'rgba(113,112,255,0.3)' : colors.accentBg,
-              color: colors.textPrimary,
+              borderRadius: radii.md,
+              backgroundColor: isValidating ? (isLight ? '#c7d2fe' : 'rgba(113,112,255,0.3)') : c.accentBg,
+              color: '#ffffff',
               fontSize: '0.85rem',
               fontWeight: 600,
               border: 'none',
@@ -235,6 +292,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
               alignItems: 'center',
               gap: '0.5rem',
               opacity: !selectedConfigId ? 0.6 : 1,
+              boxShadow: isLight ? '0 1px 2px rgba(99,102,241,0.2)' : 'none',
             }}
           >
             {isValidating ? (
@@ -251,12 +309,12 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             onClick={handleExport}
             style={{
               padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
-              backgroundColor: 'rgba(255,255,255,0.08)',
-              color: colors.textPrimary,
+              borderRadius: radii.md,
+              backgroundColor: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)',
+              color: c.textPrimary,
               fontSize: '0.85rem',
               fontWeight: 600,
-              border: colors.border,
+              border: `1px solid ${c.border}`,
               cursor: 'pointer',
             }}
           >
@@ -272,11 +330,11 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            background: 'rgba(113, 112, 255, 0.12)',
-            border: `1px solid ${colors.accent}`,
+            background: isLight ? '#eef2ff' : 'rgba(113, 112, 255, 0.12)',
+            border: `1px solid ${c.accent}`,
             padding: '0.85rem 1.25rem',
-            borderRadius: '0.5rem',
-            color: colors.textPrimary,
+            borderRadius: radii.md,
+            color: c.textPrimary,
             fontSize: '0.85rem',
           }}
         >
@@ -285,7 +343,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
               width: '12px',
               height: '12px',
               borderRadius: '50%',
-              border: `2px solid ${colors.accent}`,
+              border: `2px solid ${c.accent}`,
               borderTopColor: 'transparent',
               animation: 'spin 1s linear infinite',
             }}
@@ -297,11 +355,11 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       {validationError && (
         <div
           style={{
-            background: 'rgba(244, 88, 110, 0.12)',
-            border: `1px solid ${colors.red}`,
+            background: isLight ? '#fef2f2' : 'rgba(244, 88, 110, 0.12)',
+            border: `1px solid ${c.red}`,
             padding: '0.85rem 1.25rem',
-            borderRadius: '0.5rem',
-            color: colors.red,
+            borderRadius: radii.md,
+            color: c.red,
             fontSize: '0.85rem',
           }}
         >
@@ -316,17 +374,17 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'rgba(245, 158, 11, 0.10)',
-            border: `1px solid ${colors.amber}`,
+            background: isLight ? '#fffbeb' : 'rgba(245, 158, 11, 0.10)',
+            border: `1px solid ${c.amber}`,
             padding: '1rem 1.25rem',
-            borderRadius: '0.5rem',
+            borderRadius: radii.md,
           }}
         >
           <div>
-            <div style={{ fontWeight: 600, color: colors.amber, fontSize: '0.9rem' }}>
+            <div style={{ fontWeight: 600, color: c.amber, fontSize: '0.9rem' }}>
               No Target Configuration Selected
             </div>
-            <div style={{ fontSize: '0.8rem', color: colors.textSecondary, marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '0.8rem', color: c.textSecondary, marginTop: '0.2rem' }}>
               Validation compares a selected configuration against the stock baseline. Choose a configuration in the Explorer tab first.
             </div>
           </div>
@@ -335,10 +393,10 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
               onClick={onNavigateExplorer}
               style={{
                 padding: '0.4rem 0.8rem',
-                borderRadius: '0.375rem',
-                background: colors.surfaceElevated,
-                color: colors.textPrimary,
-                border: colors.border,
+                borderRadius: radii.md,
+                background: c.surfaceElevated,
+                color: c.textPrimary,
+                border: `1px solid ${c.border}`,
                 fontSize: '0.8rem',
                 cursor: 'pointer',
               }}
@@ -350,13 +408,21 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       )}
 
       {/* Fresh Validation Pairs Table */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.25rem', border: colors.border }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div
+        style={{
+          background: c.surface,
+          borderRadius: radii.lg,
+          padding: '1.25rem',
+          border: `1px solid ${c.border}`,
+          boxShadow: c.cardShadow,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', color: c.textPrimary, fontWeight: 600 }}>
               Fresh Validation Executions ({pairs.length} {pairs.length === 1 ? 'Pair' : 'Pairs'})
             </h3>
-            <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
+            <div style={{ fontSize: '0.75rem', color: c.textTertiary, marginTop: '0.2rem' }}>
               Each pair is run back-to-back with hardware counter bracketing and full state restoration before and after each run.
             </div>
           </div>
@@ -364,12 +430,12 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             <div
               style={{
                 fontSize: '0.9rem',
-                color: colors.emerald,
+                color: c.emerald,
                 fontWeight: 700,
-                background: 'rgba(16, 185, 129, 0.12)',
+                background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.12)',
                 padding: '0.4rem 0.8rem',
-                borderRadius: '0.375rem',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: radii.md,
+                border: `1px solid ${isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.3)'}`,
               }}
             >
               Observed Energy Savings: {validation.verified_savings_pct.toFixed(1)}%
@@ -383,26 +449,26 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
               padding: '2.5rem 1rem',
               textAlign: 'center',
               fontSize: '0.85rem',
-              color: colors.textTertiary,
-              background: colors.surfaceElevated,
-              borderRadius: '0.5rem',
-              border: '1px dashed rgba(255,255,255,0.08)',
+              color: c.textTertiary,
+              background: c.surfaceElevated,
+              borderRadius: radii.md,
+              border: `1px dashed ${c.border}`,
             }}
           >
             <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📊</div>
-            <div style={{ fontWeight: 600, color: colors.textSecondary, marginBottom: '0.25rem' }}>
+            <div style={{ fontWeight: 600, color: c.textSecondary, marginBottom: '0.25rem' }}>
               No validation pairs measured yet
             </div>
             <div>
               Click <strong>"Run Fresh Validation Pairs"</strong> above to benchmark the baseline against{' '}
-              {selectedConfigId ? <code style={{ color: colors.emerald }}>{selectedConfigId}</code> : 'your selected configuration'}.
+              {selectedConfigId ? <code style={{ color: c.emerald, fontWeight: 600 }}>{selectedConfigId}</code> : 'your selected configuration'}.
             </div>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: colors.textTertiary }}>
+                <tr style={{ borderBottom: `1px solid ${c.border}`, color: c.textTertiary }}>
                   <th style={{ padding: '0.6rem 0.5rem' }}>Pair</th>
                   <th style={{ padding: '0.6rem 0.5rem' }}>Baseline (Stock)</th>
                   <th style={{ padding: '0.6rem 0.5rem' }}>Selected Candidate</th>
@@ -432,26 +498,27 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                       : null;
 
                   return (
-                    <tr key={p.pair_index} style={{ borderBottom: colors.border }}>
-                      <td style={{ padding: '0.65rem 0.5rem', fontWeight: 600, color: colors.textPrimary }}>
+                    <tr key={p.pair_index} style={{ borderBottom: `1px solid ${c.borderSubtle}` }}>
+                      <td style={{ padding: '0.65rem 0.5rem', fontWeight: 600, color: c.textPrimary }}>
                         Pair #{p.pair_index}
                       </td>
-                      <td style={{ padding: '0.65rem 0.5rem', color: colors.textSecondary }}>
+                      <td style={{ padding: '0.65rem 0.5rem', color: c.textSecondary, fontFamily: fonts.mono }}>
                         {bRun?.runtime_s != null ? `${bRun.runtime_s.toFixed(1)}s` : '—'} ·{' '}
                         {eBase != null ? `${eBase.toFixed(1)} J` : 'energy N/A'}
                       </td>
-                      <td style={{ padding: '0.65rem 0.5rem', color: colors.emerald, fontWeight: 600 }}>
-                        {sRun?.runtime_s != null ? `${sRun.runtime_s.toFixed(1)}s` : '—'} ·{' '}
+                      <td style={{ padding: '0.65rem 0.5rem', color: c.emerald, fontWeight: 600, fontFamily: fonts.mono }}>
+                        {sRun?.runtime_s != null && sRun.runtime_s > 0 ? `${sRun.runtime_s.toFixed(1)}s` : '0.0s'} ·{' '}
                         {eSel != null ? `${eSel.toFixed(1)} J` : 'energy N/A'}
                       </td>
-                      <td style={{ padding: '0.65rem 0.5rem', color: colors.textPrimary }}>
+                      <td style={{ padding: '0.65rem 0.5rem', color: c.textPrimary, fontFamily: fonts.mono }}>
                         {tDelta != null ? `${Number(tDelta) >= 0 ? '+' : ''}${tDelta}s` : '—'}
                       </td>
                       <td
                         style={{
                           padding: '0.65rem 0.5rem',
-                          color: eSavings != null && eSavings > 0 ? colors.emerald : colors.textTertiary,
+                          color: eSavings != null && eSavings > 0 ? c.emerald : c.textTertiary,
                           fontWeight: 700,
+                          fontFamily: fonts.mono,
                         }}
                       >
                         {eSavings != null ? `${eSavings >= 0 ? '-' : '+'}${Math.abs(eSavings)}%` : 'N/A'}
@@ -460,10 +527,11 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                         {p.both_succeeded ? (
                           <span
                             style={{
-                              color: colors.emerald,
-                              background: 'rgba(16,185,129,0.12)',
+                              color: c.emerald,
+                              background: isLight ? '#ecfdf5' : 'rgba(16,185,129,0.12)',
+                              border: `1px solid ${isLight ? '#a7f3d0' : 'rgba(16,185,129,0.3)'}`,
                               padding: '0.2rem 0.5rem',
-                              borderRadius: '0.25rem',
+                              borderRadius: radii.sm,
                               fontSize: '0.75rem',
                               fontWeight: 600,
                             }}
@@ -473,10 +541,11 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                         ) : (
                           <span
                             style={{
-                              color: colors.red,
-                              background: 'rgba(244,88,110,0.12)',
+                              color: c.red,
+                              background: isLight ? '#fef2f2' : 'rgba(244,88,110,0.12)',
+                              border: `1px solid ${isLight ? '#fecaca' : 'rgba(244,88,110,0.3)'}`,
                               padding: '0.2rem 0.5rem',
-                              borderRadius: '0.25rem',
+                              borderRadius: radii.sm,
                               fontSize: '0.75rem',
                               fontWeight: 600,
                             }}
@@ -495,18 +564,26 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       </div>
 
       {/* Topology Layout Candidates Explorer */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.25rem', border: colors.border }}>
+      <div
+        style={{
+          background: c.surface,
+          borderRadius: radii.lg,
+          padding: '1.25rem',
+          border: `1px solid ${c.border}`,
+          boxShadow: c.cardShadow,
+        }}
+      >
         <div style={{ marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: c.textPrimary, fontWeight: 600 }}>
             Execution Layout Candidates (Topology Verification)
           </h3>
-          <div style={{ fontSize: '0.78rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.78rem', color: c.textTertiary, marginTop: '0.25rem' }}>
             Discovered hardware layout options based on CPU topology (Fast Cores, All Physical, All Logical, Efficient Cores).
           </div>
         </div>
 
         {isLoadingLayouts ? (
-          <div style={{ padding: '1rem', color: colors.textTertiary, fontSize: '0.85rem' }}>Loading layout points...</div>
+          <div style={{ padding: '1rem', color: c.textTertiary, fontSize: '0.85rem' }}>Loading layout points...</div>
         ) : layoutCandidates.length > 0 ? (
           <div
             style={{
@@ -521,13 +598,16 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                 <div
                   key={cand.config_id}
                   style={{
-                    background: isSelected ? 'rgba(113, 112, 255, 0.08)' : colors.surfaceElevated,
-                    border: `1px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.08)'}`,
-                    borderRadius: '0.5rem',
+                    background: isSelected
+                      ? (isLight ? '#eef2ff' : 'rgba(113, 112, 255, 0.08)')
+                      : c.surfaceElevated,
+                    border: `1px solid ${isSelected ? c.accent : c.border}`,
+                    borderRadius: radii.md,
                     padding: '0.85rem',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '0.4rem',
+                    boxShadow: isSelected && isLight ? '0 1px 3px rgba(99,102,241,0.15)' : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -535,48 +615,66 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                       style={{
                         fontSize: '0.75rem',
                         fontWeight: 700,
-                        color: colors.accentHover,
-                        background: 'rgba(113, 112, 255, 0.15)',
+                        color: c.accent,
+                        background: isLight ? '#e0e7ff' : 'rgba(113, 112, 255, 0.15)',
                         padding: '0.15rem 0.45rem',
-                        borderRadius: '0.25rem',
+                        borderRadius: radii.xs,
                       }}
                     >
                       Layout {cand.layout}
                     </span>
                     {isSelected && (
-                      <span style={{ fontSize: '0.7rem', color: colors.emerald, fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.7rem', color: c.emerald, fontWeight: 600 }}>
                         ★ Active Layout
                       </span>
                     )}
                   </div>
 
-                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: colors.textPrimary, marginTop: '0.1rem' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: c.textPrimary, marginTop: '0.1rem' }}>
                     {cand.config_id}
                   </div>
 
-                  <div style={{ fontSize: '0.75rem', color: colors.textSecondary }}>
+                  <div style={{ fontSize: '0.75rem', color: c.textSecondary }}>
                     {cand.description}
                   </div>
 
-                  <div style={{ marginTop: 'auto', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: colors.textTertiary }}>
+                  <div
+                    style={{
+                      marginTop: 'auto',
+                      paddingTop: '0.4rem',
+                      borderTop: `1px solid ${c.borderSubtle}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '0.72rem',
+                      color: c.textTertiary,
+                    }}
+                  >
                     <span>Workers: <strong>{cand.workers}</strong></span>
-                    <span>Mask: <code style={{ color: colors.textSecondary }}>{cand.cpu_mask}</code></span>
+                    <span>Mask: <code style={{ color: c.textSecondary }}>{cand.cpu_mask}</code></span>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div style={{ fontSize: '0.8rem', color: colors.textTertiary }}>
+          <div style={{ fontSize: '0.8rem', color: c.textTertiary }}>
             Layout candidates generated dynamically from discovered machine topology.
           </div>
         )}
       </div>
 
       {/* Explanation Card */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.25rem', border: colors.border }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
+      <div
+        style={{
+          background: c.surface,
+          borderRadius: radii.lg,
+          padding: '1.25rem',
+          border: `1px solid ${c.border}`,
+          boxShadow: c.cardShadow,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: c.textPrimary, fontWeight: 600 }}>
             Deterministic Explanation &amp; Rationale
           </h3>
 
@@ -590,10 +688,12 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                   padding: '0.3rem 0.6rem',
                   fontSize: '0.75rem',
                   fontWeight: 600,
-                  borderRadius: '0.25rem',
-                  border: `1px solid ${provider === p ? colors.accent : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: provider === p ? 'rgba(113,112,255,0.2)' : colors.surfaceElevated,
-                  color: provider === p ? colors.accentHover : colors.textTertiary,
+                  borderRadius: radii.sm,
+                  border: `1px solid ${provider === p ? c.accent : c.border}`,
+                  backgroundColor: provider === p
+                    ? (isLight ? '#e0e7ff' : 'rgba(113,112,255,0.2)')
+                    : c.surfaceElevated,
+                  color: provider === p ? c.accent : c.textTertiary,
                   cursor: isExplaining ? 'wait' : 'pointer',
                   textTransform: 'capitalize',
                 }}
@@ -605,21 +705,28 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
         </div>
 
         {explanation ? (
-          <div style={{ background: colors.surfaceElevated, borderRadius: '0.5rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div
+            style={{
+              background: c.surfaceElevated,
+              borderRadius: radii.md,
+              padding: '1rem',
+              border: `1px solid ${c.border}`,
+            }}
+          >
             {explanation.fallback && (
-              <div style={{ fontSize: '0.75rem', color: colors.amber, marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.75rem', color: c.amber, marginBottom: '0.5rem' }}>
                 ⚠ Requested provider unavailable — degraded to deterministic Basic templates (guaranteed default).
               </div>
             )}
-            <div style={{ fontSize: '0.9rem', color: colors.textPrimary, lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>
+            <div style={{ fontSize: '0.9rem', color: c.textPrimary, lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>
               {explanation.text}
             </div>
             {explanation.grounding_facts && explanation.grounding_facts.length > 0 && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.3rem' }}>
+              <div style={{ borderTop: `1px solid ${c.borderSubtle}`, paddingTop: '0.6rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: c.textTertiary, marginBottom: '0.3rem' }}>
                   Grounding Facts (Empirically Verified):
                 </div>
-                <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.78rem', color: colors.textSecondary, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.78rem', color: c.textSecondary, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                   {explanation.grounding_facts.map((fact, idx) => (
                     <li key={idx}>{fact}</li>
                   ))}
@@ -628,7 +735,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             )}
           </div>
         ) : (
-          <div style={{ padding: '1rem', color: colors.textTertiary, fontSize: '0.85rem' }}>
+          <div style={{ padding: '1rem', color: c.textTertiary, fontSize: '0.85rem' }}>
             Select a configuration to generate an explanation and evidence breakdown.
           </div>
         )}
@@ -637,7 +744,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       {/* Restoration Card */}
       {(() => {
         const statusKey = experiment?.restoration_status || 'not_required';
-        const label = RESTORATION_LABELS[statusKey] ?? RESTORATION_LABELS.not_required;
+        const label = restorationLabels[statusKey] ?? restorationLabels.not_required;
         return (
           <div
             style={{
@@ -647,12 +754,12 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
               background: label.bg,
               border: `1px solid ${label.border}`,
               padding: '0.9rem 1.25rem',
-              borderRadius: '0.5rem',
+              borderRadius: radii.md,
             }}
           >
             <div>
               <div style={{ fontWeight: 600, color: label.color, fontSize: '0.9rem' }}>{label.title}</div>
-              <div style={{ fontSize: '0.75rem', color: colors.textSecondary, marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.75rem', color: c.textSecondary, marginTop: '0.2rem' }}>
                 {statusKey === 'restored'
                   ? 'Stock frequencies, power limits, and boost configurations restored to initial state.'
                   : statusKey === 'recovery_required'
@@ -671,8 +778,8 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
           textAlign: 'center',
           padding: '1.5rem 0',
           fontSize: '0.75rem',
-          color: colors.textTertiary,
-          borderTop: colors.border,
+          color: c.textTertiary,
+          borderTop: `1px solid ${c.borderSubtle}`,
         }}
       >
         CPU-package energy, not whole-system electricity. Best among measured configurations; future runtimes may vary.
@@ -680,4 +787,3 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
     </div>
   );
 };
-

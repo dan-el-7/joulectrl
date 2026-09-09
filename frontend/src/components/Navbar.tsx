@@ -1,6 +1,6 @@
 import React from 'react';
 import { fetchSystemThermal, SystemThermalStatus } from '../api';
-import { colors, fonts, fontFeatures, type, radii, sectionLabel } from '../design';
+import { getThemeColors, fonts, fontFeatures, type, radii, ThemeMode } from '../design';
 
 interface NavbarProps {
   activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks';
@@ -15,6 +15,8 @@ interface NavbarProps {
   currentExperimentId?: string;
   onSelectExperiment?: (id: string) => void;
   onCancelExperiment?: () => void;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 const TABS = [
@@ -54,7 +56,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentExperimentId,
   onSelectExperiment,
   onCancelExperiment,
+  theme = 'dark',
+  onToggleTheme,
 }) => {
+  const c = getThemeColors(theme);
   const restored = restorationStatus === 'restored' || restorationStatus === 'not_required';
   const isRunning = !!experimentState && RUNNING_STATES[experimentState] !== undefined;
   const stateLabel = experimentState
@@ -88,22 +93,23 @@ export const Navbar: React.FC<NavbarProps> = ({
         justifyContent: 'space-between',
         padding: '0 20px',
         height: 48,
-        backgroundColor: colors.panel,
-        borderBottom: `1px solid ${colors.borderSubtle}`,
+        backgroundColor: c.panel,
+        borderBottom: `1px solid ${c.borderSubtle}`,
         position: 'sticky',
         top: 0,
         zIndex: 50,
         fontFeatureSettings: fontFeatures,
         fontFamily: fonts.sans,
+        transition: 'background-color 0.2s ease, border-color 0.2s ease',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
         {/* wordmark */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-          <span style={{ ...type.h2, color: colors.textPrimary, letterSpacing: '-0.3px' }}>
+          <span style={{ ...type.h2, color: c.textPrimary, letterSpacing: '-0.3px' }}>
             joulectrl
           </span>
-          <span style={{ ...type.micro, color: colors.textQuaternary, fontFamily: fonts.mono }}>
+          <span style={{ ...type.micro, color: c.textQuaternary, fontFamily: fonts.mono }}>
             v0.2
           </span>
         </div>
@@ -121,9 +127,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   padding: '0 10px',
                   height: '100%',
                   border: 'none',
-                  borderBottom: `2px solid ${active ? colors.accent : 'transparent'}`,
+                  borderBottom: `2px solid ${active ? c.accent : 'transparent'}`,
                   backgroundColor: 'transparent',
-                  color: active ? colors.textPrimary : colors.textTertiary,
+                  color: active ? c.textPrimary : c.textTertiary,
                   cursor: 'pointer',
                   transition: 'color 0.15s ease',
                 }}
@@ -145,9 +151,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               gap: 8,
               padding: '3px 10px',
               borderRadius: radii.full,
-              border: `1px solid ${colors.border}`,
+              border: `1px solid ${c.border}`,
               ...type.micro,
-              color: colors.textSecondary,
+              color: c.textSecondary,
               fontFamily: fonts.mono,
             }}
             title={runProgress.configId ? `Measuring: ${runProgress.configId}` : 'Measuring'}
@@ -160,7 +166,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 width: 64,
                 height: 4,
                 borderRadius: radii.full,
-                background: colors.borderSubtle,
+                background: c.borderSubtle,
                 overflow: 'hidden',
                 display: 'inline-block',
               }}
@@ -170,7 +176,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   display: 'block',
                   width: `${Math.round((runProgress.index / runProgress.total) * 100)}%`,
                   height: '100%',
-                  background: colors.accentHover,
+                  background: c.accentHover,
                   transition: 'width 0.3s ease',
                 }}
               />
@@ -187,10 +193,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               gap: 7,
               padding: '3px 10px',
               borderRadius: radii.full,
-              border: `1px solid ${isRunning ? colors.accentDim : colors.border}`,
-              background: isRunning ? 'rgba(113,112,255,0.08)' : 'transparent',
+              border: `1px solid ${isRunning ? c.accentDim : c.border}`,
+              background: isRunning ? (theme === 'light' ? 'rgba(99,102,241,0.1)' : 'rgba(113,112,255,0.08)') : 'transparent',
               ...type.micro,
-              color: isRunning ? colors.accentHover : colors.textSecondary,
+              color: isRunning ? c.accentHover : c.textSecondary,
               fontFamily: fonts.mono,
             }}
             title={experimentStateMessage ? `${experimentState}: ${experimentStateMessage}` : `Experiment state: ${experimentState}`}
@@ -201,7 +207,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  backgroundColor: colors.accentHover,
+                  backgroundColor: c.accentHover,
                   animation: 'jc-pulse 1.2s ease-in-out infinite',
                 }}
               />
@@ -211,7 +217,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  backgroundColor: experimentState === 'COMPLETE' ? colors.emerald : colors.amber,
+                  backgroundColor: experimentState === 'COMPLETE' ? c.emerald : c.amber,
                 }}
               />
             )}
@@ -219,7 +225,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         )}
 
-        {/* Stop Calibration button */}
+        {/* Stop Run button */}
         {isRunning && onCancelExperiment && (
           <button
             onClick={onCancelExperiment}
@@ -247,14 +253,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Experiment switcher dropdown */}
         {experiments && experiments.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ ...type.micro, color: colors.textTertiary, fontFamily: fonts.mono }}>Exp:</span>
+            <span style={{ ...type.micro, color: c.textTertiary, fontFamily: fonts.mono }}>Exp:</span>
             <select
               value={currentExperimentId || ''}
               onChange={(e) => onSelectExperiment && onSelectExperiment(e.target.value)}
               style={{
-                backgroundColor: colors.surfaceElevated,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
+                backgroundColor: c.surfaceElevated,
+                color: c.textPrimary,
+                border: `1px solid ${c.border}`,
                 borderRadius: radii.md,
                 padding: '2px 8px',
                 fontSize: 11,
@@ -289,7 +295,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? 'rgba(239, 68, 68, 0.5)'
                   : thermal.warning_level === 'elevated'
                     ? 'rgba(245, 158, 11, 0.4)'
-                    : colors.border
+                    : c.border
               }`,
               background:
                 thermal.warning_level === 'critical'
@@ -303,7 +309,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? '#ef4444'
                   : thermal.warning_level === 'elevated'
                     ? '#f59e0b'
-                    : colors.textTertiary,
+                    : c.textTertiary,
               fontFamily: fonts.mono,
             }}
             title={thermal.message}
@@ -318,7 +324,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ? '#ef4444'
                     : thermal.warning_level === 'elevated'
                       ? '#f59e0b'
-                      : colors.emerald,
+                      : c.emerald,
               }}
             />
             <span>{thermal.cpu_temp_c.toFixed(0)}°C</span>
@@ -338,9 +344,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             gap: 6,
             padding: '3px 10px',
             borderRadius: radii.full,
-            border: `1px solid ${colors.border}`,
+            border: `1px solid ${c.border}`,
             ...type.micro,
-            color: colors.textSecondary,
+            color: c.textSecondary,
             fontFamily: fonts.mono,
           }}
           title={`Restoration state: ${restorationStatus}`}
@@ -350,22 +356,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               width: 6,
               height: 6,
               borderRadius: '50%',
-              backgroundColor: restored ? colors.emerald : colors.amber,
-              boxShadow: `0 0 6px ${restored ? colors.emerald : colors.amber}`,
+              backgroundColor: restored ? c.emerald : c.amber,
+              boxShadow: `0 0 6px ${restored ? c.emerald : c.amber}`,
             }}
           />
           {restorationStatus.replace('_', ' ')}
         </div>
 
+        {/* Emergency restore button */}
         <button
           onClick={onEmergencyRestore}
           disabled={isRestoring}
           style={{
             ...type.label,
             padding: '5px 12px',
-            background: 'rgba(255,255,255,0.03)',
-            color: isRestoring ? colors.textTertiary : colors.textSecondary,
-            border: `1px solid ${colors.border}`,
+            background: theme === 'light' ? '#f1f5f9' : 'rgba(255,255,255,0.03)',
+            color: isRestoring ? c.textTertiary : c.textSecondary,
+            border: `1px solid ${c.border}`,
             borderRadius: radii.md,
             cursor: isRestoring ? 'wait' : 'pointer',
             font: 'inherit',
@@ -375,6 +382,33 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           {isRestoring ? 'Restoring…' : 'Restore'}
         </button>
+
+        {/* Global Light / Dark Theme toggle pill */}
+        {onToggleTheme && (
+          <button
+            onClick={onToggleTheme}
+            style={{
+              ...type.label,
+              padding: '4px 10px',
+              background: theme === 'light' ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+              color: c.textPrimary,
+              border: `1px solid ${c.border}`,
+              borderRadius: radii.md,
+              cursor: 'pointer',
+              font: 'inherit',
+              fontSize: 11,
+              fontWeight: 510,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              transition: 'all 0.15s ease',
+            }}
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+          >
+            <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
+            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+        )}
       </div>
     </header>
   );

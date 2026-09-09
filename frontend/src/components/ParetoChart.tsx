@@ -74,7 +74,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
   const hoveredConfig = hoveredId ? configurations[hoveredId] : null;
 
   return (
-    <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: colors.border }}>
+    <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textSecondary, fontWeight: 600 }}>
           Package Energy vs. Runtime (Pareto Frontier)

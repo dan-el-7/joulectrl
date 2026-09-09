@@ -17,9 +17,11 @@ import { SetupView } from './components/SetupView';
 import { ValidationView } from './components/ValidationView';
 import { WatchPanel } from './components/WatchPanel';
 import { TaskManagerView } from './components/TaskManagerView';
+import { ThemeProvider, useTheme } from './ThemeContext';
 import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { theme, themeColors, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks'>('explorer');
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [workloads, setWorkloads] = useState<WorkloadInfo[]>([]);
@@ -285,7 +287,16 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: themeColors.bg,
+        color: themeColors.textPrimary,
+        transition: 'background-color 0.2s ease, color 0.2s ease',
+      }}
+    >
       <Navbar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -299,6 +310,8 @@ export const App: React.FC = () => {
         currentExperimentId={experiment?.id}
         onSelectExperiment={handleSelectExperiment}
         onCancelExperiment={handleCancelExperiment}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: '1300px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
@@ -366,5 +379,13 @@ export const App: React.FC = () => {
         {activeTab === 'tasks' && <TaskManagerView />}
       </main>
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };

@@ -205,7 +205,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '1.5rem', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Left Column: Workload & Objective Configuration */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.5rem', border: colors.border }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: colors.textPrimary, fontWeight: 600 }}>
           Experiment Setup
         </h2>
@@ -923,7 +923,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
       </div>
 
       {/* Right Column: Hardware Discovery Card */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.5rem', border: colors.border }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: colors.textPrimary, fontWeight: 600 }}>
           Hardware Discovery & Capabilities
         </h2>
@@ -1017,7 +1017,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
             </div>
 
-            <div style={{ background: colors.surfaceElevated, border: colors.border, borderRadius: '0.5rem', padding: '0.6rem', fontSize: '0.72rem', color: colors.textTertiary }}>
+            <div style={{ background: colors.surfaceElevated, border: `1px solid ${colors.border}`, borderRadius: '0.5rem', padding: '0.6rem', fontSize: '0.72rem', color: colors.textTertiary }}>
               <strong>Non-negotiable rule:</strong> Package energy measured directly from verified hardware counter. Missing energy is never relabeled as zero.
             </div>
           </div>

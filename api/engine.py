@@ -750,16 +750,19 @@ class LiveEngine:
             wl = get_workload(workload_id, chunks=8192 * cfg.worker_count, iters=200000)
         except (KeyError, TypeError):
             wl = get_workload("fixed_compute", chunks=8192 * cfg.worker_count, iters=200000)
-        # apply (pstate_mode first when the experimental option is on, so caps
-        # bind under passive; restore returns the original mode)
-        control = {"boost": cfg.boost}
-        if cfg.freq_cap_khz:
-            # per-CPU policies (policyN == cpuN on per-policy machines)
-            control["policy_freq_caps_khz"] = {
-                f"policy{cpu}": cfg.freq_cap_khz for cpu in (cfg.cpu_affinity or [])
-            }
-        if passive:
+        # Check clock holdability and adapt controls automatically (<1ms check, on by default)
+        from core.clock_checker import check_clock_holdable
+
+        hold = check_clock_holdable(
+            freq_cap_khz=cfg.freq_cap_khz,
+            boost=cfg.boost,
+            cpu_affinity=cfg.cpu_affinity,
+        )
+        control = dict(hold["adapted_control"])
+        if passive or hold["requires_passive_mode"]:
             control["pstate_mode"] = "passive"
+            control["boost"] = True
+        control["clamp_out_of_range"] = True
         r = helper.apply_configuration(control)
         if not r.get("ok"):
             return self._failed_record(exp_id, cfg, f"apply failed: {r.get('error')}", phase=phase)

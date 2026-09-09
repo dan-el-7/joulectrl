@@ -103,7 +103,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           background: colors.surface,
           padding: '1rem 1.5rem',
           borderRadius: '0.75rem',
-          border: colors.border,
+          border: `1px solid ${colors.border}`,
+          boxShadow: colors.cardShadow,
         }}
       >
         <div>
@@ -291,7 +292,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       />
 
       {/* Validation-Point Candidates (B's layout selector + measured calibration points) */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: colors.border }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
           Validation-Point Candidates
         </h3>
@@ -343,7 +344,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       </div>
 
       {/* Complete Run List Table */}
-      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: colors.border }}>
+      <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
           Individual Execution Runs ({(profile?.runs || []).length} captured)
         </h3>

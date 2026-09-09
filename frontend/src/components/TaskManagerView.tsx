@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { fetchUserProcesses, setProcessPriority, UserProcess } from '../api';
 import { fonts, fontFeatures, radii } from '../design';
+import { useTheme } from '../ThemeContext';
 
 interface ThemePalette {
   canvasBg: string;
@@ -85,20 +86,12 @@ export const TaskManagerView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'board' | 'table'>(() => {
     return (localStorage.getItem('joulectrl_tasks_view') as any) || 'board';
   });
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('joulectrl_theme') as any) || 'dark';
-  });
+  const { theme, toggleTheme: handleToggleTheme } = useTheme();
 
   // Modal / Add task to column state
   const [activeAddColumn, setActiveAddColumn] = useState<'fast' | 'eco' | null>(null);
 
   const t = THEMES[theme];
-
-  const handleToggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    localStorage.setItem('joulectrl_theme', next);
-  };
 
   const handleToggleView = (mode: 'board' | 'table') => {
     setViewMode(mode);

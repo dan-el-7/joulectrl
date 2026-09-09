@@ -1332,6 +1332,23 @@ def get_system_thermal_endpoint() -> dict[str, Any]:
     return get_thermal_status()
 
 
+@app.get("/api/system/clock-check")
+def get_system_clock_check_endpoint(
+    freq_cap_khz: Optional[int] = None,
+    boost: Optional[bool] = None,
+    affinity: Optional[str] = None,
+) -> dict[str, Any]:
+    """Check clock holdability and compatibility under current hardware drivers (<1ms)."""
+    from core.clock_checker import check_clock_holdable
+    cpus = None
+    if affinity:
+        try:
+            cpus = [int(x.strip()) for x in affinity.split(",") if x.strip()]
+        except Exception:
+            pass
+    return check_clock_holdable(freq_cap_khz=freq_cap_khz, boost=boost, cpu_affinity=cpus)
+
+
 # ---------------------------------------------------------------------------
 # Single-Origin Frontend Serving (Vite build in frontend/dist)
 # ---------------------------------------------------------------------------
