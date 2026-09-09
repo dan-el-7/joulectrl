@@ -54,6 +54,19 @@ def phase_1_capabilities() -> None:
         print(f"Recommended Mode:    {cap.get('recommended_mode', 'full')}")
     else:
         print("Using synthetic capability profile: AMD Ryzen AI 7 350 (Zen 5 + Zen 5c)")
+
+    c1_file = REAL_DIR / "calibration_c1.json"
+    if c1_file.exists():
+        with open(c1_file, "r", encoding="utf-8") as f:
+            c1 = json.load(f)
+        sum_data = c1.get("summary", {})
+        f_s = sum_data.get("fast", {})
+        e_s = sum_data.get("efficient", {})
+        if f_s and e_s:
+            ratio = f_s.get("median_chunks_per_s", 1.0) / max(e_s.get("median_chunks_per_s", 1.0), 1e-6)
+            print(f"C1 Calibration:      Confirmed Zen 5 ({f_s.get('median_runtime_s', 0):.2f}s, {f_s.get('median_energy_j', 0):.1f}J) vs "
+                  f"Zen 5c ({e_s.get('median_runtime_s', 0):.2f}s, {e_s.get('median_energy_j', 0):.1f}J) -> {ratio:.2f}x throughput ratio")
+
     print("Restore Status:      All settings snapshotted and restorable.")
 
 

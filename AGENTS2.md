@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T12:03:00Z`
+- heartbeat: `2026-09-09T12:05:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). test_compute_kernel light preset verified; 39 tests green.`
+- current unit: `Gate 4 complete ([gate4]). demo/run_demo.py now cites real C1 calibration metrics; 39 tests green.`
 - next action: `stand by for Agent A's C2 sweep results and live demo execution`
-- notes for others: `39 tests passing across workloads, explain, integration, and kernel. Ready for A's C2 sweep.`
+- notes for others: `Real C1 hardware metrics displayed in demo Phase 1. Ready for A's C2 sweep. 39 tests passing.`
