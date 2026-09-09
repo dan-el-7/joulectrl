@@ -14,4 +14,6 @@ run_data/
 node_modules/
 frontend/dist/
 fixed_compute
+workloads/build_target/
 .DS_Store
+

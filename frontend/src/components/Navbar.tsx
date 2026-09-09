@@ -1,4 +1,5 @@
 import React from 'react';
+import { fetchSystemThermal, SystemThermalStatus } from '../api';
 import { colors, fonts, fontFeatures, type, radii, sectionLabel } from '../design';
 
 interface NavbarProps {
@@ -59,6 +60,25 @@ export const Navbar: React.FC<NavbarProps> = ({
   const stateLabel = experimentState
     ? RUNNING_STATES[experimentState] ?? experimentState.replace('_', ' ').toLowerCase()
     : null;
+
+  const [thermal, setThermal] = React.useState<SystemThermalStatus | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    const checkThermal = () => {
+      fetchSystemThermal()
+        .then((th) => {
+          if (active) setThermal(th);
+        })
+        .catch(() => {});
+    };
+    checkThermal();
+    const interval = setInterval(checkThermal, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <header
@@ -252,6 +272,61 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Thermal / Throttling live indicator */}
+        {thermal && thermal.cpu_temp_c !== null && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '3px 8px',
+              borderRadius: radii.full,
+              border: `1px solid ${
+                thermal.warning_level === 'critical'
+                  ? 'rgba(239, 68, 68, 0.5)'
+                  : thermal.warning_level === 'elevated'
+                    ? 'rgba(245, 158, 11, 0.4)'
+                    : colors.border
+              }`,
+              background:
+                thermal.warning_level === 'critical'
+                  ? 'rgba(239, 68, 68, 0.15)'
+                  : thermal.warning_level === 'elevated'
+                    ? 'rgba(245, 158, 11, 0.12)'
+                    : 'transparent',
+              ...type.micro,
+              color:
+                thermal.warning_level === 'critical'
+                  ? '#ef4444'
+                  : thermal.warning_level === 'elevated'
+                    ? '#f59e0b'
+                    : colors.textTertiary,
+              fontFamily: fonts.mono,
+            }}
+            title={thermal.message}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                backgroundColor:
+                  thermal.warning_level === 'critical'
+                    ? '#ef4444'
+                    : thermal.warning_level === 'elevated'
+                      ? '#f59e0b'
+                      : colors.emerald,
+              }}
+            />
+            <span>{thermal.cpu_temp_c.toFixed(0)}°C</span>
+            {thermal.warning_level !== 'normal' && (
+              <span style={{ fontWeight: 600 }}>
+                {thermal.warning_level === 'critical' ? 'THROTTLING' : 'WARM'}
+              </span>
+            )}
           </div>
         )}
 

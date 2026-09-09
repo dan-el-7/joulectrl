@@ -41,6 +41,7 @@ class CleanBuildWorkload(Workload):
         cflags: str = "-O2",
         source_pin: str = DEFAULT_ZSTD_TAG,
         build_tool: str = "make",
+        **kwargs: Any,
     ):
         self._source_dir = source_dir
         self.target = target
@@ -63,10 +64,22 @@ class CleanBuildWorkload(Workload):
     def _resolve_source_dir(self, run_context: RunContext) -> str:
         if self._source_dir and os.path.exists(self._source_dir):
             return self._source_dir
+        # Auto-detect bundled zstd in workloads/build_target/zstd
+        from pathlib import Path
+        bundled = Path(__file__).resolve().parent / "build_target" / "zstd"
+        if bundled.exists():
+            return str(bundled)
+        # Check repo-level paths
+        repo_bundled = Path(__file__).resolve().parent.parent / "workloads" / "build_target" / "zstd"
+        if repo_bundled.exists():
+            return str(repo_bundled)
         # Check if source is inside working_dir
         candidate = os.path.join(run_context.working_dir, "zstd")
         if os.path.exists(candidate):
             return candidate
+        candidate_sub = os.path.join(run_context.working_dir, "workloads", "build_target", "zstd")
+        if os.path.exists(candidate_sub):
+            return candidate_sub
         return run_context.working_dir
 
     def _warm_filesystem_cache(self, directory: str) -> int:
@@ -114,7 +127,7 @@ class CleanBuildWorkload(Workload):
 
     def command(self, workers: int) -> list[str]:
         """Return build command argument array."""
-        source_dir = self._source_dir or "."
+        source_dir = self._resolve_source_dir(RunContext(working_dir="."))
         if self.build_tool == "make":
             return [
                 "make",

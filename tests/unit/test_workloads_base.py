@@ -117,5 +117,29 @@ class TestFixedComputeWorkload(unittest.TestCase):
             self.assertTrue(len(fp["source_sha256"]) == 64)
 
 
+class TestCleanBuildWorkload(unittest.TestCase):
+    def test_clean_build_workload_lifecycle_and_kwargs(self):
+        from workloads.clean_build import CleanBuildWorkload
+        # Must accept chunks/iters kwargs gracefully without TypeError
+        wl = CleanBuildWorkload(chunks=8192, iters=200000)
+        self.assertEqual(wl.name, "clean_build")
+        self.assertIn("zstd", wl.description)
+
+        cmd = wl.command(workers=4)
+        self.assertIn("make", cmd[0])
+        self.assertIn("-j4", cmd)
+        self.assertIn("zstd", cmd)
+
+        env = wl.environment(workers=4)
+        self.assertEqual(env.get("CCACHE_DISABLE"), "1")
+        self.assertEqual(env.get("SCCACHE_DISABLE"), "1")
+
+        fp = wl.fingerprint()
+        self.assertEqual(fp["workload"], "clean_build")
+        self.assertEqual(fp["project"], "zstd")
+        self.assertTrue(fp["compiler_caching_disabled"])
+
+
 if __name__ == "__main__":
     unittest.main()
+
