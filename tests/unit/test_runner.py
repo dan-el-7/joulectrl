@@ -119,7 +119,7 @@ def test_cancel_uses_posix_process_group(monkeypatch, tmp_path):
             return None
 
     killed: list[tuple[int, int]] = []
-    monkeypatch.setattr(os, "killpg", lambda pid, sig: killed.append((pid, sig)))
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: killed.append((pid, sig)), raising=False)
     runner._active_process = ActiveProcess()  # type: ignore[assignment]
 
     assert runner.cancel()

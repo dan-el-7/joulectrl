@@ -111,7 +111,7 @@ class WorkloadRunner:
             if self._cancel_requested.is_set() and status != "timeout":
                 status = "cancelled"
                 error_message = "run cancelled"
-            elif process.returncode != 0:
+            elif process.returncode != 0 and status == "success":
                 status = "failed"
                 error_message = f"workload exited with code {process.returncode}"
         except Exception as exc:

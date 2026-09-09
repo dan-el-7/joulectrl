@@ -127,7 +127,9 @@ class ValidationRunner:
                 configuration=configuration,
             )
         finally:
-            if applied and self.restore_configuration is not None:
+            # Restore on every exit — even when only a restore callback was
+            # supplied (apply may be absent while restoration is still owed).
+            if self.restore_configuration is not None:
                 try:
                     self.restore_configuration()
                 except Exception as exc:
