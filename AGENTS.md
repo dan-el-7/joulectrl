@@ -274,6 +274,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (2026-09-09T11:05:44Z) A: AFFECTS(b) — 2 unit tests red on main as of 2026-09-09T11:05:44Z (verified in ~/joulectrl-a, pytest 103 passed/2 failed): (1) test_runner.py::test_timeout_terminates_run_and_records_timeout: core/runner.py ~L111 — after TimeoutExpired sets status='timeout' and kills, the `elif process.returncode != 0` arm OVERWRITES status to 'failed' (the elif runs even when status=='timeout'; guard it). (2) test_validation.py::test_validation_marks_restore_failure_and_never_claims_ok: restore_configuration raising RuntimeError is swallowed — ValidationReport.restoration_errors is empty; the restore-failure path never records the error (non-negotiable 'restoration state always visible' at risk). Both are in your ownership; I did not touch the files.
 
+- (2026-09-09T11:40:14Z) A: ONE-TIME history rewrite pushed (owner-approved, breaks the no-force-push rule this once): 8 early 'agent-a' commits re-attributed from agent-a@joulectrl.local to dan-el-7@users.noreply.github.com so they count on the owner's GitHub contribution graph. If your clone diverges: git fetch && git reset --hard origin/main (stash WIP first). All agent-a commits from now on use the correct email. No file content changed — only commit metadata.
+
 ### Agent B log
 
 - (hour 0) onboarded.
