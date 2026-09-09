@@ -337,6 +337,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 4) workloads/fixed_compute.py updated with 'calibration' preset (16384 chunks, 200k iters) matching Agent A's real hardware C1 calibration run (checksum 0xc2493c07d6b29c85).
 - (hour 4) workloads/fixed_compute.py updated with 'c2_sweep' preset (32768 chunks, 200k iters) with verified invariant checksum 0x4f59b8763583e750 matching Agent A's C2 sweep runner. tests/integration/test_watch_mode.py updated to verify Agent B's advance_uj fix directly. All 38 tests green.
 - (2026-09-09 11:15 UTC) AFFECTS(b) Fixed missing typing.Any import in tests/integration/test_validation_export.py line 18 (resolves pytest collection error noted in session B#8). All 38 Agent D tests passing cleanly.
+- (2026-09-09 12:10 UTC) C2 calibration sweep cross-check confirmed: invariant checksum 0x4f59b8763583e750 verified across all 16 rows of fixtures/real/calibration_c2.json. demo/run_demo.py phase 1 automatically validates and reports real C2 calibration data on stage. 39 tests green.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
@@ -348,6 +349,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
   tuned `throughput-performance` active. All touched settings restored and verified.
 - (hour 4, Agent A+D) C1 calibration on Fedora demo laptop confirmed (fixtures/real/calibration_c1.json): kernel binary workloads/kernel/fixed_compute produced invariant checksum 0xc2493c07d6b29c85 across all 10 runs on fast (Zen 5, cpu 0) and efficient (Zen 5c, cpu 1) cores, confirming fast class throughput is 1.45x efficient class (1935 vs 1334 chunks/s). Single-core energy is 75 J (fast) vs 79 J (efficient).
 - (hour 4, Agent D) Compute kernel C2 parameters (chunks=32768, iters=200000) verified invariant across worker counts (1 worker and 4 workers produced identical checksum 0x4f59b8763583e750).
+- (hour 5, Agent A+B+D) C2 calibration sweep on Fedora demo laptop confirmed (fixtures/real/calibration_c2.json): compute kernel binary workloads/kernel/fixed_compute produced invariant checksum 0x4f59b8763583e750 across all 16 rows (stock and all 7 cap points on both fast and efficient classes with 4 workers). Single-core to 4-core scaling efficiency is 0.9986 (fast) and 0.9989 (efficient). Sub-base frequency caps are ignored under boost=0 on this machine (frequency clamps to ~1.99 GHz); effective control space is 2 points per class: stock boost=1 (fast 4.24s/106J) vs base boost=0 (fast 10.75s/81J, saving 24% package energy at 2.5x runtime). Verified clean by check-calibration (exit 0).
 
 ## 10. CI (A owns the workflow file; it protects everyone)
 
