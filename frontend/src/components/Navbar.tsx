@@ -10,6 +10,9 @@ interface NavbarProps {
   experimentState?: string | null;
   experimentStateMessage?: string | null;
   runProgress?: { index: number; total: number; configId?: string } | null;
+  experiments?: any[];
+  currentExperimentId?: string;
+  onSelectExperiment?: (id: string) => void;
 }
 
 const TABS = [
@@ -44,6 +47,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   experimentState,
   experimentStateMessage,
   runProgress,
+  experiments,
+  currentExperimentId,
+  onSelectExperiment,
 }) => {
   const restored = restorationStatus === 'restored' || restorationStatus === 'not_required';
   const isRunning = !!experimentState && RUNNING_STATES[experimentState] !== undefined;
@@ -187,6 +193,37 @@ export const Navbar: React.FC<NavbarProps> = ({
               />
             )}
             {stateLabel}
+          </div>
+        )}
+
+        {/* Experiment switcher dropdown */}
+        {experiments && experiments.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ ...type.micro, color: colors.textTertiary, fontFamily: fonts.mono }}>Exp:</span>
+            <select
+              value={currentExperimentId || ''}
+              onChange={(e) => onSelectExperiment && onSelectExperiment(e.target.value)}
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: radii.md,
+                padding: '2px 8px',
+                fontSize: 11,
+                fontFamily: fonts.mono,
+                cursor: 'pointer',
+                maxWidth: '220px',
+                outline: 'none',
+              }}
+            >
+              {experiments.map((exp: any) => (
+                <option key={exp.id} value={exp.id}>
+                  {exp.id.startsWith('exp_') && exp.id.length > 20
+                    ? `${exp.workload_id || 'run'} (${exp.created_at ? exp.created_at.slice(11, 19) : exp.id.slice(4, 15)})`
+                    : exp.id}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

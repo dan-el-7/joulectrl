@@ -16,6 +16,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import sys
 import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
@@ -62,8 +64,15 @@ app.add_middleware(
 # Persistence (Agent B's Store) seeded with fixture-backed experiments.
 # On the demo machine this becomes the same Store the CLI/runner writes to.
 # ---------------------------------------------------------------------------
-_STORE: Store = Store(":memory:")
-store_bridge.seed_store(_STORE)
+if "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules:
+    _DEFAULT_DB = ":memory:"
+else:
+    _DEFAULT_DB = os.path.join(os.path.expanduser("~"), ".joulectrl", "joulectrl.db")
+
+_DB_PATH = os.environ.get("JOUCTRL_DB_PATH", _DEFAULT_DB)
+_STORE: Store = Store(_DB_PATH)
+if _STORE.get_experiment(store_bridge.SYNTHETIC_EXPERIMENT_ID) is None:
+    store_bridge.seed_store(_STORE)
 
 # Runtime overlay for fixture experiments created via POST /api/experiments
 # (no runner on the dev machine; replaced by live runner state in Gate 3).
@@ -74,12 +83,51 @@ _CAPS_CACHE_AT: float = 0.0
 
 def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
     """Return the API-shaped experiment dict, overlay first then Store."""
+    exp = None
     if experiment_id in _OVERLAY:
-        return _OVERLAY[experiment_id]
-    row = _STORE.get_experiment(experiment_id)
-    if row is None:
+        exp = dict(_OVERLAY[experiment_id])
+    else:
+        row = _STORE.get_experiment(experiment_id)
+        if row is not None:
+            exp = store_bridge.experiment_to_api(row)
+
+    if exp is None:
         return None
-    return store_bridge.experiment_to_api(row)
+
+    # Attach runs from persistent SQLite Store so runs are never lost
+    try:
+        db_runs = _STORE.get_runs(experiment_id)
+        if db_runs:
+            prof = exp.setdefault("profile", {})
+            existing_runs = prof.setdefault("runs", [])
+            existing_ids = {r.get("run_id") for r in existing_runs if isinstance(r, dict)}
+            for r in db_runs:
+                if r.run_id not in existing_ids:
+                    cfg_api = (
+                        r.configuration.to_dict()
+                        if hasattr(r.configuration, "to_dict")
+                        else {
+                            "layout": getattr(r.configuration, "layout", "B"),
+                            "worker_count": getattr(r.configuration, "worker_count", 1),
+                            "cpu_affinity": getattr(r.configuration, "cpu_affinity", []),
+                            "freq_cap_khz": getattr(r.configuration, "freq_cap_khz", None),
+                            "boost": getattr(r.configuration, "boost", False),
+                        }
+                    )
+                    existing_runs.append({
+                        "run_id": r.run_id,
+                        "config_id": r.config_id,
+                        "configuration": cfg_api,
+                        "repetition": r.repetition,
+                        "runtime_s": r.runtime_s,
+                        "package_energy_j": r.package_energy_j,
+                        "energy_available": r.energy_available,
+                        "status": r.status,
+                    })
+    except Exception as exc:
+        logging.warning("Failed to attach stored runs for %s: %s", experiment_id, exc)
+
+    return exp
 
 
 def _resolve_selection_model(experiment_id: str) -> Optional[dict[str, Any]]:
@@ -274,7 +322,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
     try:
         from api.engine import LiveEngine
 
-        engine = LiveEngine(default_bus(), store_bridge_mod=store_bridge, overlays=_OVERLAY)
+        engine = LiveEngine(default_bus(), store_bridge_mod=store_bridge, overlays=_OVERLAY, store=_STORE)
         seeded = dict(_OVERLAY[exp_id])
         seeded["_live_capabilities"] = _live_capabilities_cached()
         if engine.start_experiment(exp_id, {
@@ -306,21 +354,24 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
 def list_experiments() -> list[dict[str, Any]]:
     """List summary of persisted experiments for history/dashboard."""
     summaries = []
+    seen = set()
+    for eid, exp in reversed(list(_OVERLAY.items())):
+        seen.add(eid)
+        summaries.append(store_bridge.experiment_summary_to_api(
+            {
+                "id": eid,
+                "workload_name": exp.get("workload_id", "clean_build"),
+                "state": exp.get("state", "COMPLETE"),
+                "created_at": exp.get("created_at", utc_now_iso()),
+                "selection": exp.get("_selection_model"),
+            }
+        ))
     for row in _STORE.list_experiments():
-        full = _STORE.get_experiment(row["id"])
-        if full:
-            summaries.append(store_bridge.experiment_summary_to_api(full))
-    for eid, exp in _OVERLAY.items():
-        if _STORE.get_experiment(eid) is None:
-            summaries.append(store_bridge.experiment_summary_to_api(
-                {
-                    "id": eid,
-                    "workload_name": exp.get("workload_id", "clean_build"),
-                    "state": exp.get("state", "COMPLETE"),
-                    "created_at": exp.get("created_at", utc_now_iso()),
-                    "selection": exp.get("_selection_model"),
-                }
-            ))
+        if row["id"] not in seen:
+            seen.add(row["id"])
+            full = _STORE.get_experiment(row["id"])
+            if full:
+                summaries.append(store_bridge.experiment_summary_to_api(full))
     return summaries
 
 

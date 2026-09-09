@@ -53,10 +53,11 @@ _EXPERIMENTAL_CAP_LADDER = [4000000, 3500000, 3000000, 2500000, 2000000]
 class LiveEngine:
     """Runs real experiments in a background thread, publishing to the bus."""
 
-    def __init__(self, bus, store_bridge_mod, overlays: Optional[dict[str, dict[str, Any]]] = None):
+    def __init__(self, bus, store_bridge_mod, overlays: Optional[dict[str, dict[str, Any]]] = None, store: Optional[Any] = None):
         self.bus = bus
         self.sb = store_bridge_mod
         self._overlays: dict[str, dict[str, Any]] = overlays if overlays is not None else {}
+        self.store = store
         self._threads: dict[str, threading.Thread] = {}
 
     # ------------------------------------------------------------------ helpers
@@ -271,6 +272,11 @@ class LiveEngine:
                     })
                     rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg, passive=passive, repetition=rep)
                     runs.append(rec)
+                    if self.store:
+                        try:
+                            self.store.record_run(rec)
+                        except Exception as e:
+                            logger.warning(f"Failed to record run {rec.run_id} in store: {e}")
                     if rep == repetitions:
                         measured_keys.add(key)
 
@@ -633,6 +639,16 @@ class LiveEngine:
                 }
             self.sb.apply_live_profile(self._overlay_for(exp_id), exp_id, runs_api, configs, selection,
                                        "calibration" if used_calibration else "fresh_runs", state=state)
+            if self.store:
+                try:
+                    self.store.transition_state(exp_id, state.upper())
+                except Exception:
+                    pass
+                if selection:
+                    try:
+                        self.store.save_selection(selection)
+                    except Exception:
+                        pass
         except Exception:
             logger.exception("persist failed")
 

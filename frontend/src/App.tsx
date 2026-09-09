@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   createExperiment,
   fetchCapabilities,
   fetchCalibration,
   fetchExperiment,
+  fetchExperiments,
   fetchWorkloads,
   reselectConfiguration,
   restoreSettings,
@@ -44,6 +45,43 @@ export const App: React.FC = () => {
   const [experimentState, setExperimentState] = useState<string | null>(null);
   const [runProgress, setRunProgress] = useState<{ index: number; total: number; configId?: string } | null>(null);
   const [experimentStateMessage, setExperimentStateMessage] = useState<string | null>(null);
+  const [experimentsList, setExperimentsList] = useState<any[]>([]);
+
+  const loadExperiments = useCallback(async (preferredId?: string) => {
+    try {
+      const exps = await fetchExperiments();
+      setExperimentsList(exps);
+      const savedId = localStorage.getItem('joulectrl_active_experiment_id');
+      const targetId =
+        preferredId ||
+        (savedId && exps.some((x: any) => x.id === savedId) ? savedId : null) ||
+        (exps.length > 0 ? exps[0].id : 'exp_demo_clean_build');
+
+      const fullExp = await fetchExperiment(targetId);
+      setExperiment(fullExp);
+      if (fullExp.state) setExperimentState(fullExp.state);
+      localStorage.setItem('joulectrl_active_experiment_id', targetId);
+    } catch (e) {
+      console.warn('Could not load experiments list:', e);
+      fetchExperiment('exp_demo_clean_build')
+        .then((e) => {
+          setExperiment(e);
+          if (e.state) setExperimentState(e.state);
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  const handleSelectExperiment = async (id: string) => {
+    try {
+      const full = await fetchExperiment(id);
+      setExperiment(full);
+      if (full.state) setExperimentState(full.state);
+      localStorage.setItem('joulectrl_active_experiment_id', id);
+    } catch (e) {
+      console.error('Failed to select experiment:', e);
+    }
+  };
 
   useEffect(() => {
     // Initial data fetch
@@ -71,13 +109,8 @@ export const App: React.FC = () => {
         setHasCalibration(false);
       });
 
-    fetchExperiment('exp_demo_clean_build')
-      .then((e) => {
-        setExperiment(e);
-        if (e.state) setExperimentState(e.state);
-      })
-      .catch((e) => console.warn('Could not fetch default experiment:', e));
-  }, []);
+    loadExperiments();
+  }, [loadExperiments]);
 
   // Listen for SSE events when an experiment is active
   useEffect(() => {
@@ -144,8 +177,8 @@ export const App: React.FC = () => {
         experimental_passive_caps: expPassiveCaps,
         repetitions,
       });
-      const fullExp = await fetchExperiment(res.id);
-      setExperiment(fullExp);
+      localStorage.setItem('joulectrl_active_experiment_id', res.id);
+      await loadExperiments(res.id);
       setActiveTab('explorer');
     } catch (e: any) {
       alert(`Error starting experiment: ${e.message}`);
@@ -201,6 +234,9 @@ export const App: React.FC = () => {
         experimentState={experimentState}
         experimentStateMessage={experimentStateMessage}
         runProgress={runProgress}
+        experiments={experimentsList}
+        currentExperimentId={experiment?.id}
+        onSelectExperiment={handleSelectExperiment}
       />
 
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: '1300px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
