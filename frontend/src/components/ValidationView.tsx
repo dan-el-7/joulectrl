@@ -11,7 +11,7 @@ const RESTORATION_LABELS: Record<string, { title: string; color: string; bg: str
   restored: {
     title: 'Restoration Status: Fully Restored',
     color: colors.emerald,
-    bg: 'rgba(16,185,129,0.12)15',
+    bg: 'rgba(16,185,129,0.15)',
     border: colors.emerald,
     icon: '🛡️',
   },

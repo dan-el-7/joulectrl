@@ -33,13 +33,16 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
     return <div style={{ padding: '2rem', textAlign: 'center', color: colors.textTertiary }}>No configuration data available</div>;
   }
 
-  // Calculate bounds with padding
+  // Calculate bounds with padding (guard against divide-by-zero when a single
+  // config or identical values collapse the range)
   const runtimes = configsList.map((c) => c.median_runtime_s);
   const energies = configsList.map((c) => c.median_energy_j);
-  const minX = Math.min(...runtimes, deadlineS ?? runtimes[0]) * 0.85;
-  const maxX = Math.max(...runtimes, deadlineS ?? runtimes[0]) * 1.15;
-  const minY = Math.min(...energies) * 0.85;
-  const maxY = Math.max(...energies) * 1.15;
+  const spanX = Math.max(...runtimes, deadlineS ?? 0) - Math.min(...runtimes, deadlineS ?? Infinity) || 1;
+  const spanY = Math.max(...energies) - Math.min(...energies) || 1;
+  const minX = (Math.min(...runtimes, deadlineS ?? Infinity) || 0) - spanX * 0.15;
+  const maxX = Math.max(...runtimes, deadlineS ?? 0) + spanX * 0.15;
+  const minY = Math.min(...energies) - spanY * 0.15;
+  const maxY = Math.max(...energies) + spanY * 0.15;
 
   // Chart dimensions
   const width = 640;
@@ -130,7 +133,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             fontSize="11"
             textAnchor="middle"
           >
-            CPU-Package Energy (Joules)
+            Package Energy (Joules)
           </text>
 
           {/* Deadline Vertical Line */}
@@ -167,7 +170,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
           {configsList.map((cfg) => {
             const cx = scaleX(cfg.median_runtime_s);
             const cy = scaleY(cfg.median_energy_j);
-            const layoutKey = cfg.configuration.layout || 'D';
+            const layoutKey = cfg.configuration.layout || 'A';
             const color = LAYOUT_COLORS[layoutKey] || { bg: colors.textTertiary, border: colors.textTertiary };
             const isSelected = cfg.config_id === selectedConfigId;
             const isBaseline = cfg.config_id === baselineConfigId;

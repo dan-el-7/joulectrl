@@ -10,14 +10,17 @@ export interface MachineInfo {
 export interface TopologyInfo {
   logical_cores: number;
   physical_cores: number;
-  classes: {
-    fast: number[];
-    efficient: number[];
-  };
+  /** Class entries are either number[] (legacy fixture) or {cpus, hw_max_freq}
+   *  (live discovery). Use classCpus() to read either shape. */
+  classes: Record<string, number[] | { cpus?: number[]; hw_max_freq?: number }>;
   driver: string;
   governor: string;
   cpufreq_policies_count: number;
 }
+
+/** Read the CPU list from either class shape without crashing. */
+export const classCpus = (v: number[] | { cpus?: number[] } | undefined | null): number[] =>
+  Array.isArray(v) ? v : (v?.cpus ?? []);
 
 export interface EnergyInfo {
   backend: string;

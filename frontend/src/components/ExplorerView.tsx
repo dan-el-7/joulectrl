@@ -157,10 +157,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             Default Baseline
           </div>
           <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.2rem' }}>
-            {baseCfg ? baseCfg.config_id : 'cfg_stock_all'}
+            {baseCfg ? baseCfg.config_id : '—'}
           </div>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-            16 threads · Stock boost · All cores
+            {describeConfig(baseCfg)}
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: colors.textTertiary }}>Runtime:</span>
@@ -221,7 +221,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
             <span style={{ color: colors.textTertiary }}>Energy Savings:</span>
             <span style={{ fontWeight: 700, color: colors.emerald, fontSize: '1rem' }}>
-              -{selection.savings_vs_baseline_pct ?? selection.energy_reduction_pct ?? 44.6}%
+              -{selection.savings_vs_baseline_pct ?? selection.energy_reduction_pct ?? 0}%
             </span>
           </div>
           <button
@@ -283,7 +283,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   padding: '0.45rem 0.7rem',
                   borderRadius: '0.5rem',
                   border: `1.5px solid ${selected ? colors.emerald : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: selected ? 'rgba(16,185,129,0.12)33' : colors.surfaceElevated,
+                  backgroundColor: selected ? 'rgba(16,185,129,0.20)' : colors.surfaceElevated,
                   cursor: 'pointer',
                   fontSize: '0.78rem',
                   color: selected ? colors.emerald : colors.textSecondary,
@@ -336,7 +336,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                     key={r.run_id}
                     style={{
                       borderBottom: colors.border,
-                      backgroundColor: isSelected ? 'rgba(16,185,129,0.12)15' : isBase ? 'rgba(244,88,110,0.10)15' : 'transparent',
+                      backgroundColor: isSelected ? 'rgba(16,185,129,0.15)' : isBase ? 'rgba(244,88,110,0.10)' : 'transparent',
                     }}
                   >
                     <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.run_id}</td>

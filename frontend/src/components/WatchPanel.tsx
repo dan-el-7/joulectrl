@@ -215,7 +215,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       {latestSegment && (
         <div
           style={{
-            background: 'rgba(16,185,129,0.12)18',
+            background: 'rgba(16,185,129,0.18)',
             border: '1.5px solid ' + colors.emerald,
             borderRadius: '0.75rem',
             padding: '1.25rem',

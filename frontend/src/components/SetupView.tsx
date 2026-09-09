@@ -1,5 +1,5 @@
 import React from 'react';
-import { CapabilitiesResponse, WorkloadInfo } from '../types';
+import { CapabilitiesResponse, WorkloadInfo, classCpus } from '../types';
 import { colors } from '../design';
 
 interface SetupViewProps {
@@ -99,7 +99,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   padding: '0.5rem',
                   borderRadius: '0.375rem',
                   border: `1.5px solid ${objective === obj.id ? colors.emerald : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: objective === obj.id ? 'rgba(16,185,129,0.12)33' : colors.surfaceElevated,
+                  backgroundColor: objective === obj.id ? 'rgba(16,185,129,0.20)' : colors.surfaceElevated,
                   color: objective === obj.id ? colors.emerald : colors.textSecondary,
                   fontSize: '0.8rem',
                   fontWeight: 600,
@@ -297,7 +297,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                       fontSize: '0.7rem',
                     }}
                   >
-                    {cls} class: CPUs {(cpus as number[]).join(', ')}
+                    {cls} class: CPUs {classCpus(cpus).join(', ')}
                   </span>
                 ))}
               </div>
