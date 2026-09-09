@@ -287,6 +287,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09 11:10 UTC) AFFECTS(a,c,d) Added `core/watch.py` passive detector and scripted-profile tests: learned idle baseline, sustained onset backdating, dip absorption, sustained idle end backtracking, wrap-safe energy, and unavailable-energy honesty. Bundled-Python compile/smoke confirms 31s→80s / 49s scripted window.
 - (2026-09-09 11:22 UTC) AFFECTS(a,c,d) Added `core/validation.py`: seeded randomized fresh baseline/candidate pairs, apply/restore callbacks around every run, deadline marking, persistence, and restoration-error honesty. Focused tests and bundled-Python smoke pass.
 - (2026-09-09 11:30 UTC) AFFECTS(d) Fixed `energy/synthetic.py`: simulated monotonic time now advances even while counter reads are unavailable, preserving watch detection timing. Added regression test; bundled-Python compile/smoke pass.
+- (2026-09-09 11:34 UTC) [gate3] `tests.integration.test_watch_mode` passes 4/4 with Agent B detector, including onset/end backtracking, dip absorption, transient rejection, and unavailable-energy timing honesty.
 
 
 
