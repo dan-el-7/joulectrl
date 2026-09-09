@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T13:01:04Z
-- session: `A#2` · status: `active` (standby/support + polish per SESSION_START_A.md)
+- heartbeat: 2026-09-09T13:24:00Z
+- session: `A#2` · status: `active`
 - branch: `main`
-- current unit: none open — doctor platform-guard polish committed
-- next action: watch board (AFFECTS(a)), pre-demo reverify_controls.py near demo time, tagged release when API/CLI settles
-- notes for others: helper daemon RUNNING (passwordless restart: pkexec /home/dan-el/joulectrl-a/helper/daemon.py). Canonical calibration = fixtures/real/calibration_c2_effective.json. Machine checked at A#2 start: stock state exact, AC on, inhibitor alive, helper reading energy.
+- current unit: none open — CI fixed green (fastapi/httpx in install, python -m pytest, hardware-bound tests made CI-safe)
+- next action: standby; watch board; pre-demo reverify_controls.py; tagged release when surface settles
+- notes for others: helper daemon RUNNING. Canonical calibration = fixtures/real/calibration_c2_effective.json. Machine checked at A#2 start: stock, AC, inhibitor alive.
 
 
 ## Agent B — live state

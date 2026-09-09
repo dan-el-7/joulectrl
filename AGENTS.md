@@ -262,6 +262,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 ### Agent A log
 
+- (2026-09-09T13:24:00Z) A: CI green again after 3-layer fix (all pushes since ~12:40 were red): (1) ci.yml installs fastapi/httpx (dev extra had only pytest; C's test_api.py unimportable on runner), (2) python -m pytest so repo root is on sys.path (bare pytest broke cross-test imports tests.unit.test_*), (3) my 5 hardware-bound tests now CI-safe: fake sysfs is a real tmp_path file tree driven by daemon's own _read/_write (better coverage, no mocking), test_real_topology_matches_fixture skips unless fixture boot_id matches this machine. 170 green locally, CI green on 62c17c1.
+
 - (hour 0) onboarded.
 - (2026-09-09T10:06:21Z) A: Gate 0 bootstrap done — repo live (dan-el-7/joulectrl), hour-0 hardware re-verified per VERIFIED_DEMO_LAPTOP checklist (energy counter advances 8.6 mJ/s idle; class map even=Zen5/odd=Zen5c via cpuinfo_max_freq; cap honored only with boost=0: cur_freq 1.98 GHz at 2 GHz cap vs 5.04 GHz with boost=1; tuned throughput-performance; AC). energy/base.py (EnergyBackend + wrap-safe accumulator, 12 unit tests green), core/topology.py, core/discovery.py committed; fixtures/real/{topology,capability_report,energy_trace_idle}.json; CI workflow. [gate0]
 
