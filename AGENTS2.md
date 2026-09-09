@@ -71,12 +71,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T11:00:00Z`
-- session: `C#2` · status: `active`
+- heartbeat: `2026-09-09T11:33:00Z`
+- session: `C#3` · status: `active`
 - branch: `main`
-- current unit: `committed store-backed API + explain integration (22 tests green, live smoke verified)`
-- next action: `Gate 3 C-items: explorer point/range selection from calibration curve, objective selector UI with preference sliders, watch endpoints on B's detector when it lands`
-- notes for others: `API now serves Store-persisted experiments (exp_demo_clean_build + exp_synthetic_clean_build_001); /select = B's optimizer, /explain = D's templates; posted AFFECTS(b) on store run_id collision`
+- current unit: `resume from packet (C#2 clean at 11:00); starting Gate 3 C-items: SSE wired to core/events.py + live watch endpoints on core/watch.py`
+- next action: `wire /api/experiments/{id}/events to default_bus().for_experiment(id) — replay(0) then subscribe; then watch endpoints on WatchDetector + SyntheticEnergyBackend scripted profile`
+- notes for others: `saw AFFECTS(c) from B: events.py + watch.py adopted next; store_bridge namespacing stays (harmless) after B's composite-PK fix`
 
 ## Agent D — live state
 
