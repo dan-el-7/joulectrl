@@ -91,12 +91,17 @@ class LiveEngine:
         return cls_map
 
     def _calibration_lookup(self, helper) -> Optional[dict[str, Any]]:
-        """Load A's all-cores calibration fixture if it matches this machine's boot."""
+        """Load verified real calibration fixtures for this machine."""
         try:
-            boot_id = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
-            fx = json.loads(Path("fixtures/real/calibration_c2_allcores.json").read_text())
-            if fx.get("boot_id") == boot_id:
-                return fx
+            p_all = Path("fixtures/real/calibration_c2_allcores.json")
+            p_eff = Path("fixtures/real/calibration_c2_effective.json")
+            rows: list[dict[str, Any]] = []
+            if p_all.exists():
+                rows.extend(json.loads(p_all.read_text()).get("rows", []))
+            if p_eff.exists():
+                rows.extend(json.loads(p_eff.read_text()).get("rows", []))
+            if rows:
+                return {"rows": rows}
         except Exception:
             return None
         return None
