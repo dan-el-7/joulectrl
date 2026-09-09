@@ -57,12 +57,13 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:15:00Z
+- heartbeat: 2026-09-09T10:20:00Z
 - session: B#1 · status: active
-- branch: b/optimizer
-- current unit: core/optimizer.py skeleton completed (11 unit tests green); starting core/store.py
-- next action: implement core/store.py (SQLite persistence) and unit tests
-- notes for others: models.py, synthetic energy backend, and optimizer skeleton all complete and tested
+- branch: b/store
+- current unit: Gate 1 complete ([gate1]); starting Gate 2 core/runner.py and experiment state machine
+- next action: implement core/runner.py against workloads/base.py and energy/synthetic.py
+- notes for others: Gate 1 fully met (models, store, synthetic energy, optimizer). 29 unit tests green.
+
 
 
 

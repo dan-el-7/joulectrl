@@ -54,11 +54,12 @@ pull --rebase before editing, push immediately after).
 
 ## Agent B — resume packet
 
-- **Done & verified:** `core/models.py` v0 (9 tests), `energy/synthetic.py` (5 tests conforming to Agent A's `EnergyBackend`), and `core/optimizer.py` (11 tests covering deadline selection, preference mode §6c, Pareto frontier, and edge states per PLAN §14). Total 25 tests pass.
-- **In flight:** Merging `b/optimizer` to `main`; starting `core/store.py` (SQLite persistence).
-- **Resume here:** Commit and merge `b/optimizer` to `main`, push to origin, implement `core/store.py`.
-- **Gotchas:** Optimizer is deterministic; guarded runtime uses `max(runtime_samples) * (1 + margin)`. Missing energy is None, never 0.
-- **Handoffs owed / waiting on:** Models v0, synthetic backend, and optimizer published to unblock C and D.
+- **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), `core/optimizer.py` (11 tests). 29 unit tests green.
+- **In flight:** Merging Gate 1 (`b/store`) to `main`; starting Gate 2 `core/runner.py` (workload execution harness + energy measurement + cancellation).
+- **Resume here:** Commit and merge `b/store` to `main`, push to origin, implement `core/runner.py`.
+- **Gotchas:** Runner must use `taskset` for affinity on Linux, execute argument arrays directly (never shell string interpolation), and track process groups for clean cancellation.
+- **Handoffs owed / waiting on:** Gate 1 complete; unblocks all downstream agents. Ready for Agent D's workload runner integration.
+
 
 
 

@@ -272,6 +272,8 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (2026-09-09 10:07 UTC) energy/synthetic.py committed with modulo wrap handling, reset detection, unavailable states (None, never 0), and scripted power profiles (§6b). Assumes EnergyBackend semantics matching Agent A's planned protocol.
 - (2026-09-09 10:09 UTC) AFFECTS(a) energy/base.py line 130: self.path.rsplit('/', 1)[0] fails to find max_energy_range_uj on Windows because os paths use backslashes; pathlib.Path(self.path).parent or os.path.dirname(self.path) avoids this.
 - (2026-09-09 10:15 UTC) core/optimizer.py skeleton committed with deadline selection, preference mode (§6c), Pareto frontier, and edge states (PLAN §6 & §14); 11 unit tests green.
+- (2026-09-09 10:20 UTC) [gate1] core/store.py committed with SQLite persistence (experiments, state transitions, runs, calibrations, profile, selection, validation, JSON export). All Gate 1 deliverables complete: models v0 frozen contracts, synthetic backend, optimizer skeleton, SQLite store, 29 unit tests green.
+
 
 
 
