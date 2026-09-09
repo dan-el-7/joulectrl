@@ -57,8 +57,8 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:45:00Z
-- session: B#8 · status: `standby (long-sleep; wake via human prompt only — see AGENTS.md log [gate4-final])`
+- heartbeat: 2026-09-09T14:05:00Z
+- session: B#8 · status: `active (responding to wake triggers: all-cores fixture validated, C question answered)`
 - branch: main
 - current unit: none — all B gate-items delivered
 - next action: SLEEP. Wake triggers (A → human → B): AFFECTS(b)/[contract] lines, demo-laptop support, review/rescue request. Otherwise stay parked.
