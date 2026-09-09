@@ -106,6 +106,28 @@ def list_layouts(args: argparse.Namespace) -> int:
     return 0
 
 
+def check_calibration(args: argparse.Namespace) -> int:
+    """Run the sweep sanity cross-check; exit 0 = clean, 1 = problems, 3 = absent."""
+    from core.sweep_check import check_calibration_files
+
+    report = check_calibration_files(args.c2, args.c1)
+    if report is None:
+        print(f"C2 fixture not found: {args.c2} (nothing to check yet)")
+        return 3
+    if report.ok:
+        print("calibration sweep cross-check: OK")
+    else:
+        print("calibration sweep cross-check: PROBLEMS FOUND")
+    for problem in report.problems:
+        print(f"  problem: {problem}")
+    for warning in report.warnings:
+        print(f"  warning: {warning}")
+    for cname, info in report.classes.items():
+        print(f"  class {cname}: stock={info['n_stock']} sweep={info['n_sweep']} "
+              f"caps={len(info['median_throughput_per_cap'])}")
+    return 0 if report.ok else 1
+
+
 def run_fixed_compute(args: argparse.Namespace) -> int:
     capability = _capability(Path(args.capabilities))
     energy = capability.get("package_energy", {})
@@ -167,6 +189,13 @@ def build_parser() -> argparse.ArgumentParser:
     layouts.add_argument("--topology", default="fixtures/real/topology.json")
     layouts.add_argument("--json", action="store_true", help="emit JSON instead of a table")
     layouts.set_defaults(handler=list_layouts)
+    check = sub.add_parser(
+        "check-calibration",
+        help="sanity cross-check on calibration sweep fixtures (C1/C2)",
+    )
+    check.add_argument("--c2", default="fixtures/real/calibration_c2.json")
+    check.add_argument("--c1", default="fixtures/real/calibration_c1.json")
+    check.set_defaults(handler=check_calibration)
     run = sub.add_parser("run-fixed", help="measure the approved fixed-compute workload")
     run.add_argument("--capabilities", default="fixtures/real/capability_report.json")
     run.add_argument("--socket", default="/run/joulectrl-helper.sock")

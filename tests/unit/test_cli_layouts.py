@@ -74,3 +74,41 @@ def test_layouts_command_json(tmp_path, capsys):
 def test_layouts_missing_fixture_fails_cleanly(tmp_path, capsys):
     assert run_cli(["layouts", "--topology", str(tmp_path / "nope.json")], capsys) == 2
     assert "not found" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# check-calibration subcommand
+# ---------------------------------------------------------------------------
+
+from tests.unit.test_sweep_check import C1_DOC, c2_doc, good_rows  # noqa: E402
+
+
+def test_check_calibration_absent_fixture_returns_3(tmp_path, capsys):
+    assert run_cli(["check-calibration", "--c2", str(tmp_path / "nope.json")], capsys) == 3
+    assert "not found" in capsys.readouterr().out
+
+
+def test_check_calibration_good_fixture_returns_0(tmp_path, capsys):
+    (tmp_path / "c2.json").write_text(json.dumps(c2_doc(good_rows())))
+    (tmp_path / "c1.json").write_text(json.dumps(C1_DOC))
+    code = run_cli(
+        ["check-calibration", "--c2", str(tmp_path / "c2.json"), "--c1", str(tmp_path / "c1.json")],
+        capsys,
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "OK" in out
+    assert "class fast" in out
+
+
+def test_check_calibration_problems_return_1(tmp_path, capsys):
+    doc = c2_doc(good_rows())
+    doc["summary"]["fast"]["scaling_efficiency"] = 1.5  # superlinear -> problem
+    (tmp_path / "c2.json").write_text(json.dumps(doc))
+    (tmp_path / "c1.json").write_text(json.dumps(C1_DOC))
+    code = run_cli(
+        ["check-calibration", "--c2", str(tmp_path / "c2.json"), "--c1", str(tmp_path / "c1.json")],
+        capsys,
+    )
+    assert code == 1
+    assert "PROBLEMS FOUND" in capsys.readouterr().out
