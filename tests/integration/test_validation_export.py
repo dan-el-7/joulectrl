@@ -6,6 +6,8 @@ import shutil
 import tempfile
 import unittest
 
+from typing import Any
+
 from core.models import Configuration, Profile, RunRecord, Selection, ValidationPair
 from core.store import Store
 

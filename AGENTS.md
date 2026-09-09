@@ -321,6 +321,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 4) AFFECTS(b) energy/synthetic.py: in advance_uj (line 128), 'if not self._available: return' early-returns before advancing self._simulated_time_s += dt_s, which freezes simulated monotonic time in step() during simulated counter outages. Recommend moving time advancement before the early return.
 - (hour 4) workloads/fixed_compute.py updated with 'calibration' preset (16384 chunks, 200k iters) matching Agent A's real hardware C1 calibration run (checksum 0xc2493c07d6b29c85).
 - (hour 4) workloads/fixed_compute.py updated with 'c2_sweep' preset (32768 chunks, 200k iters) with verified invariant checksum 0x4f59b8763583e750 matching Agent A's C2 sweep runner. tests/integration/test_watch_mode.py updated to verify Agent B's advance_uj fix directly. All 38 tests green.
+- (2026-09-09 11:15 UTC) AFFECTS(b) Fixed missing typing.Any import in tests/integration/test_validation_export.py line 18 (resolves pytest collection error noted in session B#8). All 38 Agent D tests passing cleanly.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
