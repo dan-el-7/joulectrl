@@ -55,8 +55,8 @@ pull --rebase before editing, push immediately after).
 ## Agent B — resume packet
 
 - **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), 29 unit tests green. `core/runner.py`, `core/experiment.py`, and focused tests cover measurement, cancellation, legal lifecycle, restoration failure, and profile-point integration. `cli/main.py run-fixed` now uses only the approved fixed workload and helper operations, persists the run, and restores in `finally`. Compile/help smoke pass.
-- **In flight:** B#6 is implementing fresh validation-pair orchestration with deterministic randomization and apply/restore callbacks.
-- **Resume here:** `git status --short; git pull --rebase origin main` then inspect C's watch endpoint integration before extending validation selection.
+- **In flight:** None; `core/validation.py` fresh-pair orchestration is complete and ready for C endpoint integration.
+- **Resume here:** `git status --short; git pull --rebase origin main` then inspect C's validation endpoint integration.
 - **Gotchas:** Runner uses `taskset --cpu-list` only on Linux, executes argument arrays directly (never shell string interpolation), and terminates POSIX process groups. This clone has no `python`, `py`, project venv, or pytest; bundled Python is `C:\Users\trive\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` but has no pytest.
 - **Handoffs owed / waiting on:** Gate 1 complete; unblocks all downstream agents. Ready for Agent D's workload runner integration.
 

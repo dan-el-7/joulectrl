@@ -57,11 +57,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:15:00Z
-- session: B#6 · status: active
+- heartbeat: 2026-09-09T11:22:00Z
+- session: B#6 · status: off
 - branch: main
-- current unit: Gate 3 fresh validation-pair orchestration
-- next action: implement core/validation.py with deterministic randomized pairs and guaranteed restoration callbacks
+- current unit: Gate 3 fresh validation-pair orchestration complete
+- next action: integrate with C's validation endpoint when available; preserve helper restore around each point
 - notes for others: CLI uses HelperClient begin/apply/read/restore/end and only FixedComputeWorkload; no arbitrary command path. Windows has no os.getuid/helper socket, so it reports a clear error.
 
 
