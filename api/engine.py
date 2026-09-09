@@ -53,12 +53,35 @@ _EXPERIMENTAL_CAP_LADDER = [4000000, 3500000, 3000000, 2500000, 2000000]
 class LiveEngine:
     """Runs real experiments in a background thread, publishing to the bus."""
 
+    _cancel_events: dict[str, threading.Event] = {}
+    _active_runners: dict[str, Any] = {}
+    _threads: dict[str, threading.Thread] = {}
+
+    @classmethod
+    def cancel_active_experiment(cls, exp_id: str) -> bool:
+        """Cancel active experiment or validation thread and terminate any running child process."""
+        ev = cls._cancel_events.get(exp_id)
+        if ev:
+            ev.set()
+        runner = cls._active_runners.get(exp_id)
+        if runner:
+            try:
+                runner.cancel()
+                logger.info("Cancelled active runner process group for %s", exp_id)
+            except Exception as e:
+                logger.warning("Error cancelling runner for %s: %s", exp_id, e)
+        return True
+
+    @classmethod
+    def is_cancelled(cls, exp_id: str) -> bool:
+        ev = cls._cancel_events.get(exp_id)
+        return ev.is_set() if ev else False
+
     def __init__(self, bus, store_bridge_mod, overlays: Optional[dict[str, dict[str, Any]]] = None, store: Optional[Any] = None):
         self.bus = bus
         self.sb = store_bridge_mod
         self._overlays: dict[str, dict[str, Any]] = overlays if overlays is not None else {}
         self.store = store
-        self._threads: dict[str, threading.Thread] = {}
 
     # ------------------------------------------------------------------ helpers
 
@@ -131,6 +154,7 @@ class LiveEngine:
             daemon=True,
             name=f"engine-{experiment_id}",
         )
+        self._cancel_events[experiment_id] = threading.Event()
         self._threads[experiment_id] = t
         t.start()
         return True
@@ -147,6 +171,7 @@ class LiveEngine:
             daemon=True,
             name=thread_key,
         )
+        self._cancel_events[experiment_id] = threading.Event()
         self._threads[thread_key] = t
         t.start()
         return True
@@ -256,6 +281,10 @@ class LiveEngine:
             }
 
             for rep in range(1, repetitions + 1):
+                if self.is_cancelled(exp_id):
+                    logger.info("Validation cancelled by user for %s", exp_id)
+                    break
+
                 # Baseline execution
                 self._emit(exp_id, "validation_progress", {
                     "experiment_id": exp_id,
@@ -273,6 +302,10 @@ class LiveEngine:
                     base_run = runner.run(wl, exp_id, base_cfg, repetition=rep, phase="validation")
                 base_run.phase = "validation"
                 base_run.run_id = f"val_base_r{rep}_{int(time.time()*1000)}"
+
+                if self.is_cancelled(exp_id):
+                    logger.info("Validation cancelled by user before candidate run for %s", exp_id)
+                    break
 
                 # Candidate execution
                 self._emit(exp_id, "validation_progress", {
@@ -323,6 +356,21 @@ class LiveEngine:
                     "verified_savings_pct": val_api.get("verified_savings_pct"),
                     "verified_runtime_delta_s": val_api.get("verified_runtime_delta_s"),
                 })
+
+            if self.is_cancelled(exp_id):
+                self._overlay_for(exp_id)["state"] = "RESTORED"
+                self._overlay_for(exp_id)["restoration_status"] = "restored"
+                if self.store:
+                    try:
+                        self.store.transition_state(exp_id, "RESTORED", "Validation cancelled by user")
+                        self.store.update_restoration_status(exp_id, "restored")
+                    except Exception:
+                        pass
+                self._emit(exp_id, "experiment_state", {
+                    "state": "RESTORED",
+                    "message": "Validation stopped by user. Settings restored.",
+                })
+                return
 
             # Completed all pairs
             self._overlay_for(exp_id)["state"] = "complete"
@@ -458,6 +506,11 @@ class LiveEngine:
 
                 break_outer = False
                 for rep in range(1, repetitions + 1):
+                    if self.is_cancelled(exp_id):
+                        logger.info("Profiling sweep cancelled by user for %s", exp_id)
+                        break_outer = True
+                        break
+
                     now = time.monotonic()
                     elapsed = now - start_wall
                     remaining = time_limit_s - elapsed
@@ -520,6 +573,22 @@ class LiveEngine:
 
                 if break_outer:
                     break
+
+            if self.is_cancelled(exp_id):
+                logger.info("Live engine stopping profiling cleanly after cancellation for %s", exp_id)
+                self._overlay_for(exp_id)["state"] = "RESTORED"
+                self._overlay_for(exp_id)["restoration_status"] = "restored"
+                if self.store:
+                    try:
+                        self.store.transition_state(exp_id, "RESTORED", "Profiling cancelled by user")
+                        self.store.update_restoration_status(exp_id, "restored")
+                    except Exception:
+                        pass
+                self._emit(exp_id, "experiment_state", {
+                    "state": "RESTORED",
+                    "message": "Calibration stopped by user. Settings restored to stock.",
+                })
+                return
 
             # Assemble profile from calibration + fresh runs
             profile_rows = self._profile_rows(cal, runs, cls_map, workload_id)
@@ -696,6 +765,7 @@ class LiveEngine:
             return self._failed_record(exp_id, cfg, f"apply failed: {r.get('error')}", phase=phase)
         helper.heartbeat()
         time.sleep(0.3)
+        self._active_runners[exp_id] = runner
         try:
             e1 = helper.read_energy()
             rec = runner.run(wl, exp_id, cfg, repetition=repetition, phase=phase)
@@ -705,6 +775,7 @@ class LiveEngine:
                 rec.energy_available = True
             return rec
         finally:
+            self._active_runners.pop(exp_id, None)
             rr = helper.restore()
             if not rr.get("ok"):
                 logger.warning("restore mismatch: %s", rr.get("mismatches"))

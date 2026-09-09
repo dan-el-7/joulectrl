@@ -303,32 +303,40 @@ def list_workloads() -> list[dict[str, Any]]:
 
 @app.post("/api/experiments", status_code=status.HTTP_201_CREATED)
 def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
-    """Create and start a new experiment session.
-
-    Dev-machine mode: seeded with the fixture profile/selection/validation pipeline
-    so the full flow is renderable end-to-end; replaced by live runner state (Gate 3).
-    """
+    """Create and start a new experiment session."""
     exp_id = f"exp_{utc_now_iso().replace(':', '').replace('-', '')[:15]}_{req.workload_id}"
-    exp = build_fixture_experiment(exp_id)
-    exp["workload_id"] = req.workload_id
-    exp["objective"] = req.objective
-    exp["runtime_budget_s"] = req.runtime_budget_s
-    if req.preference:
-        exp["preference"] = req.preference.model_dump()
-    row = store_bridge.persist_experiment_dict(_STORE, exp)
-    _OVERLAY[exp_id] = store_bridge.experiment_to_api(row)
-    _OVERLAY[exp_id]["_selection_model"] = row.get("selection")
 
-    # Live path: on machines with the privileged helper, run the REAL pipeline
-    # (calibration-informed profiling -> deterministic selection -> restore)
-    # in a background thread, emitting SSE progress. Dev machines keep the
-    # fixture-seeded behavior above.
+    # Try live path first on machines with helper
+    started_live = False
     try:
         from api.engine import LiveEngine
 
+        seeded = {
+            "id": exp_id,
+            "workload_id": req.workload_id,
+            "objective": req.objective,
+            "state": "profiling",
+            "runtime_budget_s": req.runtime_budget_s,
+            "preference": req.preference.model_dump() if req.preference else None,
+            "created_at": utc_now_iso(),
+            "profile": {
+                "runs": [],
+                "configurations": {},
+                "baseline_config_id": None,
+                "source": "live",
+            },
+            "selection": None,
+            "validation": {
+                "status": "not_run",
+                "pairs": [],
+                "verified_savings_pct": None,
+                "verified_runtime_delta_s": None,
+            },
+            "restoration_status": "restored",
+            "_live_capabilities": _live_capabilities_cached(),
+        }
+
         engine = LiveEngine(default_bus(), store_bridge_mod=store_bridge, overlays=_OVERLAY, store=_STORE)
-        seeded = dict(_OVERLAY[exp_id])
-        seeded["_live_capabilities"] = _live_capabilities_cached()
         if engine.start_experiment(exp_id, {
             "workload_id": req.workload_id, "objective": req.objective,
             "runtime_budget_s": req.runtime_budget_s,
@@ -338,20 +346,30 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             "repetitions": max(1, min(5, req.repetitions)),
             "priority_mode": req.priority_mode or "top_priority",
         }, seeded):
-            _OVERLAY[exp_id]["state"] = "profiling"
-            prof = _OVERLAY[exp_id].setdefault("profile", {})
-            prof["runs"] = []
-            prof["configurations"] = {}
-            _OVERLAY[exp_id]["validation"] = {
-                "status": "not_run",
-                "pairs": [],
-                "verified_savings_pct": None,
-                "verified_runtime_delta_s": None,
-            }
-            if _STORE.get_experiment(exp_id):
-                _STORE.save_validation_pairs(exp_id, [])
-    except Exception as exc:  # pragma: no cover - stay on fixture path
-        logging.warning("live engine unavailable, using fixture mode: %s", exc)
+            started_live = True
+            _STORE.create_experiment(
+                exp_id,
+                req.workload_id,
+                objective=req.objective,
+                runtime_budget_s=req.runtime_budget_s,
+                preference=req.preference.model_dump() if req.preference else None,
+            )
+            _STORE.transition_state(exp_id, "PROFILING", "starting live profiling sweep")
+            _STORE.update_restoration_status(exp_id, "restored")
+            _OVERLAY[exp_id] = seeded
+    except Exception as exc:
+        logging.warning("live engine start failed, using fallback fixture mode: %s", exc)
+
+    if not started_live:
+        exp = build_fixture_experiment(exp_id)
+        exp["workload_id"] = req.workload_id
+        exp["objective"] = req.objective
+        exp["runtime_budget_s"] = req.runtime_budget_s
+        if req.preference:
+            exp["preference"] = req.preference.model_dump()
+        row = store_bridge.persist_experiment_dict(_STORE, exp)
+        _OVERLAY[exp_id] = store_bridge.experiment_to_api(row)
+        _OVERLAY[exp_id]["_selection_model"] = row.get("selection")
 
     return {
         "id": exp_id,
@@ -536,13 +554,14 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
     try:
         exps = _STORE.list_experiments()
         for e in exps:
+            exp_wl = e.get("workload_name") or e.get("workload_id") or "clean_build"
             runs = _STORE.get_runs(e["id"])
-            succ = [r for r in runs if r.status == "success" and r.runtime_s and r.runtime_s > 0]
+            succ = [r for r in runs if r.status == "success" and r.runtime_s and r.runtime_s > 0 and r.workload_name == exp_wl]
             if succ:
                 experiments_meta.append({
                     "id": e["id"],
                     "title": e.get("title") or e["id"],
-                    "workload_name": succ[0].workload_name if succ else e.get("workload_id", "unknown"),
+                    "workload_name": exp_wl,
                     "run_count": len(succ),
                     "created_at": e.get("created_at"),
                 })
@@ -568,15 +587,29 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
     # Determine target runs from _STORE
     selected_exp_id = experiment_id
     target_runs = []
+    selected_workload = None
     if selected_exp_id and selected_exp_id != "all":
         try:
-            target_runs = [r for r in _STORE.get_runs(selected_exp_id) if r.status == "success" and r.runtime_s and r.runtime_s > 0]
+            exp_row = _STORE.get_experiment(selected_exp_id)
+            selected_workload = exp_row.get("workload_name") if exp_row else None
+            all_runs = _STORE.get_runs(selected_exp_id)
+            target_runs = [
+                r for r in all_runs
+                if r.status == "success" and r.runtime_s and r.runtime_s > 0
+                and (selected_workload is None or r.workload_name == selected_workload)
+            ]
         except Exception:
             target_runs = []
     elif selected_exp_id == "all":
         try:
             for e in _STORE.list_experiments():
-                target_runs.extend([r for r in _STORE.get_runs(e["id"]) if r.status == "success" and r.runtime_s and r.runtime_s > 0])
+                exp_wl = e.get("workload_name")
+                all_runs = _STORE.get_runs(e["id"])
+                target_runs.extend([
+                    r for r in all_runs
+                    if r.status == "success" and r.runtime_s and r.runtime_s > 0
+                    and (exp_wl is None or r.workload_name == exp_wl)
+                ])
         except Exception:
             target_runs = []
     else:
@@ -584,7 +617,13 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
         best_exp = max(experiments_meta, key=lambda x: x["run_count"], default=None) if experiments_meta else None
         if best_exp:
             selected_exp_id = best_exp["id"]
-            target_runs = [r for r in _STORE.get_runs(selected_exp_id) if r.status == "success" and r.runtime_s and r.runtime_s > 0]
+            selected_workload = best_exp["workload_name"]
+            all_runs = _STORE.get_runs(selected_exp_id)
+            target_runs = [
+                r for r in all_runs
+                if r.status == "success" and r.runtime_s and r.runtime_s > 0
+                and (selected_workload is None or r.workload_name == selected_workload)
+            ]
 
     # If database runs exist, aggregate them into clean curves
     if target_runs:
@@ -602,7 +641,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
                 cls = "efficient"
             else:
                 cls = "all"
-            key = (cls, cpus, cfg.worker_count, cfg.freq_cap_khz, cfg.boost, cfg.id)
+            key = (cls, cpus, cfg.worker_count, cfg.freq_cap_khz, cfg.boost, cfg.id, r.workload_name)
             by_key.setdefault(key, []).append(r)
 
         classes_map: dict[str, dict[str, Any]] = {
@@ -612,7 +651,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
         }
 
         # Check for C1 single-core reference points
-        for (cls, cpus, workers, freq, boost, cid), rlist in by_key.items():
+        for (cls, cpus, workers, freq, boost, cid, wname), rlist in by_key.items():
             if workers == 1 or len(cpus) == 1:
                 if classes_map[cls]["c1"] is None or boost:
                     avg_rt = sum(r.runtime_s for r in rlist) / len(rlist)
