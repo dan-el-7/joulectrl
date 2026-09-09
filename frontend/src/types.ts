@@ -106,6 +106,7 @@ export interface RunRecord {
 export interface Selection {
   config_id: string;
   selected_config_id?: string;
+  configuration?: Configuration;
   objective: string;
   status: string;
   status_message?: string;

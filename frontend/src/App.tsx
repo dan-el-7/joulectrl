@@ -175,6 +175,14 @@ export const App: React.FC = () => {
       }
     });
 
+    eventSource.addEventListener('validation_pair_complete', () => {
+      fetchExperiment(experiment.id).then((full) => setExperiment(full)).catch(() => {});
+    });
+
+    eventSource.addEventListener('validation_complete', () => {
+      fetchExperiment(experiment.id).then((full) => setExperiment(full)).catch(() => {});
+    });
+
     return () => {
       eventSource.close();
     };
@@ -325,7 +333,14 @@ export const App: React.FC = () => {
         {activeTab === 'calibration' && <CalibrationView />}
 
         {activeTab === 'validation' && experiment && (
-          <ValidationView experiment={experiment} />
+          <ValidationView
+            experiment={experiment}
+            onRefreshExperiment={async () => {
+              const full = await fetchExperiment(experiment.id);
+              setExperiment(full);
+            }}
+            onNavigateExplorer={() => setActiveTab('explorer')}
+          />
         )}
 
         {activeTab === 'watch' && (

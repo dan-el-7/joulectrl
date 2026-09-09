@@ -32,6 +32,9 @@ EVENT_NAMES = frozenset(
         "profile_ready",
         "selection_updated",
         "restore_status",
+        "validation_progress",
+        "validation_pair_complete",
+        "validation_complete",
     }
 )
 

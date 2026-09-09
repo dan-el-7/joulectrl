@@ -192,7 +192,12 @@ def validation_to_api(pairs: Optional[list[dict[str, Any]]]) -> dict[str, Any]:
     t_deltas = [
         p["selected_run"]["runtime_s"] - p["baseline_run"]["runtime_s"]
         for p in pairs
-        if p.get("selected_run") and p.get("baseline_run")
+        if (
+            isinstance(p.get("selected_run"), dict)
+            and isinstance(p.get("baseline_run"), dict)
+            and p["selected_run"].get("runtime_s") is not None
+            and p["baseline_run"].get("runtime_s") is not None
+        )
     ]
     all_ok = all(p.get("both_succeeded") for p in pairs)
     met_budget = all(p.get("met_budget") for p in pairs)

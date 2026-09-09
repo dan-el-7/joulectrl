@@ -135,6 +135,226 @@ class LiveEngine:
         t.start()
         return True
 
+    def start_validation(self, experiment_id: str, repetitions: int = 3) -> bool:
+        """Launch validation of baseline vs selected candidate in a background thread."""
+        thread_key = f"val-{experiment_id}"
+        if thread_key in self._threads and self._threads[thread_key].is_alive():
+            return True
+
+        t = threading.Thread(
+            target=self._run_validation,
+            args=(experiment_id, repetitions),
+            daemon=True,
+            name=thread_key,
+        )
+        self._threads[thread_key] = t
+        t.start()
+        return True
+
+    def _run_validation(self, exp_id: str, repetitions: int = 3) -> None:
+        from workloads.registry import get_workload
+        from core.runner import WorkloadRunner
+        from core.models import ValidationPair, Configuration
+
+        logger.info("Starting validation execution for %s (repetitions=%d)", exp_id, repetitions)
+
+        # 1. Resolve experiment
+        exp = self._overlays.get(exp_id)
+        if not exp and self.store:
+            row = self.store.get_experiment(exp_id)
+            if row:
+                exp = self.sb.experiment_to_api(row)
+                if exp_id not in self._overlays:
+                    self._overlays[exp_id] = dict(exp)
+                    if row.get("selection"):
+                        self._overlays[exp_id]["_selection_model"] = row.get("selection")
+        if not exp:
+            logger.warning("Validation cannot run: experiment %s not found", exp_id)
+            return
+
+        # 2. Resolve selected candidate configuration
+        sel = exp.get("selection") or {}
+        cand_cfg_id = sel.get("config_id")
+        prof = exp.get("profile") or {}
+        configs = prof.get("configurations") or {}
+
+        cand_cfg: Optional[Configuration] = None
+        if cand_cfg_id and cand_cfg_id in configs:
+            cand_raw = configs[cand_cfg_id].get("configuration") or {}
+            cand_cfg = Configuration.from_dict(cand_raw)
+        elif sel.get("configuration"):
+            cand_cfg = Configuration.from_dict(sel["configuration"])
+
+        if not cand_cfg and configs:
+            first_id = next(iter(configs))
+            cand_cfg = Configuration.from_dict(configs[first_id].get("configuration") or {})
+            cand_cfg_id = first_id
+
+        if not cand_cfg:
+            logger.warning("No candidate config found for validation of %s", exp_id)
+            self._emit(exp_id, "experiment_state", {"state": "failed", "message": "No candidate configuration found for validation"})
+            return
+
+        # 3. Resolve baseline configuration
+        base_cfg_id = prof.get("baseline_config_id")
+        base_cfg: Optional[Configuration] = None
+        if base_cfg_id and base_cfg_id in configs:
+            base_raw = configs[base_cfg_id].get("configuration") or {}
+            base_cfg = Configuration.from_dict(base_raw)
+        else:
+            for cid, cinfo in configs.items():
+                if cinfo.get("is_baseline") or "stock" in cid:
+                    base_cfg = Configuration.from_dict(cinfo.get("configuration") or {})
+                    break
+
+        if not base_cfg:
+            base_cfg = Configuration(
+                id="cfg_baseline_stock",
+                layout="B",
+                worker_count=8,
+                cpu_affinity=[0, 1, 2, 3, 4, 5, 6, 7],
+                boost=True,
+            )
+
+        workload_id = exp.get("workload_id", "fixed_compute")
+        deadline_s = exp.get("runtime_budget_s")
+
+        # 4. Helper acquisition
+        helper = None
+        has_helper = False
+        try:
+            helper = self._helper()
+            resp = helper.read_energy()
+            if resp.get("ok"):
+                has_helper = True
+        except Exception:
+            has_helper = False
+
+        if has_helper:
+            helper.end_session()
+            if not helper.begin_session().get("ok"):
+                logger.warning("helper session busy for validation of %s", exp_id)
+                self._emit(exp_id, "experiment_state", {"state": "failed", "message": "CPU helper session busy"})
+                return
+
+        try:
+            self._overlay_for(exp_id)["state"] = "validating"
+            if self.store:
+                try:
+                    self.store.transition_state(exp_id, "VALIDATING")
+                except Exception:
+                    pass
+            self._emit(exp_id, "experiment_state", {"state": "validating", "message": "Executing fresh validation pairs on hardware"})
+
+            runner = WorkloadRunner(None, working_dir=_REPO_ROOT)
+            pairs: list[ValidationPair] = []
+            self._overlay_for(exp_id)["validation"] = {
+                "status": "validating",
+                "pairs": [],
+                "verified_savings_pct": None,
+                "verified_runtime_delta_s": None,
+            }
+
+            for rep in range(1, repetitions + 1):
+                # Baseline execution
+                self._emit(exp_id, "validation_progress", {
+                    "experiment_id": exp_id,
+                    "pair_index": rep,
+                    "total_pairs": repetitions,
+                    "phase": "baseline",
+                    "status": "running",
+                    "config_id": base_cfg.id,
+                    "message": f"Measuring baseline pair {rep}/{repetitions}...",
+                })
+                if has_helper:
+                    base_run = self._run_one(helper, runner, workload_id, exp_id, base_cfg, repetition=rep, phase="validation")
+                else:
+                    wl = get_workload(workload_id, chunks=8192 * base_cfg.worker_count, iters=200000)
+                    base_run = runner.run(wl, exp_id, base_cfg, repetition=rep, phase="validation")
+                base_run.phase = "validation"
+                base_run.run_id = f"val_base_r{rep}_{int(time.time()*1000)}"
+
+                # Candidate execution
+                self._emit(exp_id, "validation_progress", {
+                    "experiment_id": exp_id,
+                    "pair_index": rep,
+                    "total_pairs": repetitions,
+                    "phase": "selected",
+                    "status": "running",
+                    "config_id": cand_cfg.id,
+                    "message": f"Measuring candidate pair {rep}/{repetitions}...",
+                })
+                if has_helper:
+                    sel_run = self._run_one(helper, runner, workload_id, exp_id, cand_cfg, repetition=rep, phase="validation")
+                else:
+                    wl = get_workload(workload_id, chunks=8192 * cand_cfg.worker_count, iters=200000)
+                    sel_run = runner.run(wl, exp_id, cand_cfg, repetition=rep, phase="validation")
+                sel_run.phase = "validation"
+                sel_run.run_id = f"val_sel_r{rep}_{int(time.time()*1000)}"
+
+                pair = ValidationPair(
+                    pair_index=rep,
+                    baseline_run=base_run,
+                    selected_run=sel_run,
+                    live=True,
+                )
+                if deadline_s is not None and sel_run.runtime_s:
+                    pair.met_budget = sel_run.runtime_s <= deadline_s
+                else:
+                    pair.met_budget = pair.both_succeeded
+
+                pairs.append(pair)
+                pairs_dicts = [p.to_dict() for p in pairs]
+
+                if self.store:
+                    try:
+                        self.store.save_validation_pairs(exp_id, pairs)
+                    except Exception as e:
+                        logger.warning("save_validation_pairs failed: %s", e)
+
+                val_api = self.sb.validation_to_api(pairs_dicts)
+                self._overlay_for(exp_id)["validation"] = val_api
+
+                self._emit(exp_id, "validation_pair_complete", {
+                    "experiment_id": exp_id,
+                    "pair_index": rep,
+                    "total_pairs": repetitions,
+                    "pair": pair.to_dict(),
+                    "verified_savings_pct": val_api.get("verified_savings_pct"),
+                    "verified_runtime_delta_s": val_api.get("verified_runtime_delta_s"),
+                })
+
+            # Completed all pairs
+            self._overlay_for(exp_id)["state"] = "complete"
+            self._overlay_for(exp_id)["restoration_status"] = "restored"
+            if self.store:
+                try:
+                    self.store.transition_state(exp_id, "COMPLETE")
+                except Exception:
+                    pass
+
+            final_val = self._overlay_for(exp_id)["validation"]
+            self._emit(exp_id, "experiment_state", {"state": "complete", "message": "Validation complete"})
+            self._emit(exp_id, "validation_complete", {
+                "experiment_id": exp_id,
+                "pairs_count": len(pairs),
+                "verified_savings_pct": final_val.get("verified_savings_pct"),
+                "verified_runtime_delta_s": final_val.get("verified_runtime_delta_s"),
+                "status": final_val.get("status"),
+            })
+            logger.info("Validation complete for %s: %d pairs, savings=%s%%", exp_id, len(pairs), final_val.get("verified_savings_pct"))
+
+        except Exception as exc:
+            logger.exception("Validation execution failed: %s", exc)
+            self._emit(exp_id, "experiment_state", {"state": "failed", "message": f"Validation failed: {exc}"})
+        finally:
+            if has_helper and helper:
+                try:
+                    helper.restore()
+                    helper.end_session()
+                except Exception:
+                    pass
+
     def _run_experiment(self, exp_id, request, seeded) -> None:
         from workloads.registry import get_workload
         from core.runner import WorkloadRunner
@@ -449,7 +669,7 @@ class LiveEngine:
 
         return out
 
-    def _run_one(self, helper, runner: Any, workload_id: str, exp_id: str, cfg: Configuration, passive: bool = False, repetition: int = 1) -> RunRecord:
+    def _run_one(self, helper, runner: Any, workload_id: str, exp_id: str, cfg: Configuration, passive: bool = False, repetition: int = 1, phase: str = "profiling") -> RunRecord:
         """Apply config via helper, run workload bracketed, restore, return record."""
         from workloads.registry import get_workload
 
@@ -473,12 +693,12 @@ class LiveEngine:
             control["pstate_mode"] = "passive"
         r = helper.apply_configuration(control)
         if not r.get("ok"):
-            return self._failed_record(exp_id, cfg, f"apply failed: {r.get('error')}")
+            return self._failed_record(exp_id, cfg, f"apply failed: {r.get('error')}", phase=phase)
         helper.heartbeat()
         time.sleep(0.3)
         try:
             e1 = helper.read_energy()
-            rec = runner.run(wl, exp_id, cfg, repetition=repetition, phase="profiling")
+            rec = runner.run(wl, exp_id, cfg, repetition=repetition, phase=phase)
             e2 = helper.read_energy()
             if e1.get("ok") and e2.get("ok"):
                 rec.package_energy_j = round(((e2["uj"] - e1["uj"]) % WRAP_UJ) / 1e6, 4)
@@ -494,10 +714,10 @@ class LiveEngine:
                 logger.warning("helper session re-acquire failed after restore")
             time.sleep(0.2)
 
-    def _failed_record(self, exp_id, cfg, why) -> RunRecord:
+    def _failed_record(self, exp_id, cfg, why, phase: str = "profiling") -> RunRecord:
         return RunRecord(
             run_id=f"fail_{int(time.time()*1000)}", experiment_id=exp_id, config_id=cfg.id,
-            workload_name="fixed_compute", repetition=1, mode="harness", phase="profiling",
+            workload_name="fixed_compute", repetition=1, mode="harness", phase=phase,
             runtime_s=0.0, package_energy_j=None, energy_available=False,
             status="failed", exit_code=1, output_verified=False, configuration=cfg,
         )

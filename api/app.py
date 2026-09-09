@@ -82,14 +82,17 @@ _CAPS_CACHE_AT: float = 0.0
 
 
 def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
-    """Return the API-shaped experiment dict, overlay first then Store."""
+    """Return the API-shaped experiment dict, overlay merged over Store."""
     exp = None
+    row = _STORE.get_experiment(experiment_id)
+    if row is not None:
+        exp = store_bridge.experiment_to_api(row)
+
     if experiment_id in _OVERLAY:
-        exp = dict(_OVERLAY[experiment_id])
-    else:
-        row = _STORE.get_experiment(experiment_id)
-        if row is not None:
-            exp = store_bridge.experiment_to_api(row)
+        if exp is None:
+            exp = dict(_OVERLAY[experiment_id])
+        else:
+            exp.update({k: v for k, v in _OVERLAY[experiment_id].items() if not k.startswith("_")})
 
     if exp is None:
         return None
@@ -132,7 +135,7 @@ def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
 
 def _resolve_selection_model(experiment_id: str) -> Optional[dict[str, Any]]:
     """Return the canonical model-shaped Selection dict (needed for explanations)."""
-    if experiment_id in _OVERLAY:
+    if experiment_id in _OVERLAY and _OVERLAY[experiment_id].get("_selection_model"):
         return _OVERLAY[experiment_id].get("_selection_model")
     row = _STORE.get_experiment(experiment_id)
     if row is None:
@@ -339,6 +342,14 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             prof = _OVERLAY[exp_id].setdefault("profile", {})
             prof["runs"] = []
             prof["configurations"] = {}
+            _OVERLAY[exp_id]["validation"] = {
+                "status": "not_run",
+                "pairs": [],
+                "verified_savings_pct": None,
+                "verified_runtime_delta_s": None,
+            }
+            if _STORE.get_experiment(exp_id):
+                _STORE.save_validation_pairs(exp_id, [])
     except Exception as exc:  # pragma: no cover - stay on fixture path
         logging.warning("live engine unavailable, using fixture mode: %s", exc)
 
@@ -481,13 +492,24 @@ def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
 @app.post("/api/experiments/{id}/validate", status_code=status.HTTP_202_ACCEPTED)
 def validate_experiment(id: str) -> dict[str, Any]:
     """Trigger fresh validation executions of baseline vs selected."""
-    if _resolve_experiment(id) is None:
+    exp = _resolve_experiment(id)
+    if exp is None:
         raise HTTPException(status_code=404, detail=f"Experiment '{id}' not found")
+
+    try:
+        from api.engine import LiveEngine
+
+        engine = LiveEngine(default_bus(), store_bridge_mod=store_bridge, overlays=_OVERLAY, store=_STORE)
+        started = engine.start_validation(id, repetitions=3)
+    except Exception as exc:
+        logger.warning("Failed to launch live validation: %s", exc)
+        started = False
+
     return {
         "status": "validation_started",
         "experiment_id": id,
         "planned_pairs": 3,
-        "message": "Validation runs scheduled against hardware counters.",
+        "message": "Validation runs scheduled against hardware counters." if started else "Validation scheduled in simulation mode.",
     }
 
 

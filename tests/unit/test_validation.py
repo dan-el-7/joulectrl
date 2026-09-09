@@ -102,3 +102,69 @@ def test_dedupe_configurations_collapses_identical_resolutions():
     cfg_other = Configuration(id="b", layout="A", worker_count=4, cpu_affinity=[0, 2, 4, 8])
     result = dedupe_configurations([cfg1, cfg_dup, cfg_other])
     assert [c.id for c in result] == ["a", "b"]
+
+
+def test_live_engine_validation_execution(tmp_path):
+    from core.events import EventBus
+    from core.store import Store
+    from api import store_bridge
+    from api.engine import LiveEngine
+    from core.models import Configuration, RunRecord
+    from unittest.mock import MagicMock, patch
+
+    bus = EventBus()
+    store = Store(str(tmp_path / "test.db"))
+    store.create_experiment("exp_test_val", "clean_build", "deadline", 45.0)
+
+    cfg_base = Configuration(id="cfg_base", layout="B", worker_count=4, cpu_affinity=[0, 1, 2, 3], boost=True)
+    cfg_sel = Configuration(id="cfg_sel", layout="A", worker_count=2, cpu_affinity=[0, 2], boost=False)
+
+    overlays = {
+        "exp_test_val": {
+            "id": "exp_test_val",
+            "state": "selected",
+            "workload_id": "dummy",
+            "runtime_budget_s": 45.0,
+            "profile": {
+                "baseline_config_id": "cfg_base",
+                "configurations": {
+                    "cfg_base": {"configuration": cfg_base.to_dict(), "is_baseline": True},
+                    "cfg_sel": {"configuration": cfg_sel.to_dict()},
+                },
+            },
+            "selection": {"config_id": "cfg_sel", "configuration": cfg_sel.to_dict()},
+            "validation": {"status": "not_run", "pairs": []},
+        }
+    }
+
+    engine = LiveEngine(bus, store_bridge, overlays=overlays, store=store)
+
+    # Mock runner and helper
+    mock_run = MagicMock()
+    mock_run.side_effect = [
+        RunRecord(run_id="r1", experiment_id="exp_test_val", config_id="cfg_base", workload_name="dummy", repetition=1, runtime_s=2.0, package_energy_j=100.0, status="success"),
+        RunRecord(run_id="r2", experiment_id="exp_test_val", config_id="cfg_sel", workload_name="dummy", repetition=1, runtime_s=2.2, package_energy_j=70.0, status="success"),
+    ]
+
+    with patch.object(engine, "_helper") as mock_h:
+        mock_helper = MagicMock()
+        mock_helper.read_energy.side_effect = [
+            {"ok": True, "uj": 50_000_000, "t": 0.5},
+            {"ok": True, "uj": 100_000_000, "t": 1.0},
+            {"ok": True, "uj": 200_000_000, "t": 3.0},
+            {"ok": True, "uj": 200_000_000, "t": 3.0},
+            {"ok": True, "uj": 270_000_000, "t": 5.2},
+        ]
+        mock_helper.begin_session.return_value = {"ok": True}
+        mock_helper.apply_configuration.return_value = {"ok": True}
+        mock_helper.restore.return_value = {"ok": True}
+        mock_h.return_value = mock_helper
+
+        with patch("core.runner.WorkloadRunner.run", mock_run):
+            engine._run_validation("exp_test_val", repetitions=1)
+
+    assert overlays["exp_test_val"]["state"] == "complete"
+    assert overlays["exp_test_val"]["validation"]["status"] == "verified"
+    assert len(overlays["exp_test_val"]["validation"]["pairs"]) == 1
+    assert overlays["exp_test_val"]["validation"]["verified_savings_pct"] == 30.0
+
