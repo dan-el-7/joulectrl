@@ -274,6 +274,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 ### Agent C log
 
 - (hour 0) onboarded.
+- (2026-09-09 10:10 UTC) [contract] AFFECTS(a,b,d) docs/API.md committed: frozen route table (PLAN §8), watch endpoints/SSE (§6b), preference mode targets/outcomes (§6c), and SSE event contracts.
 
 ### Agent D log
 
