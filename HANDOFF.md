@@ -53,11 +53,12 @@ pull --rebase before editing, push immediately after).
 
 ## Agent B — resume packet
 
-- **Done & verified:** `<...>`
-- **In flight:** `<...>`
-- **Resume here:** `<...>`
-- **Gotchas:** `<e.g. "models.py contract pending C's objection window">`
-- **Handoffs owed / waiting on:** `<...>`
+- **Done & verified:** `core/models.py` v0 + `tests/unit/test_models.py` (9 passed, covering all §5 contracts, watch mode metadata, preference mode targets/outcomes, and calibration records).
+- **In flight:** `b/models-v0` branch ready to merge/push; starting `energy/synthetic.py`.
+- **Resume here:** Commit and merge `b/models-v0` to `main`, push to origin, start `energy/synthetic.py`.
+- **Gotchas:** `energy_available=False` must ensure `package_energy_j=None` (never 0.0).
+- **Handoffs owed / waiting on:** Models v0 published to unblock C and D; awaiting Agent A's energy/base.py protocol.
+
 
 ## Agent C — resume packet
 
