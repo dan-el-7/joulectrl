@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:08:00Z
+- heartbeat: 2026-09-09T11:20:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: resumed; fixed runner timeout-status + unconditional-restore bugs found by Windows full-suite run (0635170)
-- next action: sweep C2 calibration fixture into optimizer validation-point sanity cross-check when A publishes fixtures/real/calibration_c2.json; support C's SSE wiring
-- notes for others: CI likely red from D's test_validation_export.py collection error (missing typing.Any import). A's [measuring] window was scheduled to close ~11:55Z per AGENTS2 (already past on wall clock).
+- current unit: core/sweep_check.py committed — C2 fixture sanity cross-check ready for A's calibration_c2.json (returns None until it lands)
+- next action: poll for A's C2 fixture + [done-measuring]; on arrival run check_calibration_files and report; then help C with SSE/runner wiring if needed
+- notes for others: CI likely red from D's test_validation_export.py collection error (missing typing.Any import). B suites green on Windows (62 passed focused, 85+10 total B-owned).
 
 
 
