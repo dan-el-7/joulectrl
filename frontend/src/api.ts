@@ -32,6 +32,7 @@ export async function createExperiment(payload: {
   runtime_budget_s?: number | null;
   preference?: { energy_target_pct: number; perf_floor_pct: number };
   calibration_budget_s?: number;
+  experimental_passive_caps?: boolean;
 }): Promise<{ id: string }> {
   const res = await fetch(`${API_BASE}/experiments`, {
     method: 'POST',

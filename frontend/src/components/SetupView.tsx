@@ -69,6 +69,8 @@ interface SetupViewProps {
   onChangePerfFloor: (val: number) => void;
   calibrationBudgetS: number | null;
   onChangeCalibrationBudget: (val: number | null) => void;
+  expPassiveCaps: boolean;
+  onChangeExpPassiveCaps: (val: boolean) => void;
   onStartExperiment: () => void;
   isStarting: boolean;
   baselineRuntimeS?: number | null;
@@ -89,6 +91,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onChangePerfFloor,
   calibrationBudgetS,
   onChangeCalibrationBudget,
+  expPassiveCaps,
+  onChangeExpPassiveCaps,
   onStartExperiment,
   isStarting,
   baselineRuntimeS,
@@ -287,6 +291,30 @@ export const SetupView: React.FC<SetupViewProps> = ({
               Exhaustive
             </label>
           </div>
+        </div>
+
+        {/* Experimental: passive-mode caps */}
+        <div
+          style={{
+            marginBottom: '1rem', padding: '0.6rem 0.8rem', borderRadius: '0.5rem',
+            border: `1px dashed ${expPassiveCaps ? colors.amber : colors.border}`,
+            background: expPassiveCaps ? 'rgba(245,158,11,0.06)' : 'transparent',
+          }}
+        >
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={expPassiveCaps}
+              onChange={(e) => onChangeExpPassiveCaps(e.target.checked)}
+              style={{ marginTop: 3, accentColor: colors.amber }}
+            />
+            <span style={{ fontSize: '0.8rem', color: colors.textSecondary }}>
+              <span style={{ color: colors.amber, fontWeight: 600 }}>EXPERIMENTAL:</span> intermediate
+              frequency caps (amd_pstate passive mode) — adds 3.0–4.5 GHz boost-on points to the sweep.
+              Caps bind only in passive mode; measured gains are marginal (~4% energy at +27% runtime on
+              this machine) and mode-switching perturbs the system. Restored automatically after the run.
+            </span>
+          </label>
         </div>
 
         {/* Action Button */}

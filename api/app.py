@@ -113,6 +113,10 @@ class CreateExperimentRequest(BaseModel):
     runtime_budget_s: Optional[float] = 45.0
     preference: Optional[PreferenceSpec] = None
     calibration_budget_s: Optional[float] = 120.0
+    # EXPERIMENTAL (dev option, off by default): profile with amd_pstate in
+    # passive mode, where frequency caps bind WITH boost on. Restored after.
+    # Measured on the demo laptop: marginal gains (see capability_report note).
+    experimental_passive_caps: bool = False
     headroom_pct: float = 5.0
     validation_selection: str = "pareto"
 
@@ -276,6 +280,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             "workload_id": req.workload_id, "objective": req.objective,
             "runtime_budget_s": req.runtime_budget_s,
             "preference": req.preference.model_dump() if req.preference else None,
+            "experimental_passive_caps": req.experimental_passive_caps,
         }, seeded):
             _OVERLAY[exp_id]["state"] = "profiling"
     except Exception as exc:  # pragma: no cover - stay on fixture path

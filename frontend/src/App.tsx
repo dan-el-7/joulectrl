@@ -28,6 +28,7 @@ export const App: React.FC = () => {
   const [energyTargetPct, setEnergyTargetPct] = useState<number>(70);
   const [perfFloorPct, setPerfFloorPct] = useState<number>(90);
   const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(120);
+  const [expPassiveCaps, setExpPassiveCaps] = useState<boolean>(false);
 
   // Status flags
   const [isStarting, setIsStarting] = useState<boolean>(false);
@@ -120,6 +121,7 @@ export const App: React.FC = () => {
             ? { energy_target_pct: energyTargetPct, perf_floor_pct: perfFloorPct }
             : undefined,
         calibration_budget_s: calibrationBudgetS ?? undefined,
+        experimental_passive_caps: expPassiveCaps,
       });
       const fullExp = await fetchExperiment(res.id);
       setExperiment(fullExp);
@@ -194,6 +196,8 @@ export const App: React.FC = () => {
             onChangePerfFloor={setPerfFloorPct}
             calibrationBudgetS={calibrationBudgetS}
             onChangeCalibrationBudget={setCalibrationBudgetS}
+            expPassiveCaps={expPassiveCaps}
+            onChangeExpPassiveCaps={setExpPassiveCaps}
             onStartExperiment={handleStartExperiment}
             isStarting={isStarting}
             baselineRuntimeS={

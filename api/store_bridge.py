@@ -260,10 +260,10 @@ def apply_live_profile(
     for the contract shape.
     """
     sel_dict = selection
-    if hasattr(selection, "model_dump"):
+    if hasattr(selection, "to_dict"):  # B's dataclass contract
+        sel_dict = selection.to_dict()
+    elif hasattr(selection, "model_dump"):  # pydantic models
         sel_dict = selection.model_dump()
-    elif hasattr(selection, "_asdict"):
-        sel_dict = selection._asdict()
 
     profile = overlay.setdefault("profile", {})
     profile["configurations"] = configurations
