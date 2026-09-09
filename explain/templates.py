@@ -31,8 +31,8 @@ def format_deadline_explanation(facts: dict[str, Any]) -> str:
     if base and e_red is not None and t_inc is not None:
         lines.append(
             f"Compared to the baseline ({base['id']}), it reduces package energy by "
-            f"{e_red:.1f}% ({base['median_energy_j']:.1f} J → {sel['median_energy_j']:.1f} J) "
-            f"with a {t_inc:.1f}% runtime increase ({base['median_runtime_s']:.1f}s → {sel['median_runtime_s']:.1f}s)."
+            f"{e_red:.1f}% ({base['median_energy_j']:.1f} J -> {sel['median_energy_j']:.1f} J) "
+            f"with a {t_inc:.1f}% runtime increase ({base['median_runtime_s']:.1f}s -> {sel['median_runtime_s']:.1f}s)."
         )
 
     # Lowest overall note

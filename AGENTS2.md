@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T10:35:00Z`
+- heartbeat: `2026-09-09T10:40:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/integration-tests`
-- current unit: `committed integration tests; preparing demo/ runner assets`
-- next action: `prepare demo/ CLI and scripted scenario scripts per PLAN §13`
-- notes for others: `All unit (17) and integration (2) tests passing. Waiting on Agent B runner for Gate 2 integration.`
+- branch: `d/demo-scaffold`
+- current unit: `committed demo/run_demo.py and demo/README.md; Gate 1 complete, Gate 2 ready`
+- next action: `wire Workload plugins into Agent B runner upon Gate 2 merge`
+- notes for others: `All deliverables up to Gate 2 complete: kernel, workloads, synthetic fixtures, explain layer, integration tests, and live demo script.`

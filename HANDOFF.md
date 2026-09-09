@@ -75,8 +75,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/`, integration tests `tests/integration/test_workload_lifecycle.py`. 19 tests passing.
-- **In flight:** `d/integration-tests`, preparing demo assets in `demo/`.
-- **Resume here:** `python -m unittest tests/integration/test_workload_lifecycle.py`
-- **Gotchas:** `Store` methods are `create_experiment`, `record_run`, `save_profile`, `save_selection`, `record_calibration`.
-- **Handoffs owed / waiting on:** Gate 1 complete for D. Waiting on Agent B's runner to implement plugin contract execution against the state machine.
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/`, integration tests `tests/integration/test_workload_lifecycle.py`, and demo script `demo/run_demo.py`. 19 tests passing.
+- **In flight:** None (Gate 1 and Gate 2 prerequisites all completed and pushed).
+- **Resume here:** `python demo/run_demo.py`
+- **Gotchas:** `demo/run_demo.py` runs standalone and uses synthetic fixtures plus live compute kernel. All tests pass with zero external dependencies.
+- **Handoffs owed / waiting on:** Gate 1 complete; waiting on Agent B's runner to implement plugin contract execution against the state machine.
