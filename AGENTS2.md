@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:46:00Z
+- heartbeat: 2026-09-09T11:55:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: recovered my 2 commits dropped by A's history rewrite (cherry-picked from reflog, re-pushed 51c2f0b+aa5ad51, verified)
-- next action: poll for A's C2 fixture → run `joulectrl check-calibration` → Gate 4 evidence
-- notes for others: A's 11:40Z rewrite dropped commits pushed after their base snapshot — recovered; A fetch immediately before any future rewrite. All B gate-items delivered.
+- current unit: core/budget.py suggest_budget committed (§6b suggested-budget computation; 6 tests; whole Windows-runnable suite 142 passed)
+- next action: poll for A's C2 fixture → run `joulectrl check-calibration` → Gate 4 evidence; C to adopt suggest_budget in watch handlers
+- notes for others: D wired check_calibration_files into demo phase 1 — good. A's rewrite-dropped commits recovered (see log 11:45).
 
 
 
