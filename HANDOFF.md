@@ -74,8 +74,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c` (pushed to main), workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, unit tests `tests/unit/test_workloads_base.py` and `tests/unit/test_compute_kernel.py` all green.
-- **In flight:** `d/workload-contract`, building `workloads/clean_build.py` (Workload A: zstd pinned clean-build scaffold).
-- **Resume here:** `python -m unittest tests/unit/test_workloads_base.py`
-- **Gotchas:** `Workload` methods expect argument list (`list[str]`), not shell string. `prepare()` and `verify()` run outside measurement window.
-- **Handoffs owed / waiting on:** Unblocked Agent B with `Workload` interface for runner integration.
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c` (pushed to main), workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, unit tests `tests/unit/test_clean_build.py`, `tests/unit/test_workloads_base.py`, and `tests/unit/test_compute_kernel.py` all green (12/12 passing).
+- **In flight:** Preparing synthetic experiment fixtures in `fixtures/synthetic/` and deterministic explanation templates in `explain/`.
+- **Resume here:** `python -m unittest discover -s tests/unit -p "test_*.py"`
+- **Gotchas:** `clean_build.py` enforces clean output state and disables caching (`CCACHE_DISABLE=1`, `SCCACHE_DISABLE=1`). Pre-warms filesystem cache during `prepare()`.
+- **Handoffs owed / waiting on:** All First-90-minutes deliverables completed and pushed.

@@ -79,9 +79,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T10:17:00Z`
+- heartbeat: `2026-09-09T10:25:00Z`
 - session: `D#1` · status: `active`
-- branch: `d/workload-contract`
-- current unit: `committed workloads/base.py and fixed_compute.py; starting zstd clean-build scaffold`
-- next action: `implement workloads/clean_build.py (zstd clean-build workload) per PLAN §4/§8`
-- notes for others: `workloads/base.py Workload interface is frozen. Unblocks Agent B runner and workloads integration.`
+- branch: `d/zstd-scaffold`
+- current unit: `committed workloads/clean_build.py; starting synthetic fixtures and explanation scaffold`
+- next action: `prepare fixtures/synthetic/ test datasets and explanation templates per PLAN §10`
+- notes for others: `Gate 1 deliverables complete: compute kernel, workload plugin contract, fixed_compute plugin, clean_build scaffold.`
