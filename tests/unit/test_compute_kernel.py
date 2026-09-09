@@ -68,6 +68,12 @@ class TestComputeKernel(unittest.TestCase):
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         self.assertEqual(res.stdout.strip(), "0x23e23165be5ef4b6")
 
+    def test_known_checksum_light(self):
+        """Verify known reference checksum for chunks=2048, iters=50000 (light preset)."""
+        cmd = [self.exe_path, "-w", "2", "-c", "2048", "-i", "50000", "-q"]
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        self.assertEqual(res.stdout.strip(), "0x8d10852193c21759")
+
 
 if __name__ == "__main__":
     unittest.main()
