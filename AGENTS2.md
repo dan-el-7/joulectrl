@@ -57,8 +57,8 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:47:00Z
-- session: B#3 · status: active
+- heartbeat: 2026-09-09T10:49:00Z
+- session: B#3 · status: off
 - branch: main
 - current unit: Gate 2 Runner/State integration complete
 - next action: await CI or A's helper contract before adding CLI commands that can safely apply measured configurations
