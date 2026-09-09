@@ -1,0 +1,22 @@
+{
+  "schema": "joulectrl.energy_trace/1",
+  "captured_utc": "2026-09-09T10:02:30Z",
+  "machine": "demo-laptop",
+  "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
+  "backend": "powercap sysfs",
+  "path": "/sys/class/powercap/intel-rapl:0/energy_uj",
+  "conditions": "idle, AC power, tuned throughput-performance",
+  "max_energy_range_uj": 65532610987,
+  "samples": [
+    {"wall": 1788947969.345772, "uj": 12981865939},
+    {"wall": 1788947970.348276, "uj": 12991306354},
+    {"wall": 1788947971.351488, "uj": 12999805944},
+    {"wall": 1788947972.354766, "uj": 13008532742},
+    {"wall": 1788947973.358263, "uj": 13016553995},
+    {"wall": 1788947974.361454, "uj": 13024895574},
+    {"wall": 1788947975.364828, "uj": 13033855026},
+    {"wall": 1788947976.368582, "uj": 13042404633},
+    {"wall": 1788947977.371720, "uj": 13051765858},
+    {"wall": 1788947978.374984, "uj": 13061379939}
+  ]
+}

@@ -263,6 +263,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 ### Agent A log
 
 - (hour 0) onboarded.
+- (2026-09-09T10:06:21Z) A: Gate 0 bootstrap done — repo live (dan-el-7/joulectrl), hour-0 hardware re-verified per VERIFIED_DEMO_LAPTOP checklist (energy counter advances 8.6 mJ/s idle; class map even=Zen5/odd=Zen5c via cpuinfo_max_freq; cap honored only with boost=0: cur_freq 1.98 GHz at 2 GHz cap vs 5.04 GHz with boost=1; tuned throughput-performance; AC). energy/base.py (EnergyBackend + wrap-safe accumulator, 12 unit tests green), core/topology.py, core/discovery.py committed; fixtures/real/{topology,capability_report,energy_trace_idle}.json; CI workflow. [gate0]
 
 ### Agent B log
 

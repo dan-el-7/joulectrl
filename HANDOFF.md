@@ -45,11 +45,12 @@ pull --rebase before editing, push immediately after).
 
 ## Agent A — resume packet
 
-- **Done & verified:** `<bullet list with commit hashes; what tests/fixtures prove it>`
-- **In flight:** `<branch, uncommitted files, partial measurements, open [measuring] windows>`
-- **Resume here:** `<one runnable step>`
-- **Gotchas:** `<hardware quirks, sudo steps pending human action, restore states to check>`
-- **Handoffs owed / waiting on:** `<e.g. "kernel from D by h2 — not yet arrived">`
+- **Done & verified:** repo dan-el-7/joulectrl bootstrapped (docs/PLAN.md, AGENTS*.md, HANDOFF.md, LICENSE, .gitattributes/.gitignore, pyproject). Hour-0 hardware checklist re-verified with root via pkexec: energy_uj advances (~8.6 mJ/s idle), class map even=Zen5 5.09GHz/odd=Zen5c 3.51GHz, cap honored only with boost=0 (1.98 GHz at 2 GHz cap), tuned=throughput-performance, AC=1, boot_id=6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2. energy/base.py + core/topology.py + core/discovery.py + 12 unit tests green. fixtures/real/{topology,capability_report,energy_trace_idle}.json. CI workflow committed.
+- **In flight:** first commit+push of the above (this commit).
+- **Resume here:**  — then start helper/ skeleton: docs/HELPER.md + helper op set (begin_session, read_energy, apply_configuration, heartbeat, restore, end_session), Unix socket + peer-cred auth.
+- **Gotchas:** energy reads root-only (pkexec works, GUI prompt). boost=1 makes caps silent no-ops — always (boost, cap) pairs on this machine. policy0 min is 623377, not what cpuinfo says. Never run heavy loops while a [measuring] window is open.
+- **Handoffs owed / waiting on:** D's kernel [contract] line by h2 (calibration C1/C2 driver). Invited collaborators should push under own accounts.
+
 
 ## Agent B — resume packet
 

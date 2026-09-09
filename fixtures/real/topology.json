@@ -1,0 +1,30 @@
+{
+  "schema": "joulectrl.topology/1",
+  "captured_utc": "2026-09-09T09:56:00Z",
+  "machine": "demo-laptop",
+  "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
+  "cpu_model": "AMD Ryzen AI 7 350 w/ Radeon 860M",
+  "kernel": "7.1.10-200.fc44.x86_64",
+  "ncpu": 16,
+  "n_cores": 8,
+  "n_sockets": 1,
+  "smt_groups": {
+    "0": [0, 8], "1": [1, 9], "2": [2, 10], "3": [3, 11],
+    "4": [4, 12], "5": [5, 13], "6": [6, 14], "7": [7, 15]
+  },
+  "sockets": {"0": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},
+  "cpufreq": {
+    "driver": "amd-pstate-epp",
+    "governor": "performance",
+    "n_policies": 16,
+    "per_cpu_policies": true,
+    "policy_names": ["policy0","policy1","policy2","policy3","policy4","policy5","policy6","policy7","policy8","policy9","policy10","policy11","policy12","policy13","policy14","policy15"]
+  },
+  "core_classes": {
+    "source": "per-cpu cpuinfo_max_freq",
+    "classes": {
+      "class_0_5090910": {"cpus": [0,2,4,6,8,10,12,14], "hw_max_freq": 5090910, "label": "fast"},
+      "class_1_3506494": {"cpus": [1,3,5,7,9,11,13,15], "hw_max_freq": 3506494, "label": "efficient"}
+    }
+  }
+}
