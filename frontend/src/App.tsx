@@ -43,6 +43,11 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem('joulectrl_repetitions');
     return saved ? parseInt(saved, 10) || 1 : 1;
   });
+  const [taskPriority, setTaskPriority] = useState<'top_priority' | 'eco_deadline' | 'best_effort'>(() => {
+    const saved = localStorage.getItem('joulectrl_task_priority');
+    if (saved === 'top_priority' || saved === 'eco_deadline' || saved === 'best_effort') return saved;
+    return 'top_priority';
+  });
   const [hasCalibration, setHasCalibration] = useState<boolean>(true);
   const [latestWatchedSegment, setLatestWatchedSegment] = useState<{
     duration_s: number;
@@ -188,6 +193,11 @@ export const App: React.FC = () => {
     localStorage.setItem('joulectrl_repetitions', String(val));
   };
 
+  const handleTaskPriorityChange = (p: 'top_priority' | 'eco_deadline' | 'best_effort') => {
+    setTaskPriority(p);
+    localStorage.setItem('joulectrl_task_priority', p);
+  };
+
   const handleStartExperiment = async () => {
     try {
       setIsStarting(true);
@@ -202,6 +212,7 @@ export const App: React.FC = () => {
         calibration_budget_s: calibrationBudgetS,
         experimental_passive_caps: expPassiveCaps,
         repetitions,
+        priority_mode: taskPriority,
       });
       localStorage.setItem('joulectrl_active_experiment_id', res.id);
       await loadExperiments(res.id);
@@ -286,6 +297,8 @@ export const App: React.FC = () => {
             onChangeExpPassiveCaps={setExpPassiveCaps}
             repetitions={repetitions}
             onChangeRepetitions={handleRepetitionsChange}
+            taskPriority={taskPriority}
+            onChangeTaskPriority={handleTaskPriorityChange}
             onStartExperiment={handleStartExperiment}
             isStarting={isStarting}
             baselineRuntimeS={

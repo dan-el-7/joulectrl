@@ -219,3 +219,64 @@ def quiet_system(app_keys: Optional[list[str]] = None, pids: Optional[list[int]]
         "closed_apps": closed_apps,
         "remaining_noise": get_system_noise(),
     }
+
+
+def get_thermal_status() -> dict[str, Any]:
+    """Inspect sysfs hwmon sensors for CPU temperature and thermal throttling risk."""
+    import glob
+
+    tctl_c: Optional[float] = None
+    acpitz_c: Optional[float] = None
+    source = "unavailable"
+
+    for hwmon in sorted(glob.glob("/sys/class/hwmon/hwmon*")):
+        name_path = os.path.join(hwmon, "name")
+        if not os.path.exists(name_path):
+            continue
+        try:
+            name = open(name_path).read().strip()
+        except Exception:
+            continue
+
+        if name == "k10temp":
+            source = "k10temp"
+            for temp_in in sorted(glob.glob(os.path.join(hwmon, "temp*_input"))):
+                try:
+                    val = int(open(temp_in).read().strip()) / 1000.0
+                    label_path = temp_in.replace("_input", "_label")
+                    lbl = open(label_path).read().strip() if os.path.exists(label_path) else "Tctl"
+                    if lbl == "Tctl" or tctl_c is None:
+                        tctl_c = val
+                except Exception:
+                    pass
+        elif name == "acpitz" and acpitz_c is None:
+            for temp_in in sorted(glob.glob(os.path.join(hwmon, "temp*_input"))):
+                try:
+                    acpitz_c = int(open(temp_in).read().strip()) / 1000.0
+                except Exception:
+                    pass
+
+    cpu_temp = tctl_c if tctl_c is not None else acpitz_c
+    is_throttling = False
+    warning_level = "normal"  # normal, elevated, critical
+    message = "CPU temperature is normal."
+
+    if cpu_temp is not None:
+        if cpu_temp >= 95.0:
+            is_throttling = True
+            warning_level = "critical"
+            message = f"CPU temperature is critical ({cpu_temp:.1f}°C). Thermal throttling is active."
+        elif cpu_temp >= 85.0:
+            warning_level = "elevated"
+            message = f"CPU temperature is elevated ({cpu_temp:.1f}°C). Thermal throttling may occur under sustained load."
+        else:
+            message = f"CPU temperature is {cpu_temp:.1f}°C (normal)."
+
+    return {
+        "cpu_temp_c": cpu_temp,
+        "is_throttling": is_throttling,
+        "warning_level": warning_level,
+        "message": message,
+        "source": source,
+    }
+

@@ -391,17 +391,16 @@ export const CalibrationView: React.FC = () => {
         </>
       )}
 
-      {/* perf/W curve(s) */}
+      {/* Performance vs Power curve(s) */}
       <div style={{ ...sectionLabel, marginTop: 8 }}>
-        Efficiency curve — perf/W vs avg package power
+        Performance vs Power Curve (Performance on Y axis, Wattage on X axis)
         {scopeFilter === 'single' ? ' (single-core points)' : scopeFilter === 'multi' ? ' (multicore points)' : ' (all measured points)'}
       </div>
       <div style={{ ...card, padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12, flexWrap: 'wrap' }}>
           <div style={{ ...type.small, color: colors.textSecondary, maxWidth: 640 }}>
-            Throughput per package-watt at each measured control point, one series per core class.
-            Higher is better. Points with equal class + worker count but different controls show the
-            measured frequency/boost tradeoff.
+            Performance (throughput on Y axis) vs package power (wattage in W on X axis). Higher is faster.
+            Shows how much performance each core class delivers at different power levels.
           </div>
           {/* machine-fact honesty note: why the curve is 2 points on this laptop */}
           {data && classes.length > 0 && classes.every((c) => new Set(c.points.filter((p) => p.workers > 1).map((p) => p.control)).size <= 2) && (
@@ -440,12 +439,15 @@ export const CalibrationView: React.FC = () => {
             const list = filteredPointsByClass.get(c.label) ?? [];
             return list.map((p) => ({
               x: p.watts,
-              y: (p as CalPoint & { perf_per_watt?: number }).perf_per_watt ?? p.perfPerWatt ?? 0,
+              y: p.throughput > 0 ? p.throughput : (p.runtime_s > 0 ? 16384 / p.runtime_s : 0),
               label: `${c.label} · ${p.control} · ${p.workers}w`,
               series: c.label,
               meta: {
+                performance: `${fmt(p.throughput > 0 ? p.throughput : 16384 / p.runtime_s, 0)} chunks/s`,
+                power: `${fmt(p.watts, 1)} W`,
                 runtime: `${fmt(p.runtime_s, 2)}s`,
                 energy: `${fmt(p.energy_j, 1)}J`,
+                'perf/W': `${fmt((p as CalPoint & { perf_per_watt?: number }).perf_per_watt ?? p.perfPerWatt, 0)} ch/J`,
                 'scaling eff': (p.scalingEfficiency ?? p.scaling_efficiency) ? `${(((p.scalingEfficiency ?? p.scaling_efficiency) as number) * 100).toFixed(0)}%` : '—',
               },
             }));
@@ -469,9 +471,10 @@ export const CalibrationView: React.FC = () => {
                 connectSeries
                 series={seriesColors}
                 seriesKey={(p) => (p as Point & { series?: string }).series ?? ''}
-                xLabel="avg package power"
-                yLabel="perf / W"
+                xLabel="Package Power"
+                yLabel="Performance (Throughput)"
                 xUnit="W"
+                yUnit="chunks/s"
                 onHover={setHovered}
               />
             </div>

@@ -34,6 +34,7 @@ export async function createExperiment(payload: {
   calibration_budget_s?: number | null;
   experimental_passive_caps?: boolean;
   repetitions?: number;
+  priority_mode?: string;
 }): Promise<{ id: string }> {
   const res = await fetch(`${API_BASE}/experiments`, {
     method: 'POST',
@@ -170,4 +171,19 @@ export async function quietSystem(appKeys?: string[], pids?: number[]): Promise<
   if (!res.ok) throw new Error(`Failed to quiet system: ${res.statusText}`);
   return res.json();
 }
+
+export interface SystemThermalStatus {
+  cpu_temp_c: number | null;
+  is_throttling: boolean;
+  warning_level: 'normal' | 'elevated' | 'critical';
+  message: string;
+  source: string;
+}
+
+export async function fetchSystemThermal(): Promise<SystemThermalStatus> {
+  const res = await fetch(`${API_BASE}/system/thermal`);
+  if (!res.ok) throw new Error(`Failed to fetch thermal status: ${res.statusText}`);
+  return res.json();
+}
+
 

@@ -131,6 +131,28 @@ mid-task:
 | Restartable (clean builds) | **Cancel + requeue from scratch**; scheduler decides if the restart cost beats letting it finish. |
 | Black-box (watch-mode tasks, user's own loops) | **None** — only admission control at start. Never SIGSTOP a task we don't own. |
 
+### 3.5 Priority Tiers: "Top Priority" vs "Deprioritized with Deadline" (Eco Deadline)
+
+In practical developer use, not every task with a deadline needs full blast from second zero. The user can assign tasks into three explicit operational policies:
+
+| Policy | Initial Allocation | Deadline Policy | Lag / Catch-up Reaction |
+|---|---|---|---|
+| **Top Priority ("Must-Finish")** | Fast Zen 5 physical cores, stock boost headroom reserved | Strict hard deadline. First claim on CPU resources. | Immediate escalation: expands cores, preempts background tasks, claims global boost. |
+| **Eco Deadline ("Deprioritized with Deadline")** | Efficient Zen 5c cores, base clock (~2 GHz), boost OFF | Target deadline with aggressive energy-saving default (~50%+ power reduction). | **Adaptive Catch-Up**: As long as ETA meets deadline, stays in low power. If lagging behind deadline trajectory, triggers the ladder: expands cores, gains access to idle Zen 5 cores, and engages global boost if needed. |
+| **Best Effort (Background)** | Remainder Zen 5c cores, base clock | No deadline (energy minimization objective). | Yields cores and pauses whenever Top Priority or Eco Deadline tasks need headroom. |
+
+**The Deprioritized-with-Deadline Lifecycle**:
+1. **Admission**: The scheduler verifies whether the deadline is feasible under *both* base clock and peak clock. If infeasible even at stock, admission warns immediately.
+2. **Execution at Low Power**: Starts on efficient cores with boost OFF. Peak power stays low (~10–15W).
+3. **Continuous Progress Tracking**: Every 1–2s, `lag = expected_progress - observed_progress`.
+4. **Escalation when Lagging**:
+   - If progress dips below safety threshold:
+     - Stage 1: Allocate additional efficient cores (e.g. 2 cores → 4 cores).
+     - Stage 2: If Top Priority task is finished or idle, migrate to Zen 5 fast cores.
+     - Stage 3: Engage global boost (up to 3.5–5.0 GHz) to rapidly burn down remaining work.
+     - Stage 4: Thermal check. If `k10temp` Tctl exceeds 85°C, throttle escalation to prevent thermal runaway.
+5. **De-escalation**: Once the lag is eliminated and ETA has sufficient buffer ahead of the deadline, the scheduler de-escalates back to the low-power baseline, preserving the bulk of the energy savings.
+
 ## 4. Energy accounting under concurrency — the honesty problem
 
 This is the requirement that collides with a non-negotiable ("measure, don't estimate";

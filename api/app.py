@@ -168,6 +168,7 @@ class CreateExperimentRequest(BaseModel):
     headroom_pct: float = 5.0
     validation_selection: str = "pareto"
     repetitions: int = 1
+    priority_mode: Optional[str] = "top_priority"
 
 
 class SelectRequest(BaseModel):
@@ -332,6 +333,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             "preference": req.preference.model_dump() if req.preference else None,
             "experimental_passive_caps": req.experimental_passive_caps,
             "repetitions": max(1, min(5, req.repetitions)),
+            "priority_mode": req.priority_mode or "top_priority",
         }, seeded):
             _OVERLAY[exp_id]["state"] = "profiling"
             prof = _OVERLAY[exp_id].setdefault("profile", {})
@@ -1047,6 +1049,13 @@ def quiet_system_endpoint(req: Optional[QuietSystemRequest] = None) -> dict[str,
     app_keys = req.app_keys if req else None
     pids = req.pids if req else None
     return quiet_system(app_keys=app_keys, pids=pids)
+
+
+@app.get("/api/system/thermal")
+def get_system_thermal_endpoint() -> dict[str, Any]:
+    """Inspect CPU thermal state, Tctl temperature, and potential throttling."""
+    from api.system import get_thermal_status
+    return get_thermal_status()
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import React from 'react';
 import { CapabilitiesResponse, WorkloadInfo, classCpus } from '../types';
 import { colors } from '../design';
-import { fetchSystemNoise, quietSystem, SystemNoiseStatus } from '../api';
+import { fetchSystemNoise, quietSystem, SystemNoiseStatus, fetchSystemThermal, SystemThermalStatus } from '../api';
 
 
 /** Numeric text input synced with a slider — free typing, no artificial caps. */
@@ -72,6 +72,8 @@ interface SetupViewProps {
   onChangeCalibrationBudget: (val: number | null) => void;
   expPassiveCaps: boolean;
   onChangeExpPassiveCaps: (val: boolean) => void;
+  taskPriority?: 'top_priority' | 'eco_deadline' | 'best_effort';
+  onChangeTaskPriority?: (val: 'top_priority' | 'eco_deadline' | 'best_effort') => void;
   repetitions?: number;
   onChangeRepetitions?: (val: number) => void;
   onStartExperiment: () => void;
@@ -102,6 +104,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onChangeCalibrationBudget,
   expPassiveCaps,
   onChangeExpPassiveCaps,
+  taskPriority = 'top_priority',
+  onChangeTaskPriority,
   repetitions = 1,
   onChangeRepetitions,
   onStartExperiment,
@@ -112,6 +116,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onOpenWatchTab,
 }) => {
   const [noiseStatus, setNoiseStatus] = React.useState<SystemNoiseStatus | null>(null);
+  const [thermalStatus, setThermalStatus] = React.useState<SystemThermalStatus | null>(null);
   const [isQuieting, setIsQuieting] = React.useState<boolean>(false);
   const [quietSuccessMsg, setQuietSuccessMsg] = React.useState<string | null>(null);
   const [showNoiseModal, setShowNoiseModal] = React.useState<boolean>(false);
@@ -119,15 +124,23 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
   const refreshNoise = React.useCallback(async () => {
     try {
-      const st = await fetchSystemNoise();
-      setNoiseStatus(st);
-      const appSelection: Record<string, boolean> = {};
-      st.detected_apps.forEach((a) => {
-        appSelection[a.key] = true;
-      });
-      setSelectedAppsToQuiet(appSelection);
+      const [st, therm] = await Promise.all([
+        fetchSystemNoise().catch(() => null),
+        fetchSystemThermal().catch(() => null),
+      ]);
+      if (st) {
+        setNoiseStatus(st);
+        const appSelection: Record<string, boolean> = {};
+        st.detected_apps.forEach((a) => {
+          appSelection[a.key] = true;
+        });
+        setSelectedAppsToQuiet(appSelection);
+      }
+      if (therm) {
+        setThermalStatus(therm);
+      }
     } catch (e) {
-      console.warn('Failed to fetch system noise', e);
+      console.warn('Failed to fetch system state', e);
     }
   }, []);
 
@@ -362,21 +375,80 @@ export const SetupView: React.FC<SetupViewProps> = ({
           )}
         </div>
 
+        {/* Task Priority & Catch-Up Policy */}
+        <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>⚡ Task Priority & Catch-up Policy</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
+                How the scheduler should prioritize this task if other work runs or if it lags behind.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '0.5rem' }}>
+            {[
+              {
+                key: 'top_priority',
+                label: 'Top Priority (Must-Finish)',
+                desc: 'Full speed on fast cores. Strict deadline guarantee.',
+              },
+              {
+                key: 'eco_deadline',
+                label: 'Eco (Boost if Lagging)',
+                desc: 'Runs at low power to save energy. Boosts speed only if falling behind deadline.',
+              },
+              {
+                key: 'best_effort',
+                label: 'Best Effort',
+                desc: 'Runs in background at lowest power. Yields cores to other tasks.',
+              },
+            ].map((opt) => {
+              const isSelected = (taskPriority || 'top_priority') === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => onChangeTaskPriority && onChangeTaskPriority(opt.key as any)}
+                  style={{
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.08)'}`,
+                    backgroundColor: isSelected ? 'rgba(113,112,255,0.18)' : colors.surface,
+                    color: isSelected ? colors.textPrimary : colors.textSecondary,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? colors.accentHover : colors.textPrimary }}>
+                    {opt.label}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: colors.textTertiary, marginTop: '0.2rem', lineHeight: '1.3' }}>
+                    {opt.desc}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Accuracy & Repeatability Control */}
         <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>🎯 Run Accuracy & Lineup</span>
+                <span>🎯 Runs per Speed Setting</span>
               </div>
               <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
-                Run each test configuration twice to verify consistency and ensure measurements line up.
+                Run each CPU speed twice to double-check accuracy and make sure numbers line up.
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.4rem' }}>
               {[
-                { val: 1, label: '1x (Single)' },
-                { val: 2, label: '2x (Verify Lineup)' },
+                { val: 1, label: '1 run' },
+                { val: 2, label: '2 runs (double-check)' },
               ].map((opt) => (
                 <button
                   key={opt.val}
@@ -423,7 +495,14 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   gap: '0.4rem',
                 }}
               >
-                <span>{noiseStatus?.is_quiet ? '✓ System Baseline Quiet' : '⚠️ Background Noise Detected'}</span>
+                <span>
+                  {noiseStatus?.is_quiet ? '✓ System Baseline Quiet' : '⚠️ Background Noise Detected'}
+                  {thermalStatus?.cpu_temp_c != null && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 400, color: colors.textTertiary, marginLeft: 8 }}>
+                      · CPU {thermalStatus.cpu_temp_c.toFixed(1)}°C ({thermalStatus.warning_level === 'normal' ? 'Normal' : thermalStatus.warning_level.toUpperCase()})
+                    </span>
+                  )}
+                </span>
               </div>
               <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem', lineHeight: '1.35' }}>
                 {noiseStatus?.is_quiet
@@ -460,6 +539,32 @@ export const SetupView: React.FC<SetupViewProps> = ({
           )}
         </div>
 
+        {/* Thermal Throttling Warning Banner */}
+        {thermalStatus && thermalStatus.warning_level !== 'normal' && (
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              background: thermalStatus.warning_level === 'critical' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+              border: `1px solid ${thermalStatus.warning_level === 'critical' ? colors.red : colors.amber}`,
+              borderRadius: '0.5rem',
+              padding: '0.85rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+            }}
+          >
+            <span style={{ fontSize: '1.25rem' }}>🔥</span>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: thermalStatus.warning_level === 'critical' ? colors.red : colors.amber }}>
+                {thermalStatus.warning_level === 'critical' ? 'Thermal Throttling Active' : 'Elevated CPU Temperature'} ({thermalStatus.cpu_temp_c?.toFixed(1)}°C)
+              </div>
+              <div style={{ fontSize: '0.74rem', color: colors.textSecondary, marginTop: '0.15rem' }}>
+                {thermalStatus.message} High CPU temperatures cause hardware clock throttling, which can slow down tasks and distort power measurements.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 3. Calibration Sweep & Scan Duration */}
         <div
           style={{
@@ -474,12 +579,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
             <div>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>⏱️ Calibration Sweep Budget (Scan Duration)</span>
+                <span>⏱️ Scan Duration (Calibration)</span>
               </div>
               <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
                 {hasCalibration
-                  ? 'Use pre-measured verified calibration data (instant 0s) or run a live sweep to measure configurations for this workload.'
-                  : 'No existing calibration found — a live hardware sweep is required before optimization.'}
+                  ? 'Uses saved calibration data (0s), or runs a fresh scan to test speeds on this specific workload.'
+                  : 'No saved calibration found on this machine — run a scan first so the app can measure your CPU.'}
               </div>
             </div>
 
@@ -496,7 +601,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   whiteSpace: 'nowrap',
                 }}
               >
-                ✓ Verified Curves Loaded
+                ✓ Saved Data Ready
               </span>
             ) : (
               <span
@@ -511,7 +616,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   whiteSpace: 'nowrap',
                 }}
               >
-                ⚠️ Sweep Required
+                ⚠️ Scan Needed
               </span>
             )}
           </div>
@@ -539,10 +644,10 @@ export const SetupView: React.FC<SetupViewProps> = ({
             )}
 
             {[
-              { val: 60, label: '60s (Quick)' },
-              { val: 120, label: '120s (Standard)' },
-              { val: 300, label: '300s (Thorough)' },
-              { val: 600, label: '600s (Deep)' },
+              { val: 60, label: '60s' },
+              { val: 120, label: '2 min (120s)' },
+              { val: 300, label: '5 min (300s)' },
+              { val: 600, label: '10 min (600s)' },
             ].map((preset) => {
               const isSelected = calibrationBudgetS === preset.val;
               return (
@@ -582,19 +687,19 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 transition: 'all 0.15s ease',
               }}
             >
-              ♾️ Exhaustive
+              All speeds
             </button>
           </div>
 
           {/* Slider + NumField */}
           <div style={{ background: colors.surface, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: colors.textTertiary, marginBottom: '0.4rem' }}>
-              <span>Sweep Duration:</span>
+              <span>Scan time:</span>
               <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
                 {calibrationBudgetS === null
-                  ? 'Exhaustive (~1800s safety limit)'
+                  ? 'All speeds (up to 30 min safety limit)'
                   : calibrationBudgetS === 0
-                    ? '0s (Instant · Pre-measured Calibration)'
+                    ? '0s (Instant · uses saved data)'
                     : `${calibrationBudgetS}s (~${(calibrationBudgetS / 60).toFixed(1)} min)`}
               </span>
             </div>
@@ -633,27 +738,24 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   checked={calibrationBudgetS === null}
                   onChange={(e) => onChangeCalibrationBudget(e.target.checked ? null : 120)}
                 />
-                Exhaustive
+                All speeds
               </label>
             </div>
 
-            {/* Explanation & Point Estimate */}
+            {/* Simple Human Explanation */}
             <div style={{ marginTop: '0.5rem', fontSize: '0.73rem', color: colors.textTertiary, lineHeight: '1.4' }}>
               {calibrationBudgetS === 0 ? (
                 <span style={{ color: colors.emerald }}>
-                  ✓ Instant mode: Starts optimization immediately using existing verified hardware curves and baseline (0s scan). Select 60s, 120s, or 600s above to run a fresh live sweep.
+                  ✓ Instant: Skips scanning and optimizes immediately using your saved CPU calibration curves.
                 </span>
               ) : calibrationBudgetS === null ? (
                 <span style={{ color: colors.textSecondary }}>
-                  ♾️ Exhaustive mode: Sweeps all valid frequency and core configurations until complete (bounded by ~1800s safety limit).
+                  Tests every supported CPU speed and core setup until finished.
                 </span>
               ) : (
                 <span style={{ color: colors.textSecondary }}>
-                  ⏱️ Live sweep will measure ~
-                  <strong style={{ color: colors.accentHover }}>
-                    {Math.max(1, Math.floor(calibrationBudgetS / (repetitions > 1 ? 12 : 6)))}
-                  </strong>{' '}
-                  points across core classes ({repetitions > 1 ? '2 runs per point for verified lineup' : '1 run per point'}). Ordered via bisection (peak, base, quartiles) for an accurate representative curve.
+                  ⏱️ Runs tests for up to {calibrationBudgetS}s across high, medium, and low CPU speeds to find the sweet spot for your workload. How many points fit depends on how fast your workload runs on this chip.
+                  {repetitions > 1 ? ' (Runs each test twice to verify consistency.)' : ''}
                 </span>
               )}
             </div>
@@ -669,7 +771,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 style={{ marginTop: 2, accentColor: colors.amber }}
               />
               <span style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-                <span style={{ color: colors.amber, fontWeight: 600 }}>Experimental:</span> passive-mode caps (sweeps 2.5–4.5 GHz boost-on points)
+                <span style={{ color: colors.amber, fontWeight: 600 }}>Experimental:</span> test passive mode caps (2.5–4.5 GHz with boost on)
               </span>
             </label>
           </div>
@@ -695,9 +797,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
           {isStarting
             ? 'Optimizing Workload...'
             : calibrationBudgetS && calibrationBudgetS > 0
-              ? `Run ${calibrationBudgetS}s Sweep & Optimize Workload`
+              ? `Run ${calibrationBudgetS}s Scan & Optimize Workload`
               : calibrationBudgetS === null
-                ? 'Run Exhaustive Sweep & Optimize Workload'
+                ? 'Run Full Scan & Optimize Workload'
                 : objective === 'deadline'
                   ? 'Optimize Workload for Deadline (Instant)'
                   : objective === 'preference'
