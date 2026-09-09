@@ -22,16 +22,24 @@ python demo/run_demo.py
    - Executes across worker thread counts 1, 2, and 4.
    - Demonstrates that total work is constant and the cryptographic checksum is strictly invariant (`0x23e23165be5ef4b6`).
 
-3. **Phase 3: Workload Profiling & Pareto Frontier**
+3. **Demo Beat: Passive Watch Mode ("Point it at anything you run")**
+   - Learns package power idle baseline (~10W) without manual timing.
+   - Detects sustained power spikes (>= 2s) and backdates onset to the first above-band sample.
+   - Absorbs mid-task dips within the grace window (maintains active task state).
+   - Backtracks task end to the last above-band sample after sustained idle return.
+   - Computes suggested budget (+5% margin) pre-filling the Setup slider.
+   - Enforces honesty guards (`mode="watch"`, excluded from Pareto evidence).
+
+4. **Phase 3: Workload Profiling & Pareto Frontier**
    - Displays measured configurations across Layouts A, B, C, and D.
    - Shows trade-off frontier between execution speed and package energy consumption.
 
-4. **Phase 4: Deterministic Optimizer**
+5. **Phase 4: Deterministic Optimizer**
    - Evaluates Deadline Mode with 5% guarded runtime margin.
-   - Evaluates Preference Mode (§6c) targeting ≤70% energy and ≥60% performance.
+   - Evaluates Preference Mode (§6c) targeting <= 70% energy and >= 60% performance.
    - Selects lowest-energy measured candidate (`cfg_zen5c_4c_3000`) achieving 44.6% energy savings.
 
-5. **Phase 5: Fresh Validation & Grounded Explanation**
+6. **Phase 5: Fresh Validation & Grounded Explanation**
    - Executes independent fresh validation pairs (baseline vs selected candidate).
    - Confirms all runs satisfied the runtime budget.
    - Generates grounded, factual plain-English explanation (offline template with optional local 7B / cloud LLM enhancement).

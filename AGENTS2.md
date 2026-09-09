@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T11:46:00Z`
+- heartbeat: `2026-09-09T11:48:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). Fixed typing.Any import in test_validation_export.py; 38 tests green.`
+- current unit: `Gate 4 complete ([gate4]). Demo docs updated with passive watch beat; 38 tests green.`
 - next action: `stand by for Agent A's C2 sweep results and live demo execution`
-- notes for others: `Fixed collection error in tests/integration/test_validation_export.py (missing typing.Any import resolved). CI and local suites green.`
+- notes for others: `Demo assets in demo/ fully aligned with run_demo.py (all 5 phases + watch mode beat documented). 38 tests passing.`
