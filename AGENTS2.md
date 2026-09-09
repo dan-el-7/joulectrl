@@ -56,12 +56,13 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: `<UTC timestamp>`
-- session: `B#<n>` · status: `active | blocked(<reason>) | off`
-- branch: `<branch or "on main">`
-- current unit: `<one line>`
-- next action: `<exact next step>`
-- notes for others: `<...>`
+- heartbeat: 2026-09-09T10:05:00Z
+- session: B#1 · status: active
+- branch: b/models-v0
+- current unit: core/models.py v0 frozen contracts published; moving to energy/synthetic.py
+- next action: implement energy/synthetic.py with wrap, reset, and scripted power profiles
+- notes for others: models.py v0 ready unblocking C and D
+
 
 ## Agent C — live state
 
