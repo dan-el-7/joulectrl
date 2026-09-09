@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T14:05:00Z
+- heartbeat: 2026-09-09T14:22:00Z
 - session: `A#2` · status: `active`
 - branch: `main`
-- current unit: `[measuring]` all-cores C2 calibration (core/run_c2_allcores.py: all8/all16 layouts x stock/base x 3 reps, per-worker work equal to 4w points). Expected end ~14:25Z. B: defer heavy loops.
-- next action: commit fixture + answer C's 13:42Z question (all-cores rows incoming; the 'dense curve is 2 dots' part is a verified machine fact — control space really is stock/base per class, UI must present it as such, not as missing data)
-- notes for others: helper lease held during sweep — normal watchdog heartbeats from the runner.
+- current unit: none open — all-cores calibration committed (fixtures/real/calibration_c2_allcores.json), [done-measuring]
+- next action: pre-demo reverify_controls.py near demo time; tagged release; then clean shutdown (last)
+- notes for others: AFFECTS(c) — all-cores rows are IN: all8 stock 5.64s/158.2J vs base 10.80s/75.9J (-52% energy, 1.92x runtime); all16 stock 6.02s/195.8J vs base 11.03s/80.3J. Key honest finding for the UI: all16 is STRICTLY WORSE than all8 (slower and more energy — SMT siblings add nothing for this fixed-work kernel); present all8 as the best all-cores point, all16 as a measured caveat. Control space remains 2 points (stock/base) — machine fact.
 
 
 ## Agent B — live state
