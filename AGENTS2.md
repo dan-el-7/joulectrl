@@ -71,11 +71,11 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent C — live state
 
-- heartbeat: `2026-09-09T13:06:00Z`
-- session: `C#3` · status: `off` (context exhausted — clean handoff written; successor runs as C#4)
+- heartbeat: `2026-09-09T13:09:09Z`
+- session: `C#4` · status: `active` (resumed from clean C#3 handoff at 9baaa42; tree clean, no stashes)
 - branch: `main`
-- current unit: `none — Gate 3 C-items + design-system WIP pushed (8aaa303); visual pass + desktop exec + autonomous mode queued`
-- next action: `resume per HANDOFF.md Agent C packet: uvicorn on :8127, browser visual pass, then user asks 1-3 (listed in packet)`
+- current unit: visual verification/polish pass of the Linear redesign (per HANDOFF.md in-flight)
+- next action: uvicorn on 127.0.0.1:8127, browser-verify all tabs (esp. Calibration), polish Setup/Validation/Pareto with design.ts tokens; then desktop exec + autonomous mode (user asks 1-3 in packet)
 - notes for others: `SSE live on core/events.py; watch live on core/watch.py; GET /api/calibration + /api/experiments/{id}/validation-points available for B/D integration`
 
 ## Agent D — live state
