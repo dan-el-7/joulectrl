@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
+from core.experiment import ExperimentStateMachine
 from core.models import Profile, Selection, ValidationPair, CalibrationRecord
 from core.store import Store
 from explain.facts import extract_explanation_facts
@@ -112,6 +113,70 @@ class TestWorkloadLifecycleIntegration(unittest.TestCase):
         self.assertIn("48.0s runtime rule", explanation)
         self.assertIn("44.6%", explanation)
         self.assertIn("3 of 3 validation runs finished within the budget", explanation)
+
+    def test_state_machine_lifecycle_and_restoration(self):
+        """Test full experiment state machine lifecycle through completion and restoration."""
+        store = Store(":memory:")
+        exp_id = "exp_lifecycle_test"
+        store.create_experiment(experiment_id=exp_id, workload_name="fixed_compute")
+
+        sm = ExperimentStateMachine(store, exp_id)
+        self.assertEqual(sm.state, "IDLE")
+
+        # Step through valid sequence: IDLE -> CHECKING -> PREPARING -> PROFILING -> PROFILE_READY
+        sm.transition("CHECKING", "Capability check")
+        self.assertEqual(sm.state, "CHECKING")
+
+        sm.transition("PREPARING", "Preparing workload")
+        self.assertEqual(sm.state, "PREPARING")
+
+        sm.transition("PROFILING", "Running sweep")
+        self.assertEqual(sm.state, "PROFILING")
+
+        sm.transition("PROFILE_READY", "Profiling complete")
+        self.assertEqual(sm.state, "PROFILE_READY")
+
+        # PROFILE_READY -> SELECTED -> VALIDATING -> COMPLETE
+        sm.transition("SELECTED", "Candidate picked")
+        self.assertEqual(sm.state, "SELECTED")
+
+        sm.transition("VALIDATING", "Validation starting")
+        self.assertEqual(sm.state, "VALIDATING")
+
+        sm.transition("COMPLETE", "Validation passed")
+        self.assertEqual(sm.state, "COMPLETE")
+
+        # COMPLETE -> RESTORING -> RESTORED
+        sm.transition("RESTORING", "Restoring system settings")
+        self.assertEqual(sm.state, "RESTORING")
+
+        sm.transition("RESTORED", "Settings confirmed")
+        self.assertEqual(sm.state, "RESTORED")
+
+        transitions = store.get_state_transitions(exp_id)
+        # NONE->IDLE + 9 transitions = 10 total
+        self.assertEqual(len(transitions), 10)
+        self.assertEqual(transitions[-1]["to_state"], "RESTORED")
+
+    def test_state_machine_cancellation_flow(self):
+        """Test cancellation transitions from PROFILING to CANCELLING -> RESTORING -> RESTORED."""
+        store = Store(":memory:")
+        exp_id = "exp_cancel_test"
+        store.create_experiment(experiment_id=exp_id, workload_name="clean_build")
+
+        sm = ExperimentStateMachine(store, exp_id)
+        sm.transition("CHECKING")
+        sm.transition("PREPARING")
+        sm.transition("PROFILING")
+
+        # Cancel active execution
+        cancelled = sm.cancel(cancel_active_run=lambda: True)
+        self.assertTrue(cancelled)
+        self.assertEqual(sm.state, "CANCELLING")
+
+        sm.transition("RESTORING", "Trigger cleanup")
+        sm.transition("RESTORED", "Cleanup verified")
+        self.assertEqual(sm.state, "RESTORED")
 
 
 if __name__ == "__main__":
