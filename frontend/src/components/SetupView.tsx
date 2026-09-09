@@ -71,6 +71,8 @@ interface SetupViewProps {
   onChangeCalibrationBudget: (val: number | null) => void;
   expPassiveCaps: boolean;
   onChangeExpPassiveCaps: (val: boolean) => void;
+  repetitions?: number;
+  onChangeRepetitions?: (val: number) => void;
   onStartExperiment: () => void;
   isStarting: boolean;
   baselineRuntimeS?: number | null;
@@ -99,6 +101,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onChangeCalibrationBudget,
   expPassiveCaps,
   onChangeExpPassiveCaps,
+  repetitions = 1,
+  onChangeRepetitions,
   onStartExperiment,
   isStarting,
   baselineRuntimeS,
@@ -306,6 +310,45 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Accuracy & Repeatability Control */}
+        <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>🎯 Run Accuracy & Lineup</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
+                Run each test configuration twice to verify consistency and ensure measurements line up.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {[
+                { val: 1, label: '1x (Single)' },
+                { val: 2, label: '2x (Verify Lineup)' },
+              ].map((opt) => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => onChangeRepetitions && onChangeRepetitions(opt.val)}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: `1.5px solid ${repetitions === opt.val ? colors.accent : 'rgba(255,255,255,0.1)'}`,
+                    backgroundColor: repetitions === opt.val ? 'rgba(113,112,255,0.22)' : colors.surface,
+                    color: repetitions === opt.val ? colors.accentHover : colors.textSecondary,
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 3. Calibration Status & Optional Sweep Settings */}

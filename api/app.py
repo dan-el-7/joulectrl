@@ -119,6 +119,7 @@ class CreateExperimentRequest(BaseModel):
     experimental_passive_caps: bool = False
     headroom_pct: float = 5.0
     validation_selection: str = "pareto"
+    repetitions: int = 1
 
 
 class SelectRequest(BaseModel):
@@ -282,6 +283,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             "calibration_budget_s": req.calibration_budget_s,
             "preference": req.preference.model_dump() if req.preference else None,
             "experimental_passive_caps": req.experimental_passive_caps,
+            "repetitions": max(1, min(5, req.repetitions)),
         }, seeded):
             _OVERLAY[exp_id]["state"] = "profiling"
             prof = _OVERLAY[exp_id].setdefault("profile", {})

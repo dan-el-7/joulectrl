@@ -166,6 +166,10 @@ class LiveEngine:
             time_limit_s = 0.0 if cal_budget is None else float(cal_budget or 0.0)
         preference = request.get("preference") or {}
 
+        repetitions = max(1, min(5, int(request.get("repetitions") or 1)))
+        if repetitions > 1 and time_limit_s <= 0:
+            time_limit_s = 60.0  # User explicitly requested repeatability check
+
         try:
             caps = seeded.get("_live_capabilities") or {}
             cls_map = self._class_map_from_capabilities(caps) or {"fast": {"cpus": [0, 2, 4, 6], "hw_max_freq": None},
@@ -180,7 +184,7 @@ class LiveEngine:
             measured_keys: set[tuple] = set()
 
             # Calibration fast path: seed rows from verified fixtures if available
-            if cal:
+            if cal and repetitions == 1:
                 for row in cal.get("rows", []):
                     cap = (row.get("requested_control") or {}).get("cap_khz") or row.get("freq_cap_khz")
                     key = (tuple(row["cpus"]), 1 if row["boost"] else 0, cap, row.get("workers", 4))
@@ -205,13 +209,13 @@ class LiveEngine:
 
             self._emit(exp_id, "experiment_state", {
                 "state": "profiling",
-                "message": f"Profiling sweep starting ({time_limit_s:.0f}s allotted budget)",
+                "message": f"Profiling sweep starting ({time_limit_s:.0f}s allotted budget, {repetitions}x repetition{'s' if repetitions > 1 else ''})",
             })
 
             # If starting a fresh live experiment, clear old dummy fixture runs
             # so the dashboard starts clean and populates live as tests complete!
             overlay = self._overlay_for(exp_id)
-            if overlay and "profile" in overlay and not cal:
+            if overlay and "profile" in overlay and not (cal and repetitions == 1):
                 overlay["profile"]["runs"] = []
                 overlay["profile"]["configurations"] = {}
                 overlay["selection"] = None
@@ -222,66 +226,74 @@ class LiveEngine:
                 (c, d) for c, d in configs
                 if (tuple(c.cpu_affinity or []), 1 if c.boost else 0, c.freq_cap_khz, c.worker_count) not in measured_keys
             ]
-            est_total_runs = min(len(unmeasured_configs), max(1, int(time_limit_s / avg_run_s)))
+            est_total_runs = min(len(unmeasured_configs) * repetitions, max(1, int(time_limit_s / avg_run_s)))
             run_idx = 0
 
             # Dynamic time-fitting loop: run as many prioritized points as fit into time_limit_s
             for cfg, desc in configs:
                 key = (tuple(cfg.cpu_affinity or []), 1 if cfg.boost else 0, cfg.freq_cap_khz, cfg.worker_count)
-                if key in measured_keys:
+                if key in measured_keys and repetitions == 1:
                     continue  # already covered by calibration or previous measurement
 
-                now = time.monotonic()
-                elapsed = now - start_wall
-                remaining = time_limit_s - elapsed
+                break_outer = False
+                for rep in range(1, repetitions + 1):
+                    now = time.monotonic()
+                    elapsed = now - start_wall
+                    remaining = time_limit_s - elapsed
 
-                # Update running average runtime from completed runs
-                valid_rts = [r.runtime_s for r in runs if r.runtime_s and r.runtime_s > 0]
-                if valid_rts:
-                    avg_run_s = sum(valid_rts) / len(valid_rts)
+                    # Update running average runtime from completed runs
+                    valid_rts = [r.runtime_s for r in runs if r.runtime_s and r.runtime_s > 0]
+                    if valid_rts:
+                        avg_run_s = sum(valid_rts) / len(valid_rts)
 
-                # Check if next run fits in remaining budget
-                # (Always allow run 1, but for subsequent runs stop if remaining < estimated next run duration)
-                if runs and (remaining < max(3.5, avg_run_s * 0.75)):
-                    logger.info(
-                        f"Profiling sweep filled allotted budget: elapsed={elapsed:.1f}s, remaining={remaining:.1f}s < est_next={avg_run_s:.1f}s. "
-                        f"Completed {len(runs)} fresh points."
+                    # Check if next run fits in remaining budget
+                    # (Always allow run 1, but for subsequent runs stop if remaining < estimated next run duration)
+                    if runs and (remaining < max(3.5, avg_run_s * 0.75)):
+                        logger.info(
+                            f"Profiling sweep filled allotted budget: elapsed={elapsed:.1f}s, remaining={remaining:.1f}s < est_next={avg_run_s:.1f}s. "
+                            f"Completed {len(runs)} fresh points."
+                        )
+                        break_outer = True
+                        break
+
+                    run_idx += 1
+                    est_total_runs = max(
+                        run_idx,
+                        min(len(unmeasured_configs) * repetitions, len(runs) + max(1, int(remaining / max(1.0, avg_run_s)))),
                     )
+
+                    rep_label = f" (rep #{rep})" if repetitions > 1 else ""
+                    self._emit(exp_id, "run_progress", {
+                        "experiment_id": exp_id, "phase": "profiling",
+                        "config_id": cfg.id, "repetition": rep, "status": "running",
+                        "run_index": run_idx, "total_runs": est_total_runs, "description": f"{desc}{rep_label}",
+                        "elapsed_s": round(elapsed, 1), "remaining_s": round(remaining, 1),
+                    })
+                    rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg, passive=passive, repetition=rep)
+                    runs.append(rec)
+                    if rep == repetitions:
+                        measured_keys.add(key)
+
+                    # PROGRESSIVE UPDATE: update overlay and store on EVERY run so UI live-plots!
+                    current_rows = self._profile_rows(cal if repetitions == 1 else None, runs, cls_map, workload_id)
+                    if current_rows:
+                        try:
+                            current_sel = self._select(current_rows, objective, budget, preference, exp_id)
+                            self._persist(exp_id, seeded, runs, current_rows, current_sel, cal is not None and repetitions == 1, state="profiling")
+                        except Exception as e:
+                            logger.warning(f"intermediate persist failed: {e}")
+
+                    self._emit(exp_id, "run_complete", {
+                        "experiment_id": exp_id, "phase": "profiling",
+                        "run_index": run_idx, "total_runs": est_total_runs,
+                        "config_id": cfg.id, "repetition": rep,
+                        "runtime_s": rec.runtime_s,
+                        "package_energy_j": rec.package_energy_j,
+                        "status": rec.status,
+                    })
+
+                if break_outer:
                     break
-
-                run_idx += 1
-                est_total_runs = max(
-                    run_idx,
-                    min(len(unmeasured_configs), len(runs) + max(1, int(remaining / max(1.0, avg_run_s)))),
-                )
-
-                self._emit(exp_id, "run_progress", {
-                    "experiment_id": exp_id, "phase": "profiling",
-                    "config_id": cfg.id, "repetition": 1, "status": "running",
-                    "run_index": run_idx, "total_runs": est_total_runs, "description": desc,
-                    "elapsed_s": round(elapsed, 1), "remaining_s": round(remaining, 1),
-                })
-                rec = self._run_one(helper, WorkloadRunner(None, working_dir=_REPO_ROOT), workload_id, exp_id, cfg, passive=passive)
-                runs.append(rec)
-                measured_keys.add(key)
-
-                # PROGRESSIVE UPDATE: update overlay and store on EVERY run so UI live-plots!
-                current_rows = self._profile_rows(cal, runs, cls_map, workload_id)
-                if current_rows:
-                    try:
-                        current_sel = self._select(current_rows, objective, budget, preference, exp_id)
-                        self._persist(exp_id, seeded, runs, current_rows, current_sel, cal is not None, state="profiling")
-                    except Exception as e:
-                        logger.warning(f"intermediate persist failed: {e}")
-
-                self._emit(exp_id, "run_complete", {
-                    "experiment_id": exp_id, "phase": "profiling",
-                    "run_index": run_idx, "total_runs": est_total_runs,
-                    "config_id": cfg.id,
-                    "runtime_s": rec.runtime_s,
-                    "package_energy_j": rec.package_energy_j,
-                    "status": rec.status,
-                })
 
             # Assemble profile from calibration + fresh runs
             profile_rows = self._profile_rows(cal, runs, cls_map, workload_id)
@@ -290,7 +302,7 @@ class LiveEngine:
                 return
 
             selection = self._select(profile_rows, objective, budget, preference, exp_id)
-            self._persist(exp_id, seeded, runs, profile_rows, selection, cal is not None, state="selected")
+            self._persist(exp_id, seeded, runs, profile_rows, selection, cal is not None and not runs, state="selected")
             self._emit(exp_id, "experiment_state", {"state": "selected", "message": "Selection complete (live)"})
 
         except Exception as exc:  # pragma: no cover
@@ -431,7 +443,7 @@ class LiveEngine:
 
         return out
 
-    def _run_one(self, helper, runner: Any, workload_id: str, exp_id: str, cfg: Configuration, passive: bool = False) -> RunRecord:
+    def _run_one(self, helper, runner: Any, workload_id: str, exp_id: str, cfg: Configuration, passive: bool = False, repetition: int = 1) -> RunRecord:
         """Apply config via helper, run workload bracketed, restore, return record."""
         from workloads.registry import get_workload
 
@@ -460,7 +472,7 @@ class LiveEngine:
         time.sleep(0.3)
         try:
             e1 = helper.read_energy()
-            rec = runner.run(wl, exp_id, cfg, repetition=1, phase="profiling")
+            rec = runner.run(wl, exp_id, cfg, repetition=repetition, phase="profiling")
             e2 = helper.read_energy()
             if e1.get("ok") and e2.get("ok"):
                 rec.package_energy_j = round(((e2["uj"] - e1["uj"]) % WRAP_UJ) / 1e6, 4)
@@ -507,6 +519,16 @@ class LiveEngine:
                     row["cpus"], 1 if row["boost"] else 0, workers, cap,
                     row["runtime_s"], row.get("package_energy_j"), "calibration")
 
+        # Discard calibration for any key that was freshly measured in this run
+        fresh_keys = {
+            (tuple(rec.configuration.cpu_affinity or []), 1 if rec.configuration.boost else 0, rec.configuration.freq_cap_khz, rec.configuration.worker_count)
+            for rec in runs
+            if rec.status == "success" and rec.runtime_s and rec.runtime_s > 0
+        }
+        for k in fresh_keys:
+            if k in rows:
+                del rows[k]
+
         for rec in runs:
             if rec.status == "success" and rec.runtime_s and rec.runtime_s > 0:
                 cfg = rec.configuration
@@ -523,6 +545,8 @@ class LiveEngine:
             out.append({
                 "cpus": list(ent["cpus"]), "boost": ent["boost"], "workers": ent["workers"],
                 "freq_cap_khz": ent["freq_cap_khz"],
+                "runtimes": list(ent["runtimes"]),
+                "energies": list(ent["energies"]),
                 "median_runtime_s": round(rt, 4),
                 "median_energy_j": round(e, 4) if e is not None else None,
                 "guarded_runtime_s": round(max(ent["runtimes"]) * 1.05, 4),
@@ -591,15 +615,15 @@ class LiveEngine:
                         "cpu_affinity": row["cpus"], "freq_cap_khz": row.get("freq_cap_khz"),
                         "boost": bool(row["boost"]),
                     },
-                    "runtime_samples": [row["median_runtime_s"]],
-                    "energy_samples": [row["median_energy_j"]] if row["median_energy_j"] is not None else [],
+                    "runtime_samples": row.get("runtimes", [row["median_runtime_s"]]),
+                    "energy_samples": row.get("energies", [row["median_energy_j"]] if row["median_energy_j"] is not None else []),
                     "median_runtime_s": row["median_runtime_s"],
-                    "min_runtime_s": row["median_runtime_s"],
-                    "max_runtime_s": row["median_runtime_s"],
+                    "min_runtime_s": min(row.get("runtimes", [row["median_runtime_s"]])),
+                    "max_runtime_s": max(row.get("runtimes", [row["median_runtime_s"]])),
                     "guarded_runtime_s": row["guarded_runtime_s"],
                     "median_energy_j": row["median_energy_j"],
-                    "min_energy_j": row["median_energy_j"],
-                    "max_energy_j": row["median_energy_j"],
+                    "min_energy_j": min(row["energies"]) if row.get("energies") else row["median_energy_j"],
+                    "max_energy_j": max(row["energies"]) if row.get("energies") else row["median_energy_j"],
                     "median_power_w": round(row["median_energy_j"] / row["median_runtime_s"], 2)
                     if row["median_energy_j"] else None,
                     "profile_is_usable": row["median_energy_j"] is not None,

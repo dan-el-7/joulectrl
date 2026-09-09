@@ -30,6 +30,7 @@ export const App: React.FC = () => {
   const [perfFloorPct, setPerfFloorPct] = useState<number>(90);
   const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(0);
   const [expPassiveCaps, setExpPassiveCaps] = useState<boolean>(false);
+  const [repetitions, setRepetitions] = useState<number>(1);
   const [hasCalibration, setHasCalibration] = useState<boolean>(true);
   const [latestWatchedSegment, setLatestWatchedSegment] = useState<{
     duration_s: number;
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
             : undefined,
         calibration_budget_s: calibrationBudgetS ?? undefined,
         experimental_passive_caps: expPassiveCaps,
+        repetitions,
       });
       const fullExp = await fetchExperiment(res.id);
       setExperiment(fullExp);
@@ -220,6 +222,8 @@ export const App: React.FC = () => {
             onChangeCalibrationBudget={setCalibrationBudgetS}
             expPassiveCaps={expPassiveCaps}
             onChangeExpPassiveCaps={setExpPassiveCaps}
+            repetitions={repetitions}
+            onChangeRepetitions={setRepetitions}
             onStartExperiment={handleStartExperiment}
             isStarting={isStarting}
             baselineRuntimeS={
