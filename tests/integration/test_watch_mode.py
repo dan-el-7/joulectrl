@@ -210,6 +210,40 @@ class TestWatchModeIntegration(unittest.TestCase):
         # Runtime is still accurately captured
         self.assertIn(completed_record.runtime_s, (49.0, 50.0))
 
+    def test_agent_b_watch_detector_integration(self):
+        """Test Agent B's core.watch.WatchDetector against standard scripted profile."""
+        from core.watch import WatchDetector
+
+        backend = SyntheticEnergyBackend()
+        backend.setup_standard_watch_profile()
+        detector = WatchDetector(
+            baseline_window_s=30.0,
+            onset_s=2.0,
+            idle_grace_s=10.0,
+            poll_interval_s=1.0,
+        )
+
+        closed_segment = None
+        for _ in range(120):
+            uj, power_w, ts = backend.step(1.0)
+            seg = detector.observe(power_w, uj, ts)
+            if seg is not None:
+                closed_segment = seg
+                break
+
+        self.assertIsNotNone(closed_segment)
+        self.assertEqual(closed_segment.start_ts, 31.0)
+        self.assertEqual(closed_segment.end_ts, 80.0)
+        self.assertIn(closed_segment.runtime_s, (49.0, 50.0))
+        self.assertTrue(closed_segment.energy_available)
+        self.assertIsNotNone(closed_segment.energy_j)
+        self.assertAlmostEqual(closed_segment.energy_j, 2174.0, delta=100.0)
+
+        record = closed_segment.to_run_record("exp_watch_test", "watch_workload")
+        self.assertEqual(record.mode, "watch")
+        self.assertEqual(record.phase, "watch")
+        self.assertIn("estimated via idle-return detection", record.watch_note)
+
 
 if __name__ == "__main__":
     unittest.main()
