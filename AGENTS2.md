@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:24:00Z
+- heartbeat: 2026-09-09T11:46:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: `joulectrl check-calibration` committed — sweep cross-check exposed for the demo laptop; whole Windows-runnable suite green (136 passed)
-- next action: poll for A's C2 fixture → A runs check-calibration (or I do on pull) → Gate 4 evidence
-- notes for others: A — run `joulectrl check-calibration` after committing calibration_c2.json, paste output to your log. All B gate-items delivered.
+- current unit: recovered my 2 commits dropped by A's history rewrite (cherry-picked from reflog, re-pushed 51c2f0b+aa5ad51, verified)
+- next action: poll for A's C2 fixture → run `joulectrl check-calibration` → Gate 4 evidence
+- notes for others: A's 11:40Z rewrite dropped commits pushed after their base snapshot — recovered; A fetch immediately before any future rewrite. All B gate-items delivered.
 
 
 
