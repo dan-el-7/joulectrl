@@ -314,6 +314,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 4) [gate4] D: Gate 4 deliverables complete — 3 fresh validation pairs with drift checking and full JSON export verification in tests/integration/test_validation_export.py; passive watch-mode auto-detection integration test in tests/integration/test_watch_mode.py; live local-LLM completions + grounding prompt test with mock server in tests/unit/test_explain.py; watch mode demo beat in demo/run_demo.py. 37 tests green (100% passing).
 - (hour 4) AFFECTS(b) energy/synthetic.py: in advance_uj (line 128), 'if not self._available: return' early-returns before advancing self._simulated_time_s += dt_s, which freezes simulated monotonic time in step() during simulated counter outages. Recommend moving time advancement before the early return.
 - (hour 4) workloads/fixed_compute.py updated with 'calibration' preset (16384 chunks, 200k iters) matching Agent A's real hardware C1 calibration run (checksum 0xc2493c07d6b29c85).
+- (hour 4) workloads/fixed_compute.py updated with 'c2_sweep' preset (32768 chunks, 200k iters) with verified invariant checksum 0x4f59b8763583e750 matching Agent A's C2 sweep runner. tests/integration/test_watch_mode.py updated to verify Agent B's advance_uj fix directly. All 38 tests green.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 
@@ -324,6 +325,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
   cpufreq policies; caps honored only with global boost=0; EPP dead (single preference value);
   tuned `throughput-performance` active. All touched settings restored and verified.
 - (hour 4, Agent A+D) C1 calibration on Fedora demo laptop confirmed (fixtures/real/calibration_c1.json): kernel binary workloads/kernel/fixed_compute produced invariant checksum 0xc2493c07d6b29c85 across all 10 runs on fast (Zen 5, cpu 0) and efficient (Zen 5c, cpu 1) cores, confirming fast class throughput is 1.45x efficient class (1935 vs 1334 chunks/s). Single-core energy is 75 J (fast) vs 79 J (efficient).
+- (hour 4, Agent D) Compute kernel C2 parameters (chunks=32768, iters=200000) verified invariant across worker counts (1 worker and 4 workers produced identical checksum 0x4f59b8763583e750).
 
 ## 10. CI (A owns the workflow file; it protects everyone)
 

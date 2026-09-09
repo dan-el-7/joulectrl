@@ -191,6 +191,7 @@ class TestWatchModeIntegration(unittest.TestCase):
         """Verify that missing energy counter marks energy unavailable, never 0."""
         backend = SyntheticEnergyBackend()
         backend.setup_standard_watch_profile()
+        backend.set_available(False)  # Natively supported with Agent B's clock advancement fix
 
         detector = WatchModeDetector(idle_threshold_w=15.0, onset_sustained_s=2.0, grace_period_s=10.0)
 
@@ -198,8 +199,7 @@ class TestWatchModeIntegration(unittest.TestCase):
         dt = 1.0
         for _ in range(120):
             uj, power_w, ts = backend.step(dt)
-            # Simulate counter unavailable by passing energy_uj=None
-            record = detector.sample(power_w, None, ts, backend)
+            record = detector.sample(power_w, uj, ts, backend)
             if record is not None:
                 completed_record = record
                 break

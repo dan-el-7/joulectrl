@@ -24,6 +24,7 @@ class TestContrastWorkloads(unittest.TestCase):
         self.assertIn("standard", PRESETS)
         self.assertIn("heavy", PRESETS)
         self.assertIn("calibration", PRESETS)
+        self.assertIn("c2_sweep", PRESETS)
 
         for name, p in PRESETS.items():
             self.assertGreater(p["chunks"], 0)

@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T11:25:00Z`
+- heartbeat: `2026-09-09T11:32:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). C1 calibration preset integrated; 38 tests green.`
-- next action: `stand by for cross-agent integration and live demonstration execution`
-- notes for others: `All deliverables through Gate 4 complete and verified. C1 calibration confirmed 1.45x fast-class speed with invariant checksum 0xc2493c07d6b29c85.`
+- current unit: `Gate 4 complete ([gate4]). C1 and C2 presets verified (invariant checksum 0x4f59b8763583e750); 38 tests green.`
+- next action: `stand by for Agent A's C2 sweep results and live demo execution`
+- notes for others: `All deliverables through Gate 4 complete and verified. C1 and C2 sweep presets verified with invariant checksums.`
