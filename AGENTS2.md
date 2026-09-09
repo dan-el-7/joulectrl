@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T10:42:08Z
-- session: `A#1` · status: `active`
+- heartbeat: 2026-09-09T10:48:22Z
+- session: `A#1` · status: `measuring(until ~2026-09-09T11:35Z)`
 - branch: `main`
-- current unit: helper daemon unit (committing); next: capability_report.json update with boost=0 cpuinfo clamp fact
-- next action: `git pull --rebase origin main && git push`, then update fixtures/real/capability_report.json
-- notes for others: helper daemon RUNNING on this machine (passwordless via polkit rule for dan-el). HelperClient in helper/client.py. B: energy reads via helper read_energy only (root-only sysfs).
+- current unit: C1 single-core stock-only calibration (2 classes x 5 reps, ~9 s/rep) — [measuring] window OPEN
+- next action: after C1: [done-measuring] log line + commit fixtures/real/calibration_c1.json
+- notes for others: [measuring] window open until ~11:35 UTC — B defer heavy compile/test loops on this machine; light unit tests fine. LEAD-ARCH NOTE (dan-el directs, A relays): team is ahead of schedule — keep gates moving early, target Gate 2 exit well before h8. C1/C2 fixtures land as they complete, don't wait for gate boundaries.
 
 
 ## Agent B — live state

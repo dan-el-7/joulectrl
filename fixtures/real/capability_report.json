@@ -5,7 +5,9 @@
   "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
   "cpu": {
     "model": "AMD Ryzen AI 7 350 w/ Radeon 860M",
-    "ncpu": 16, "n_cores": 8, "n_sockets": 1
+    "ncpu": 16,
+    "n_cores": 8,
+    "n_sockets": 1
   },
   "cpufreq": {
     "driver": "amd-pstate-epp",
@@ -17,8 +19,32 @@
   },
   "core_class_mapping": "verified",
   "core_classes": {
-    "fast": {"cpus": [0,2,4,6,8,10,12,14], "hw_max_freq": 5090910},
-    "efficient": {"cpus": [1,3,5,7,9,11,13,15], "hw_max_freq": 3506494}
+    "fast": {
+      "cpus": [
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14
+      ],
+      "hw_max_freq": 5090910
+    },
+    "efficient": {
+      "cpus": [
+        1,
+        3,
+        5,
+        7,
+        9,
+        11,
+        13,
+        15
+      ],
+      "hw_max_freq": 3506494
+    }
   },
   "frequency_cap_control": "verified_with_boost_off",
   "frequency_cap_evidence": {
@@ -37,16 +63,40 @@
     "note": "root-only (-r--------): read_energy is a required helper op from hour 0"
   },
   "epp": {
-    "available_values": ["performance"],
+    "available_values": [
+      "performance"
+    ],
     "usable": false
   },
   "pm_daemons": {
-    "tuned": "running", "tuned_profile": "throughput-performance",
-    "tuned_ppd": "running", "nvidia_powerd": "running"
+    "tuned": "running",
+    "tuned_profile": "throughput-performance",
+    "tuned_ppd": "running",
+    "nvidia_powerd": "running"
   },
   "ac_power": true,
   "recommended_mode": "full",
   "verification_commands": [
     "pkexec bash /tmp/joulectrl_hour0_verify.sh (snapshot->test->restore, readback verified)"
-  ]
+  ],
+  "boost0_cpuinfo_clamp": {
+    "observed_utc": "2026-09-09T10:55:00Z",
+    "fact": "with boost=0, cpuinfo_max_freq drops to 2000000 kHz on BOTH classes (Zen5 p0: 5090910->2000000, Zen5c p1: 3506494->2000000)",
+    "consequence": "cap ladder under boost=0 is [623377..2000000] kHz continuous; caps >2 GHz only possible with boost=1 where they are no-ops. C2 sweep (tier 2) range = 623.377 kHz..2.0 GHz.",
+    "verified_by": "helper daemon apply(boost=0) then read cpuinfo_max_freq; restored after"
+  },
+  "calibration_kernel": {
+    "source": "workloads/kernel/fixed_compute.c (Agent D)",
+    "binary": "workloads/kernel/fixed_compute (built locally, gcc -O3)",
+    "checksum_invariance_verified": true,
+    "checksums_observed": {
+      "c16384_i200000": "0xc2493c07d6b29c85 (workers 1/2/4 identical)"
+    },
+    "default_checksum": "0x3a762069507139ac (c4096_i100000)",
+    "c1_point_size": {
+      "chunks": 16384,
+      "iters": 200000,
+      "single_core_runtime_s": 8.4752
+    }
+  }
 }
