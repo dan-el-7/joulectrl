@@ -238,7 +238,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0, fontSize: '1.2rem', color: c.textPrimary, fontWeight: 600 }}>
-              Empirical Validation &amp; Explanation
+              Validation
             </h2>
             {clockHoldInfo && (
               <span
@@ -271,7 +271,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             )}
           </div>
           <div style={{ fontSize: '0.8rem', color: c.textTertiary, marginTop: '0.25rem' }}>
-            Fresh executions of Stock Baseline vs Selected Candidate to empirically verify package-energy savings on hardware counters.
+            Compare selected profile against stock baseline on live hardware.
           </div>
         </div>
 
@@ -420,10 +420,10 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1rem', color: c.textPrimary, fontWeight: 600 }}>
-              Fresh Validation Executions ({pairs.length} {pairs.length === 1 ? 'Pair' : 'Pairs'})
+              Validation Runs ({pairs.length} {pairs.length === 1 ? 'Pair' : 'Pairs'})
             </h3>
             <div style={{ fontSize: '0.75rem', color: c.textTertiary, marginTop: '0.2rem' }}>
-              Each pair is run back-to-back with hardware counter bracketing and full state restoration before and after each run.
+              Back-to-back runs with RAPL energy measurement and state restoration.
             </div>
           </div>
           {validation.verified_savings_pct != null && (
@@ -575,10 +575,10 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       >
         <div style={{ marginBottom: '1rem' }}>
           <h3 style={{ margin: 0, fontSize: '1rem', color: c.textPrimary, fontWeight: 600 }}>
-            Execution Layout Candidates (Topology Verification)
+            Discovered Core Layouts
           </h3>
           <div style={{ fontSize: '0.78rem', color: c.textTertiary, marginTop: '0.25rem' }}>
-            Discovered hardware layout options based on CPU topology (Fast Cores, All Physical, All Logical, Efficient Cores).
+            Core assignments based on detected processor topology.
           </div>
         </div>
 
@@ -675,7 +675,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: 8 }}>
           <h3 style={{ margin: 0, fontSize: '1rem', color: c.textPrimary, fontWeight: 600 }}>
-            Deterministic Explanation &amp; Rationale
+            Optimization Rationale
           </h3>
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -715,7 +715,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
           >
             {explanation.fallback && (
               <div style={{ fontSize: '0.75rem', color: c.amber, marginBottom: '0.5rem' }}>
-                ⚠ Requested provider unavailable — degraded to deterministic Basic templates (guaranteed default).
+                ⚠ Provider unavailable — using default explanation template.
               </div>
             )}
             <div style={{ fontSize: '0.9rem', color: c.textPrimary, lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>
@@ -724,7 +724,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             {explanation.grounding_facts && explanation.grounding_facts.length > 0 && (
               <div style={{ borderTop: `1px solid ${c.borderSubtle}`, paddingTop: '0.6rem' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: c.textTertiary, marginBottom: '0.3rem' }}>
-                  Grounding Facts (Empirically Verified):
+                  Measured Facts:
                 </div>
                 <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.78rem', color: c.textSecondary, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                   {explanation.grounding_facts.map((fact, idx) => (
@@ -763,27 +763,14 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                 {statusKey === 'restored'
                   ? 'Stock frequencies, power limits, and boost configurations restored to initial state.'
                   : statusKey === 'recovery_required'
-                    ? 'Restoration could not be verified — run the manual restore command before the next experiment.'
-                    : 'Restoration state is tracked in the persisted experiment record.'}
+                    ? 'Restoration could not be verified — run manual restore before next experiment.'
+                    : 'Restoration state is tracked in the experiment record.'}
               </div>
             </div>
             <span style={{ fontSize: '1.2rem' }}>{label.icon}</span>
           </div>
         );
       })()}
-
-      {/* Mandatory Footer per PLAN §11 */}
-      <footer
-        style={{
-          textAlign: 'center',
-          padding: '1.5rem 0',
-          fontSize: '0.75rem',
-          color: c.textTertiary,
-          borderTop: `1px solid ${c.borderSubtle}`,
-        }}
-      >
-        CPU-package energy, not whole-system electricity. Best among measured configurations; future runtimes may vary.
-      </footer>
     </div>
   );
 };

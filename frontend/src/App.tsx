@@ -57,6 +57,7 @@ const AppContent: React.FC = () => {
     duration_s: number;
     suggested_budget_s: number;
   } | null>(null);
+  const [targetedProcess, setTargetedProcess] = useState<{ pid: number; name: string } | null>(null);
 
   // Status flags
   const [isStarting, setIsStarting] = useState<boolean>(false);
@@ -348,6 +349,8 @@ const AppContent: React.FC = () => {
             latestWatchedSegment={latestWatchedSegment}
             onOpenWatchTab={() => setActiveTab('watch')}
             onOpenTasksTab={() => setActiveTab('tasks')}
+            targetedProcess={targetedProcess}
+            onSelectTargetProcess={setTargetedProcess}
           />
         )}
 
@@ -376,7 +379,14 @@ const AppContent: React.FC = () => {
           <WatchPanel onApplySuggestedBudget={handleApplySuggestedBudget} />
         )}
 
-        {activeTab === 'tasks' && <TaskManagerView />}
+        {activeTab === 'tasks' && (
+          <TaskManagerView
+            onTargetProcess={(p) => {
+              setTargetedProcess({ pid: p.pid, name: p.name });
+              setActiveTab('setup');
+            }}
+          />
+        )}
       </main>
     </div>
   );

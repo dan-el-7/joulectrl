@@ -8,6 +8,8 @@ import {
   fetchSystemThermal,
   SystemThermalStatus,
   setProcessPriority,
+  fetchUserProcesses,
+  UserProcess,
 } from '../api';
 
 
@@ -51,14 +53,14 @@ const NumField: React.FC<{
   );
 };
 
-/** Honest warning when a runtime budget is implausibly small/large vs the task. */
+/** Clear warning when a runtime budget is very tight or broad vs the task. */
 const budgetWarning = (budgetS: number | null, estTaskS?: number | null): string | null => {
   if (budgetS === null) return null;
-  if (budgetS < 1) return 'Sub-second budget: almost no measured configuration can finish in time — the selector will honestly report no feasible point.';
-  if (budgetS < 5) return 'Very tight budget: only the fastest (highest-power) configurations can meet this; expect little or no energy saving.';
+  if (budgetS < 1) return 'Sub-second budget: likely infeasible for this workload.';
+  if (budgetS < 5) return 'Very tight budget: requires high-power configurations with minimal energy savings.';
   if (estTaskS && budgetS < estTaskS * 0.5)
-    return `Budget is less than half the measured baseline runtime (~${estTaskS.toFixed(1)}s) — likely infeasible; the baseline itself may not finish in time.`;
-  if (budgetS > 3600) return 'Budget over an hour: valid, but energy savings plateau once runtime is unconstrained.';
+    return `Budget is <50% of baseline (~${estTaskS.toFixed(1)}s) — likely infeasible.`;
+  if (budgetS > 3600) return 'Budget over 1 hour: energy savings plateau with unconstrained runtime.';
   return null;
 };
 
@@ -93,6 +95,8 @@ interface SetupViewProps {
   } | null;
   onOpenWatchTab?: () => void;
   onOpenTasksTab?: () => void;
+  targetedProcess?: { pid: number; name: string } | null;
+  onSelectTargetProcess?: (p: { pid: number; name: string } | null) => void;
 }
 
 export const SetupView: React.FC<SetupViewProps> = ({
@@ -123,7 +127,87 @@ export const SetupView: React.FC<SetupViewProps> = ({
   latestWatchedSegment,
   onOpenWatchTab,
   onOpenTasksTab,
+  targetedProcess,
+  onSelectTargetProcess,
 }) => {
+  const [workloadMode, setWorkloadMode] = React.useState<'benchmark' | 'process'>(() => {
+    return targetedProcess ? 'process' : 'benchmark';
+  });
+  const [activeProcessList, setActiveProcessList] = React.useState<UserProcess[]>([]);
+  const [loadingProcs, setLoadingProcs] = React.useState<boolean>(false);
+  const [procSearch, setProcSearch] = React.useState<string>('');
+  const [manualPidInput, setManualPidInput] = React.useState<string>('');
+  const [targetProcess, setTargetProcess] = React.useState<{
+    pid: number;
+    name: string;
+    cmdline?: string;
+    cpu_pct?: number;
+    mem_pct?: number;
+    affinity_label?: string;
+  } | null>(targetedProcess || null);
+  const [targetCoreLane, setTargetCoreLane] = React.useState<'fast' | 'eco' | 'normal'>('fast');
+  const [processFeedback, setProcessFeedback] = React.useState<string | null>(null);
+  const [isApplyingPriority, setIsApplyingPriority] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (targetedProcess) {
+      setWorkloadMode('process');
+      setTargetProcess(targetedProcess);
+    }
+  }, [targetedProcess]);
+
+  const loadActiveProcesses = React.useCallback(async () => {
+    try {
+      setLoadingProcs(true);
+      const res = await fetchUserProcesses(100);
+      const list = res.processes || [];
+      setActiveProcessList(list);
+      if (targetedProcess) {
+        const match = list.find((p) => p.pid === targetedProcess.pid);
+        if (match) setTargetProcess(match);
+      }
+    } catch (e) {
+      console.warn('Failed to load processes in setup:', e);
+    } finally {
+      setLoadingProcs(false);
+    }
+  }, [targetedProcess]);
+
+  React.useEffect(() => {
+    if (workloadMode === 'process') {
+      loadActiveProcesses();
+    }
+  }, [workloadMode, loadActiveProcesses]);
+
+  const handleApplyProcessPriority = async (laneOverride?: 'fast' | 'eco' | 'normal') => {
+    const lane = laneOverride || targetCoreLane;
+    if (!targetProcess) return;
+    try {
+      setIsApplyingPriority(true);
+      const policy =
+        lane === 'fast'
+          ? 'prioritize_fast'
+          : lane === 'eco'
+            ? 'deprioritize_eco'
+            : 'restore_normal';
+      await setProcessPriority({ pid: targetProcess.pid, policy });
+      const laneName =
+        lane === 'fast'
+          ? 'Zen 5 Fast Cores (Max Clocks)'
+          : lane === 'eco'
+            ? 'Zen 5c Eco Cores (Low Power)'
+            : 'All 16 Cores';
+      setProcessFeedback(`✓ PID ${targetProcess.pid} (${targetProcess.name}) shielded on ${laneName}.`);
+      setTimeout(() => setProcessFeedback(null), 5000);
+      await loadActiveProcesses();
+    } catch (e: any) {
+      setProcessFeedback(`⚠️ Error: ${e?.message ?? e}`);
+      setTimeout(() => setProcessFeedback(null), 6000);
+    } finally {
+      setIsApplyingPriority(false);
+    }
+  };
+
   const [noiseStatus, setNoiseStatus] = React.useState<SystemNoiseStatus | null>(null);
   const [thermalStatus, setThermalStatus] = React.useState<SystemThermalStatus | null>(null);
   const [isQuieting, setIsQuieting] = React.useState<boolean>(false);
@@ -194,6 +278,10 @@ export const SetupView: React.FC<SetupViewProps> = ({
   };
 
   const handleStartWithCheck = () => {
+    if (workloadMode === 'process' && targetProcess) {
+      handleApplyProcessPriority();
+      return;
+    }
     const isCalibratingOrSweeping =
       !hasCalibration || (calibrationBudgetS !== null && calibrationBudgetS > 0) || repetitions > 1;
     if (isCalibratingOrSweeping && noiseStatus && !noiseStatus.is_quiet) {
@@ -210,38 +298,438 @@ export const SetupView: React.FC<SetupViewProps> = ({
           Experiment Setup
         </h2>
 
-        {/* 1. Workload Selection */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.5rem' }}>
-            Workload Plugin
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            {workloads.map((w) => {
-              const isSelected = w.id === selectedWorkload;
-              return (
-                <div
-                  key={w.id}
-                  onClick={() => onSelectWorkload(w.id)}
-                  style={{
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.08)'}`,
-                    backgroundColor: isSelected ? 'rgba(113,112,255,0.14)25' : colors.surfaceElevated,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: isSelected ? colors.accentHover : colors.textSecondary }}>
-                    {w.name}
+        {/* Workload Type Selector: Benchmark Workload vs Target Running Process */}
+        <div style={{ display: 'flex', background: colors.surfaceElevated, borderRadius: '0.5rem', padding: 3, marginBottom: '1.25rem', border: `1px solid ${colors.border}` }}>
+          <button
+            type="button"
+            onClick={() => {
+              setWorkloadMode('benchmark');
+              if (onSelectTargetProcess) onSelectTargetProcess(null);
+            }}
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              background: workloadMode === 'benchmark' ? colors.surface : 'transparent',
+              color: workloadMode === 'benchmark' ? colors.textPrimary : colors.textTertiary,
+              fontWeight: workloadMode === 'benchmark' ? 600 : 400,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              boxShadow: workloadMode === 'benchmark' ? colors.cardShadow : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>📦</span> Benchmark Workload
+          </button>
+          <button
+            type="button"
+            onClick={() => setWorkloadMode('process')}
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              background: workloadMode === 'process' ? colors.surface : 'transparent',
+              color: workloadMode === 'process' ? colors.textPrimary : colors.textTertiary,
+              fontWeight: workloadMode === 'process' ? 600 : 400,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              boxShadow: workloadMode === 'process' ? colors.cardShadow : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🎯</span> Target Running Process {targetProcess ? `(${targetProcess.name || `PID ${targetProcess.pid}`})` : ''}
+          </button>
+        </div>
+
+        {/* 1. Workload / Process Selection */}
+        {workloadMode === 'benchmark' ? (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.5rem' }}>
+              Workload Plugin
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {workloads.map((w) => {
+                const isSelected = w.id === selectedWorkload;
+                return (
+                  <div
+                    key={w.id}
+                    onClick={() => onSelectWorkload(w.id)}
+                    style={{
+                      padding: '0.75rem',
+                      borderRadius: '0.5rem',
+                      border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.08)'}`,
+                      backgroundColor: isSelected ? 'rgba(113,112,255,0.14)25' : colors.surfaceElevated,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: isSelected ? colors.accentHover : colors.textSecondary }}>
+                      {w.name}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
+                      {w.description}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
-                    {w.description}
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Process Targeting & Shielding Section */
+          <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, borderRadius: '0.5rem', padding: '1rem', border: `1px solid ${colors.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary }}>
+                  Target Process
+                </label>
+                <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.15rem' }}>
+                  Shield your active process on dedicated cores to isolate it from multi-task interference.
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={loadingProcs}
+                onClick={loadActiveProcesses}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '0.375rem',
+                  border: `1px solid ${colors.border}`,
+                  background: colors.surface,
+                  color: colors.textSecondary,
+                  fontSize: '0.75rem',
+                  cursor: loadingProcs ? 'wait' : 'pointer',
+                }}
+              >
+                {loadingProcs ? 'Refreshing…' : '↻ Refresh'}
+              </button>
+            </div>
+
+            {/* Active Target Card or Process Selector */}
+            {targetProcess ? (
+              <div
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '0.375rem',
+                  border: `1px solid ${targetCoreLane === 'fast' ? '#8b5cf6' : targetCoreLane === 'eco' ? '#10b981' : colors.accent}`,
+                  background: colors.surface,
+                  marginBottom: '0.85rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.95rem', color: colors.textPrimary }}>
+                          {targetProcess.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontFamily: 'monospace',
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            background: colors.surfaceElevated,
+                            border: `1px solid ${colors.border}`,
+                            color: colors.textSecondary,
+                          }}
+                        >
+                          PID {targetProcess.pid}
+                        </span>
+                      </div>
+                      {targetProcess.cmdline && (
+                        <div
+                          title={targetProcess.cmdline}
+                          style={{
+                            fontSize: '0.74rem',
+                            color: colors.textTertiary,
+                            maxWidth: 340,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginTop: 2,
+                          }}
+                        >
+                          {targetProcess.cmdline}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetProcess(null);
+                      if (onSelectTargetProcess) onSelectTargetProcess(null);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: 4,
+                      border: `1px solid ${colors.border}`,
+                      background: 'transparent',
+                      color: colors.textTertiary,
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕ Change
+                  </button>
+                </div>
+
+                {/* Metrics row */}
+                <div style={{ display: 'flex', gap: 8, marginTop: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {targetProcess.cpu_pct !== undefined && (
+                    <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: colors.textSecondary, background: colors.surfaceElevated, padding: '2px 6px', borderRadius: 4 }}>
+                      CPU: <strong>{targetProcess.cpu_pct.toFixed(1)}%</strong>
+                    </span>
+                  )}
+                  {targetProcess.mem_pct !== undefined && (
+                    <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: colors.textSecondary, background: colors.surfaceElevated, padding: '2px 6px', borderRadius: 4 }}>
+                      RAM: <strong>{targetProcess.mem_pct.toFixed(1)}%</strong>
+                    </span>
+                  )}
+                  {targetProcess.affinity_label && (
+                    <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: colors.accentHover, background: 'rgba(113,112,255,0.12)', padding: '2px 6px', borderRadius: 4 }}>
+                      Affinity: {targetProcess.affinity_label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {/* Search & Manual PID */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: '0.75rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Search active processes (e.g. brave, cargo, python)..."
+                    value={procSearch}
+                    onChange={(e) => setProcSearch(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '6px 10px',
+                      borderRadius: '0.375rem',
+                      border: `1px solid ${colors.border}`,
+                      background: colors.surface,
+                      color: colors.textPrimary,
+                      fontSize: '0.8rem',
+                      outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input
+                      type="text"
+                      placeholder="PID"
+                      value={manualPidInput}
+                      onChange={(e) => setManualPidInput(e.target.value)}
+                      style={{
+                        width: 60,
+                        padding: '6px 8px',
+                        borderRadius: '0.375rem',
+                        border: `1px solid ${colors.border}`,
+                        background: colors.surface,
+                        color: colors.textPrimary,
+                        fontSize: '0.8rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!manualPidInput.trim()}
+                      onClick={() => {
+                        const pid = parseInt(manualPidInput.trim(), 10);
+                        if (!Number.isNaN(pid)) {
+                          const proc = { pid, name: `PID ${pid}` };
+                          setTargetProcess(proc);
+                          if (onSelectTargetProcess) onSelectTargetProcess(proc);
+                        }
+                      }}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '0.375rem',
+                        border: 'none',
+                        background: colors.accentBg,
+                        color: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: manualPidInput.trim() ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      Select
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Process list */}
+                <div
+                  style={{
+                    maxHeight: 180,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    background: colors.surface,
+                    borderRadius: '0.375rem',
+                    padding: 6,
+                    border: `1px solid ${colors.border}`,
+                    marginBottom: '0.85rem',
+                  }}
+                >
+                  {activeProcessList
+                    .filter((p) => {
+                      const q = procSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return (
+                        p.name.toLowerCase().includes(q) ||
+                        p.cmdline.toLowerCase().includes(q) ||
+                        String(p.pid).includes(q)
+                      );
+                    })
+                    .slice(0, 15)
+                    .map((p) => (
+                      <div
+                        key={p.pid}
+                        onClick={() => {
+                          setTargetProcess(p);
+                          if (onSelectTargetProcess) onSelectTargetProcess({ pid: p.pid, name: p.name });
+                        }}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 4,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          background: colors.surfaceElevated,
+                          transition: 'background 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(113,112,255,0.15)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = colors.surfaceElevated)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                          <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: colors.textTertiary, minWidth: 42 }}>
+                            {p.pid}
+                          </span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: colors.textPrimary }}>
+                            {p.name}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: colors.textTertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                            {p.cmdline}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 600, color: p.cpu_pct >= 5 ? '#f59e0b' : colors.textSecondary }}>
+                            {p.cpu_pct.toFixed(1)}% CPU
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: colors.accentHover }}>Select →</span>
+                        </div>
+                      </div>
+                    ))}
+                  {activeProcessList.length === 0 && (
+                    <div style={{ padding: '1rem', textAlign: 'center', color: colors.textTertiary, fontSize: '0.78rem' }}>
+                      {loadingProcs ? 'Loading processes...' : 'No processes found.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Core Priority Lane */}
+            <div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, color: colors.textTertiary, marginBottom: '0.4rem' }}>
+                Hardware Core Lane:
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                {[
+                  {
+                    id: 'fast',
+                    label: '⚡ Fast Zen 5 Cores',
+                    desc: 'Cores 0,2,4,6,8,10,12,14 · Boost ON',
+                    color: '#8b5cf6',
+                  },
+                  {
+                    id: 'eco',
+                    label: '🌿 Eco Zen 5c Cores',
+                    desc: 'Cores 1,3,5,7,9,11,13,15 · Nice +15',
+                    color: '#10b981',
+                  },
+                  {
+                    id: 'normal',
+                    label: '⚪ All 16 Cores',
+                    desc: 'Cores 0-15 · Default scheduler',
+                    color: colors.textTertiary,
+                  },
+                ].map((opt) => {
+                  const isSel = targetCoreLane === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setTargetCoreLane(opt.id as any);
+                        if (targetProcess) handleApplyProcessPriority(opt.id as any);
+                      }}
+                      style={{
+                        padding: '0.5rem',
+                        borderRadius: '0.375rem',
+                        border: `1.5px solid ${isSel ? opt.color : 'rgba(255,255,255,0.08)'}`,
+                        background: isSel ? `${opt.color}20` : colors.surface,
+                        color: isSel ? colors.textPrimary : colors.textSecondary,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isSel ? opt.color : colors.textPrimary }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: colors.textTertiary, marginTop: 2, lineHeight: 1.3 }}>
+                        {opt.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Apply Core Lane Button */}
+              {targetProcess && (
+                <div style={{ marginTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    disabled={isApplyingPriority}
+                    onClick={() => handleApplyProcessPriority()}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '0.375rem',
+                      border: 'none',
+                      background: targetCoreLane === 'fast' ? '#8b5cf6' : targetCoreLane === 'eco' ? '#10b981' : colors.accentBg,
+                      color: '#ffffff',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: isApplyingPriority ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {isApplyingPriority ? 'Shielding…' : '⚡ Apply Core Lane to Task'}
+                  </button>
+                  {processFeedback && (
+                    <span style={{ fontSize: '0.75rem', color: colors.emerald, fontWeight: 500 }}>
+                      {processFeedback}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 2. Objective Selection */}
         <div style={{ marginBottom: '1.5rem' }}>
@@ -910,27 +1398,31 @@ export const SetupView: React.FC<SetupViewProps> = ({
         >
           {isStarting
             ? 'Optimizing Workload...'
-            : calibrationBudgetS && calibrationBudgetS > 0
-              ? `Run ${calibrationBudgetS}s Scan & Optimize Workload`
-              : calibrationBudgetS === null
-                ? 'Run Full Scan & Optimize Workload'
-                : objective === 'deadline'
-                  ? 'Optimize Workload for Deadline (Instant)'
-                  : objective === 'preference'
-                    ? 'Optimize for Preference Target (Instant)'
-                    : 'Explore Pareto Candidates (Instant)'}
+            : workloadMode === 'process'
+              ? targetProcess
+                ? `Shield PID ${targetProcess.pid} (${targetProcess.name}) on ${targetCoreLane === 'fast' ? 'Fast Cores' : targetCoreLane === 'eco' ? 'Eco Cores' : 'All Cores'}`
+                : 'Select a Running Process to Shield'
+              : calibrationBudgetS && calibrationBudgetS > 0
+                ? `Run ${calibrationBudgetS}s Scan & Optimize Workload`
+                : calibrationBudgetS === null
+                  ? 'Run Full Scan & Optimize Workload'
+                  : objective === 'deadline'
+                    ? 'Optimize Workload for Deadline (Instant)'
+                    : objective === 'preference'
+                      ? 'Optimize for Preference Target (Instant)'
+                      : 'Explore Pareto Candidates (Instant)'}
         </button>
       </div>
 
       {/* Right Column: Hardware Discovery Card */}
       <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h2 style={{ margin: '0 0 1.25rem 0', fontSize: '1.15rem', color: colors.textPrimary, fontWeight: 600 }}>
-          Hardware Discovery & Capabilities
+          Hardware Discovery
         </h2>
 
         {capabilities ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
-            {/* data provenance — never present fixture data as this machine */}
+            {/* data provenance */}
             {capabilities.source === 'fixture' && (
               <div
                 style={{
@@ -942,9 +1434,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   color: colors.amber,
                 }}
               >
-                <strong>Demo-laptop fixture data — not discovered on this machine.</strong>{' '}
-                {capabilities.note ??
-                  'Live hardware discovery is unavailable here (needs Linux sysfs); the values below come from the committed reference fixture.'}
+                <strong>Reference fixture data</strong> — sysfs unavailable.
               </div>
             )}
             {capabilities.source === 'live' && (
@@ -958,7 +1448,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   color: colors.emerald,
                 }}
               >
-                <strong>Live discovery</strong> — hardware read from this machine.
+                <strong>Live hardware discovered</strong> from this machine.
               </div>
             )}
             <div style={{ background: colors.surfaceElevated, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -995,7 +1485,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>CPU Frequency Caps</span>
-                <span style={{ color: colors.emerald, fontWeight: 700 }}>✓ Verified (16 policies, boost=0 pair)</span>
+                <span style={{ color: colors.emerald, fontWeight: 700 }}>✓ Verified (16 policies)</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Global Boost Toggle</span>
@@ -1018,7 +1508,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             </div>
 
             <div style={{ background: colors.surfaceElevated, border: `1px solid ${colors.border}`, borderRadius: '0.5rem', padding: '0.6rem', fontSize: '0.72rem', color: colors.textTertiary }}>
-              <strong>Non-negotiable rule:</strong> Package energy measured directly from verified hardware counter. Missing energy is never relabeled as zero.
+              Package energy measured directly from Linux sysfs RAPL hardware counter.
             </div>
           </div>
         ) : (

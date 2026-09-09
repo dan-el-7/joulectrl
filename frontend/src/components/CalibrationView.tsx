@@ -370,10 +370,9 @@ export const CalibrationView: React.FC = () => {
       {/* header + controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ ...type.display, color: colors.textPrimary }}>Calibration & Silicon Benchmark</div>
+          <div style={{ ...type.display, color: colors.textPrimary }}>Calibration</div>
           <div style={{ ...type.small, color: colors.textTertiary, marginTop: 4 }}>
-            Measured performance vs power curves. Faster task completion gives higher score.
-            Identical runs are averaged for measurement accuracy.
+            Measured performance vs power curves across core classes and frequencies.
           </div>
         </div>
 
@@ -479,15 +478,14 @@ export const CalibrationView: React.FC = () => {
 
       {/* Performance vs Power curve card */}
       <div style={{ ...sectionLabel, marginTop: 8 }}>
-        Performance vs Power Curve (Higher is Faster, Wattage on X Axis)
+        Efficiency Curve (Score vs Package Power)
         {scopeFilter === 'single' ? ' · Single-core' : scopeFilter === 'multi' ? ' · Multicore' : ' · All Points'}
       </div>
 
       <div style={{ ...card, padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
           <div style={{ ...type.small, color: colors.textSecondary, maxWidth: 620 }}>
-            Faster task completion gives a higher score. Power is package wattage in Watts.
-            Points sharing identical hardware frequency and cores are averaged.
+            Higher score indicates faster completion. Package power measured in Watts.
             {data?.total_runs_aggregated ? ` (${data.total_runs_aggregated} live runs aggregated)` : ''}
           </div>
 

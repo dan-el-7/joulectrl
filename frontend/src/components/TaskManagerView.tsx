@@ -72,7 +72,11 @@ const COMMON_APPS = [
   { name: 'FFmpeg', pattern: 'ffmpeg', icon: '🎬' },
 ];
 
-export const TaskManagerView: React.FC = () => {
+export interface TaskManagerViewProps {
+  onTargetProcess?: (p: UserProcess) => void;
+}
+
+export const TaskManagerView: React.FC<TaskManagerViewProps> = ({ onTargetProcess }) => {
   const [processes, setProcesses] = useState<UserProcess[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -233,7 +237,7 @@ export const TaskManagerView: React.FC = () => {
             </span>
           </div>
           <div style={{ fontSize: 13, color: t.textTertiary, marginTop: 4 }}>
-            Aceternity-style affinity board: push background tabs to Zen 5c eco cores or pin critical apps to Zen 5 fast cores.
+            Assign core affinity and scheduling priority to isolate background tasks or shield high-priority workloads on fast cores.
           </div>
         </div>
 
@@ -560,6 +564,7 @@ export const TaskManagerView: React.FC = () => {
             onDragStart={handleDragStart}
             onMoveToNormal={(pid) => handleApplyPriority({ pid }, 'restore_normal')}
             onMoveToFast={(pid) => handleApplyPriority({ pid }, 'prioritize_fast')}
+            onTargetProcess={onTargetProcess}
             onAddProcess={() => setActiveAddColumn(activeAddColumn === 'eco' ? null : 'eco')}
             isAddOpen={activeAddColumn === 'eco'}
             onConfirmAdd={(pattern) => handleApplyPriority({ pattern }, 'deprioritize_eco')}
@@ -581,6 +586,7 @@ export const TaskManagerView: React.FC = () => {
             onDragStart={handleDragStart}
             onMoveToEco={(pid) => handleApplyPriority({ pid }, 'deprioritize_eco')}
             onMoveToFast={(pid) => handleApplyPriority({ pid }, 'prioritize_fast')}
+            onTargetProcess={onTargetProcess}
           />
 
           {/* Column 3: Zen 5 Fast Cores (Top Priority) */}
@@ -599,6 +605,7 @@ export const TaskManagerView: React.FC = () => {
             onDragStart={handleDragStart}
             onMoveToNormal={(pid) => handleApplyPriority({ pid }, 'restore_normal')}
             onMoveToEco={(pid) => handleApplyPriority({ pid }, 'deprioritize_eco')}
+            onTargetProcess={onTargetProcess}
             onAddProcess={() => setActiveAddColumn(activeAddColumn === 'fast' ? null : 'fast')}
             isAddOpen={activeAddColumn === 'fast'}
             onConfirmAdd={(pattern) => handleApplyPriority({ pattern }, 'prioritize_fast')}
@@ -736,6 +743,24 @@ export const TaskManagerView: React.FC = () => {
                           >
                             ↺ Normal
                           </button>
+                          {onTargetProcess && (
+                            <button
+                              onClick={() => onTargetProcess(p)}
+                              title="Select this process in Setup to optimize or set deadline"
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: radii.sm,
+                                border: '1px solid rgba(113, 112, 255, 0.35)',
+                                background: 'rgba(113, 112, 255, 0.14)',
+                                color: '#818cf8',
+                                cursor: 'pointer',
+                                fontSize: 11,
+                                fontWeight: 600,
+                              }}
+                            >
+                              🎯 Target
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -766,6 +791,7 @@ interface KanbanColumnProps {
   onMoveToEco?: (pid: number) => void;
   onMoveToFast?: (pid: number) => void;
   onMoveToNormal?: (pid: number) => void;
+  onTargetProcess?: (p: UserProcess) => void;
   onAddProcess?: () => void;
   isAddOpen?: boolean;
   onConfirmAdd?: (pattern: string) => void;
@@ -785,6 +811,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onMoveToEco,
   onMoveToFast,
   onMoveToNormal,
+  onTargetProcess,
   onAddProcess,
   isAddOpen,
   onConfirmAdd,
@@ -966,6 +993,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
               onMoveToEco={onMoveToEco ? () => onMoveToEco(p.pid) : undefined}
               onMoveToFast={onMoveToFast ? () => onMoveToFast(p.pid) : undefined}
               onMoveToNormal={onMoveToNormal ? () => onMoveToNormal(p.pid) : undefined}
+              onTargetProcess={onTargetProcess ? () => onTargetProcess(p) : undefined}
             />
           ))
         )}
@@ -983,6 +1011,7 @@ interface ProcessCardProps {
   onMoveToEco?: () => void;
   onMoveToFast?: () => void;
   onMoveToNormal?: () => void;
+  onTargetProcess?: () => void;
 }
 
 const ProcessCard: React.FC<ProcessCardProps> = ({
@@ -994,6 +1023,7 @@ const ProcessCard: React.FC<ProcessCardProps> = ({
   onMoveToEco,
   onMoveToFast,
   onMoveToNormal,
+  onTargetProcess,
 }) => {
   const [hovered, setHovered] = useState(false);
 
@@ -1201,6 +1231,31 @@ const ProcessCard: React.FC<ProcessCardProps> = ({
             }}
           >
             ⚡ Fast
+          </button>
+        )}
+        {onTargetProcess && (
+          <button
+            disabled={isActing}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTargetProcess();
+            }}
+            title="Select this process in Setup to optimize or set deadline"
+            style={{
+              padding: '3px 8px',
+              borderRadius: radii.xs,
+              border: '1px solid rgba(113, 112, 255, 0.35)',
+              background: 'rgba(113, 112, 255, 0.12)',
+              color: '#818cf8',
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: isActing ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+          >
+            🎯 Target
           </button>
         )}
       </div>

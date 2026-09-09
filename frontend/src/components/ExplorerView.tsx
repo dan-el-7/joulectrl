@@ -110,7 +110,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <h2 style={{ margin: 0, fontSize: '1.15rem', color: colors.textPrimary, fontWeight: 600 }}>
-              Profile Explorer — {experiment.workload_id}
+              Profile Explorer
             </h2>
             <span
               style={{
@@ -291,15 +291,13 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         }}
       />
 
-      {/* Validation-Point Candidates (B's layout selector + measured calibration points) */}
+      {/* Layout Candidates */}
       <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
-          Validation-Point Candidates
+          Layout Candidates
         </h3>
         <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginBottom: '0.75rem' }}>
-          Execution layouts built from the discovered core-class map plus measured calibration points. Select the
-          configurations worth validating with fresh runs — suggestions only; the selector still checks all usable
-          configurations. {selectedCandidates.size > 0 && `${selectedCandidates.size} selected.`}
+          Configurations based on processor topology and calibration measurements. {selectedCandidates.size > 0 && `${selectedCandidates.size} selected.`}
         </div>
         {candidatesError && (
           <div style={{ fontSize: '0.8rem', color: colors.amber }}>Failed to load candidates: {candidatesError}</div>
@@ -346,7 +344,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       {/* Complete Run List Table */}
       <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem 1.5rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
         <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', color: colors.textPrimary, fontWeight: 600 }}>
-          Individual Execution Runs ({(profile?.runs || []).length} captured)
+          Measured Runs ({(profile?.runs || []).length} captured)
         </h3>
         <div style={{ overflowX: 'auto' }}>
           {(profile?.runs || []).length === 0 ? (
