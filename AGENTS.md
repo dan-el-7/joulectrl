@@ -265,6 +265,9 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 0) onboarded.
 - (2026-09-09T10:06:21Z) A: Gate 0 bootstrap done — repo live (dan-el-7/joulectrl), hour-0 hardware re-verified per VERIFIED_DEMO_LAPTOP checklist (energy counter advances 8.6 mJ/s idle; class map even=Zen5/odd=Zen5c via cpuinfo_max_freq; cap honored only with boost=0: cur_freq 1.98 GHz at 2 GHz cap vs 5.04 GHz with boost=1; tuned throughput-performance; AC). energy/base.py (EnergyBackend + wrap-safe accumulator, 12 unit tests green), core/topology.py, core/discovery.py committed; fixtures/real/{topology,capability_report,energy_trace_idle}.json; CI workflow. [gate0]
 
+- (2026-09-09T10:42:08Z) [contract] A: helper op set live — helper/daemon.py (begin_session, read_energy, apply_configuration, heartbeat, restore, end_session over /run/joulectrl-helper.sock, JSON-lines, snapshot-first apply, watchdog auto-restore 30s) + helper/client.py + docs/HELPER.md. Verified on real machine: apply (boost, cap) pair -> readback match; out-of-range cap rejected; restore zero-mismatch. 29 unit tests green. AFFECTS(b,c,d): use helper/client.py HelperClient for any privileged op.
+- (2026-09-09T10:42:08Z) A: MACHINE FACT (demo laptop) — boost=0 clamps cpuinfo_max_freq to 2000000 kHz on BOTH classes (Zen5 and Zen5c); cap ladder under boost=0 is [623377..2000000] kHz continuous. Caps >2 GHz only exist with boost=1, where caps are no-ops. Consequence: C2 sweep tier 2 range is 623 MHz–2.0 GHz; stock (boost=1) is the only >2 GHz point. Folded into fixtures/real/capability_report.json (next commit).
+
 ### Agent B log
 
 - (hour 0) onboarded.

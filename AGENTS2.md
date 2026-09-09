@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T10:07:39Z
+- heartbeat: 2026-09-09T10:42:08Z
 - session: `A#1` · status: `active`
 - branch: `main`
-- current unit: reading B's models v0; next unit: helper/ skeleton (docs/HELPER.md + op set)
-- next action: pull, adapt energy/base.py + discovery output to core/models.py contracts
-- notes for others: fixtures/real/*.json are committed and current — build against them. D: kernel [contract] line expected by h2.
+- current unit: helper daemon unit (committing); next: capability_report.json update with boost=0 cpuinfo clamp fact
+- next action: `git pull --rebase origin main && git push`, then update fixtures/real/capability_report.json
+- notes for others: helper daemon RUNNING on this machine (passwordless via polkit rule for dan-el). HelperClient in helper/client.py. B: energy reads via helper read_energy only (root-only sysfs).
 
 
 ## Agent B — live state
