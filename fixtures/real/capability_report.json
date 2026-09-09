@@ -1,0 +1,52 @@
+{
+  "schema": "joulectrl.capability_report/1",
+  "captured_utc": "2026-09-09T10:01:00Z",
+  "machine": "demo-laptop",
+  "boot_id": "6a6eb70b-267a-4ede-a0b9-b15ce2cb6fc2",
+  "cpu": {
+    "model": "AMD Ryzen AI 7 350 w/ Radeon 860M",
+    "ncpu": 16, "n_cores": 8, "n_sockets": 1
+  },
+  "cpufreq": {
+    "driver": "amd-pstate-epp",
+    "governor": "performance",
+    "n_policies": 16,
+    "per_cpu_policies": true,
+    "boost_knob": "/sys/devices/system/cpu/cpufreq/boost",
+    "boost_snapshot": 1
+  },
+  "core_class_mapping": "verified",
+  "core_classes": {
+    "fast": {"cpus": [0,2,4,6,8,10,12,14], "hw_max_freq": 5090910},
+    "efficient": {"cpus": [1,3,5,7,9,11,13,15], "hw_max_freq": 3506494}
+  },
+  "frequency_cap_control": "verified_with_boost_off",
+  "frequency_cap_evidence": {
+    "boost1_cap_2ghz_cur_freq_khz": 5038130,
+    "boost0_cap_2ghz_cur_freq_khz": 1979228,
+    "note": "cap is a silent no-op while boost=1; (boost, cap) pairs required on this machine"
+  },
+  "package_energy": {
+    "backend": "powercap sysfs",
+    "path": "/sys/class/powercap/intel-rapl:0/energy_uj",
+    "domain": "package-0",
+    "readable": "root_only",
+    "max_energy_range_uj": 65532610987,
+    "counter_advances": true,
+    "idle_delta_uj_per_s": 8636424,
+    "note": "root-only (-r--------): read_energy is a required helper op from hour 0"
+  },
+  "epp": {
+    "available_values": ["performance"],
+    "usable": false
+  },
+  "pm_daemons": {
+    "tuned": "running", "tuned_profile": "throughput-performance",
+    "tuned_ppd": "running", "nvidia_powerd": "running"
+  },
+  "ac_power": true,
+  "recommended_mode": "full",
+  "verification_commands": [
+    "pkexec bash /tmp/joulectrl_hour0_verify.sh (snapshot->test->restore, readback verified)"
+  ]
+}
