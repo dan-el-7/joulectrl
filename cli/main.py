@@ -132,11 +132,10 @@ def run_doctor(args: argparse.Namespace) -> int:
     """Render A's capability report (core/doctor.py); degrades off-Linux."""
     from core.doctor import doctor_report, format_doctor
 
-    # The helper socket is Linux-only; skip the probe on other platforms so
-    # the report renders (with honest "unavailable" fields) on dev machines.
-    helper_available = sys.platform.startswith("linux")
+    # doctor_report() platform-guards the helper probe internally (A, 13:01Z),
+    # so we can request the probe everywhere; off-Linux it degrades honestly.
     try:
-        report = doctor_report(helper_available=helper_available)
+        report = doctor_report()
     except Exception as exc:  # discovery may fail hard on non-Linux dev boxes
         print(f"capability discovery failed on this machine: {exc}", file=sys.stderr)
         return 2
