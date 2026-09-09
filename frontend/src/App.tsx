@@ -29,9 +29,20 @@ export const App: React.FC = () => {
   const [runtimeBudgetS, setRuntimeBudgetS] = useState<number | null>(45.0);
   const [energyTargetPct, setEnergyTargetPct] = useState<number>(70);
   const [perfFloorPct, setPerfFloorPct] = useState<number>(90);
-  const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(0);
+  const [calibrationBudgetS, setCalibrationBudgetS] = useState<number | null>(() => {
+    const saved = localStorage.getItem('joulectrl_calibration_budget_s');
+    if (saved !== null) {
+      if (saved === 'null') return null;
+      const parsed = parseFloat(saved);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return 120;
+  });
   const [expPassiveCaps, setExpPassiveCaps] = useState<boolean>(false);
-  const [repetitions, setRepetitions] = useState<number>(1);
+  const [repetitions, setRepetitions] = useState<number>(() => {
+    const saved = localStorage.getItem('joulectrl_repetitions');
+    return saved ? parseInt(saved, 10) || 1 : 1;
+  });
   const [hasCalibration, setHasCalibration] = useState<boolean>(true);
   const [latestWatchedSegment, setLatestWatchedSegment] = useState<{
     duration_s: number;
@@ -100,13 +111,14 @@ export const App: React.FC = () => {
       .then((cal) => {
         const hasPts = Boolean(cal?.classes?.some((c: any) => c.points?.length > 0));
         setHasCalibration(hasPts);
-        if (hasPts) {
-          setCalibrationBudgetS(0);
+        if (!hasPts) {
+          setCalibrationBudgetS((prev) => (prev === 0 ? 120 : prev));
         }
       })
       .catch((e) => {
         console.warn('Could not fetch calibration:', e);
         setHasCalibration(false);
+        setCalibrationBudgetS((prev) => (prev === 0 ? 120 : prev));
       });
 
     loadExperiments();
@@ -162,6 +174,20 @@ export const App: React.FC = () => {
     };
   }, [experiment?.id]);
 
+  const handleCalibrationBudgetChange = (val: number | null) => {
+    setCalibrationBudgetS(val);
+    if (val === null) {
+      localStorage.setItem('joulectrl_calibration_budget_s', 'null');
+    } else {
+      localStorage.setItem('joulectrl_calibration_budget_s', String(val));
+    }
+  };
+
+  const handleRepetitionsChange = (val: number) => {
+    setRepetitions(val);
+    localStorage.setItem('joulectrl_repetitions', String(val));
+  };
+
   const handleStartExperiment = async () => {
     try {
       setIsStarting(true);
@@ -173,7 +199,7 @@ export const App: React.FC = () => {
           objective === 'preference'
             ? { energy_target_pct: energyTargetPct, perf_floor_pct: perfFloorPct }
             : undefined,
-        calibration_budget_s: calibrationBudgetS ?? undefined,
+        calibration_budget_s: calibrationBudgetS,
         experimental_passive_caps: expPassiveCaps,
         repetitions,
       });
@@ -255,11 +281,11 @@ export const App: React.FC = () => {
             perfFloorPct={perfFloorPct}
             onChangePerfFloor={setPerfFloorPct}
             calibrationBudgetS={calibrationBudgetS}
-            onChangeCalibrationBudget={setCalibrationBudgetS}
+            onChangeCalibrationBudget={handleCalibrationBudgetChange}
             expPassiveCaps={expPassiveCaps}
             onChangeExpPassiveCaps={setExpPassiveCaps}
             repetitions={repetitions}
-            onChangeRepetitions={setRepetitions}
+            onChangeRepetitions={handleRepetitionsChange}
             onStartExperiment={handleStartExperiment}
             isStarting={isStarting}
             baselineRuntimeS={

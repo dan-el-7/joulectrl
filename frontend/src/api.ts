@@ -31,7 +31,7 @@ export async function createExperiment(payload: {
   objective: string;
   runtime_budget_s?: number | null;
   preference?: { energy_target_pct: number; perf_floor_pct: number };
-  calibration_budget_s?: number;
+  calibration_budget_s?: number | null;
   experimental_passive_caps?: boolean;
   repetitions?: number;
 }): Promise<{ id: string }> {

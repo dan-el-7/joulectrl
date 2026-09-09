@@ -12,7 +12,7 @@ const NumField: React.FC<{
   max?: number;
   unit?: string;
   width?: number;
-}> = ({ value, onCommit, min, max, unit, width = 84 }) => {
+}> = ({ value, onCommit, min = 0, max, unit, width = 84 }) => {
   const [text, setText] = React.useState(String(value));
   const [focused, setFocused] = React.useState(false);
   React.useEffect(() => {
@@ -20,7 +20,7 @@ const NumField: React.FC<{
   }, [value, focused]);
   const commit = () => {
     const v = parseFloat(text);
-    if (Number.isFinite(v) && v > 0) onCommit(v);
+    if (Number.isFinite(v) && v >= min && (max === undefined || v <= max)) onCommit(v);
     else setText(String(value));
   };
   return (
@@ -111,7 +111,6 @@ export const SetupView: React.FC<SetupViewProps> = ({
   latestWatchedSegment,
   onOpenWatchTab,
 }) => {
-  const [showCalibrationSettings, setShowCalibrationSettings] = React.useState<boolean>(false);
   const [noiseStatus, setNoiseStatus] = React.useState<SystemNoiseStatus | null>(null);
   const [isQuieting, setIsQuieting] = React.useState<boolean>(false);
   const [quietSuccessMsg, setQuietSuccessMsg] = React.useState<string | null>(null);
@@ -461,119 +460,174 @@ export const SetupView: React.FC<SetupViewProps> = ({
           )}
         </div>
 
-        {/* 3. Calibration Status & Optional Sweep Settings */}
-        {hasCalibration ? (
-          <div style={{
+        {/* 3. Calibration Sweep & Scan Duration */}
+        <div
+          style={{
             marginBottom: '1.5rem',
-            background: 'rgba(16,185,129,0.06)',
-            border: '1px solid rgba(16,185,129,0.22)',
+            background: colors.surfaceElevated,
+            border: `1px solid ${hasCalibration ? 'rgba(16,185,129,0.22)' : colors.border}`,
             borderRadius: '0.5rem',
-            padding: '0.75rem 1rem',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ color: colors.emerald, fontSize: '0.95rem', fontWeight: 'bold' }}>✓</span>
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: colors.textPrimary }}>
-                    Hardware Calibration Active
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: colors.textTertiary }}>
-                    Pre-measured C1/C2 curves and baseline are loaded — optimization uses existing verified points.
-                  </div>
-                </div>
+            padding: '1rem',
+          }}
+        >
+          {/* Header & Status */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>⏱️ Calibration Sweep Budget (Scan Duration)</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCalibrationSettings((prev) => {
-                    const next = !prev;
-                    onChangeCalibrationBudget(next ? (calibrationBudgetS && calibrationBudgetS > 0 ? calibrationBudgetS : 120) : 0);
-                    return next;
-                  });
-                }}
+              <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginTop: '0.2rem' }}>
+                {hasCalibration
+                  ? 'Use pre-measured verified calibration data (instant 0s) or run a live sweep to measure configurations for this workload.'
+                  : 'No existing calibration found — a live hardware sweep is required before optimization.'}
+              </div>
+            </div>
+
+            {hasCalibration ? (
+              <span
                 style={{
-                  background: 'transparent',
-                  border: `1px solid ${colors.border}`,
+                  background: 'rgba(16,185,129,0.12)',
+                  color: colors.emerald,
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '0.2rem 0.5rem',
                   borderRadius: '0.25rem',
-                  padding: '0.25rem 0.5rem',
-                  color: colors.accentHover,
-                  fontSize: '0.72rem',
-                  cursor: 'pointer',
+                  border: '1px solid rgba(16,185,129,0.3)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {showCalibrationSettings ? 'Use Calibration Only' : 'Sweep / Recalibrate'}
-              </button>
-            </div>
-
-            {showCalibrationSettings && (
-              <div style={{ marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: colors.textTertiary, marginBottom: '0.35rem' }}>
-                  <span>Scan / Calibration Sweep Budget:</span>
-                  <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
-                    {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS || 120}s`}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <input
-                    type="range"
-                    min="30"
-                    max="1800"
-                    step="10"
-                    value={Math.min(Math.max(calibrationBudgetS || 120, 30), 1800)}
-                    disabled={calibrationBudgetS === null}
-                    onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
-                    style={{ flex: 1, accentColor: colors.accent }}
-                  />
-                  <NumField value={calibrationBudgetS || 120} onCommit={onChangeCalibrationBudget} unit="s" />
-                  <label style={{ fontSize: '0.72rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={calibrationBudgetS === null}
-                      onChange={(e) => onChangeCalibrationBudget(e.target.checked ? null : 120)}
-                    />
-                    Exhaustive
-                  </label>
-                </div>
-
-                {/* Experimental passive caps */}
-                <div style={{ marginTop: '0.6rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={expPassiveCaps}
-                      onChange={(e) => onChangeExpPassiveCaps(e.target.checked)}
-                      style={{ marginTop: 2, accentColor: colors.amber }}
-                    />
-                    <span style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-                      <span style={{ color: colors.amber, fontWeight: 600 }}>Experimental:</span> passive-mode caps (sweeps 2.5–4.5 GHz boost-on points)
-                    </span>
-                  </label>
-                </div>
-              </div>
+                ✓ Verified Curves Loaded
+              </span>
+            ) : (
+              <span
+                style={{
+                  background: 'rgba(245,158,11,0.12)',
+                  color: colors.amber,
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '0.25rem',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ⚠️ Sweep Required
+              </span>
             )}
           </div>
-        ) : (
-          /* First-run calibration sweep needed */
-          <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: colors.border }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: colors.textTertiary, marginBottom: '0.4rem' }}>
-              <span>Initial Calibration Sweep Budget:</span>
+
+          {/* Quick Presets */}
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+            {hasCalibration && (
+              <button
+                type="button"
+                onClick={() => onChangeCalibrationBudget(0)}
+                style={{
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: '0.375rem',
+                  border: `1.5px solid ${calibrationBudgetS === 0 ? colors.emerald : 'rgba(255,255,255,0.1)'}`,
+                  backgroundColor: calibrationBudgetS === 0 ? 'rgba(16,185,129,0.15)' : colors.surface,
+                  color: calibrationBudgetS === 0 ? colors.emerald : colors.textSecondary,
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                ⚡ 0s (Instant)
+              </button>
+            )}
+
+            {[
+              { val: 60, label: '60s (Quick)' },
+              { val: 120, label: '120s (Standard)' },
+              { val: 300, label: '300s (Thorough)' },
+              { val: 600, label: '600s (Deep)' },
+            ].map((preset) => {
+              const isSelected = calibrationBudgetS === preset.val;
+              return (
+                <button
+                  key={preset.val}
+                  type="button"
+                  onClick={() => onChangeCalibrationBudget(preset.val)}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '0.375rem',
+                    border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.1)'}`,
+                    backgroundColor: isSelected ? 'rgba(113,112,255,0.22)' : colors.surface,
+                    color: isSelected ? colors.accentHover : colors.textSecondary,
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => onChangeCalibrationBudget(calibrationBudgetS === null ? 120 : null)}
+              style={{
+                padding: '0.35rem 0.65rem',
+                borderRadius: '0.375rem',
+                border: `1.5px solid ${calibrationBudgetS === null ? colors.accent : 'rgba(255,255,255,0.1)'}`,
+                backgroundColor: calibrationBudgetS === null ? 'rgba(113,112,255,0.22)' : colors.surface,
+                color: calibrationBudgetS === null ? colors.accentHover : colors.textSecondary,
+                fontSize: '0.76rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              ♾️ Exhaustive
+            </button>
+          </div>
+
+          {/* Slider + NumField */}
+          <div style={{ background: colors.surface, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: colors.textTertiary, marginBottom: '0.4rem' }}>
+              <span>Sweep Duration:</span>
               <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
-                {calibrationBudgetS === null ? 'Exhaustive' : `${calibrationBudgetS}s`}
+                {calibrationBudgetS === null
+                  ? 'Exhaustive (~1800s safety limit)'
+                  : calibrationBudgetS === 0
+                    ? '0s (Instant · Pre-measured Calibration)'
+                    : `${calibrationBudgetS}s (~${(calibrationBudgetS / 60).toFixed(1)} min)`}
               </span>
             </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <input
                 type="range"
                 min="30"
                 max="1800"
                 step="10"
-                value={Math.min(Math.max(calibrationBudgetS ?? 120, 30), 1800)}
+                value={
+                  calibrationBudgetS === null
+                    ? 1800
+                    : calibrationBudgetS === 0
+                      ? 120
+                      : Math.min(Math.max(calibrationBudgetS, 30), 1800)
+                }
                 disabled={calibrationBudgetS === null}
-                onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value))}
-                style={{ flex: 1, accentColor: colors.accent }}
+                onChange={(e) => onChangeCalibrationBudget(parseInt(e.target.value, 10))}
+                style={{
+                  flex: 1,
+                  accentColor: colors.accent,
+                  opacity: calibrationBudgetS === 0 ? 0.5 : 1,
+                }}
               />
-              <NumField value={calibrationBudgetS ?? 120} onCommit={onChangeCalibrationBudget} unit="s" />
-              <label style={{ fontSize: '0.75rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <NumField
+                value={calibrationBudgetS === null ? 0 : calibrationBudgetS}
+                onCommit={(v) => onChangeCalibrationBudget(v)}
+                min={0}
+                max={3600}
+                unit="s"
+              />
+              <label style={{ fontSize: '0.72rem', color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={calibrationBudgetS === null}
@@ -582,8 +636,44 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 Exhaustive
               </label>
             </div>
+
+            {/* Explanation & Point Estimate */}
+            <div style={{ marginTop: '0.5rem', fontSize: '0.73rem', color: colors.textTertiary, lineHeight: '1.4' }}>
+              {calibrationBudgetS === 0 ? (
+                <span style={{ color: colors.emerald }}>
+                  ✓ Instant mode: Starts optimization immediately using existing verified hardware curves and baseline (0s scan). Select 60s, 120s, or 600s above to run a fresh live sweep.
+                </span>
+              ) : calibrationBudgetS === null ? (
+                <span style={{ color: colors.textSecondary }}>
+                  ♾️ Exhaustive mode: Sweeps all valid frequency and core configurations until complete (bounded by ~1800s safety limit).
+                </span>
+              ) : (
+                <span style={{ color: colors.textSecondary }}>
+                  ⏱️ Live sweep will measure ~
+                  <strong style={{ color: colors.accentHover }}>
+                    {Math.max(1, Math.floor(calibrationBudgetS / (repetitions > 1 ? 12 : 6)))}
+                  </strong>{' '}
+                  points across core classes ({repetitions > 1 ? '2 runs per point for verified lineup' : '1 run per point'}). Ordered via bisection (peak, base, quartiles) for an accurate representative curve.
+                </span>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Experimental passive caps */}
+          <div style={{ marginTop: '0.75rem' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={expPassiveCaps}
+                onChange={(e) => onChangeExpPassiveCaps(e.target.checked)}
+                style={{ marginTop: 2, accentColor: colors.amber }}
+              />
+              <span style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
+                <span style={{ color: colors.amber, fontWeight: 600 }}>Experimental:</span> passive-mode caps (sweeps 2.5–4.5 GHz boost-on points)
+              </span>
+            </label>
+          </div>
+        </div>
 
         {/* Action Button */}
         <button
@@ -604,11 +694,15 @@ export const SetupView: React.FC<SetupViewProps> = ({
         >
           {isStarting
             ? 'Optimizing Workload...'
-            : objective === 'deadline'
-              ? 'Optimize Workload for Deadline'
-              : objective === 'preference'
-                ? 'Optimize for Preference Target'
-                : 'Explore Pareto Candidates'}
+            : calibrationBudgetS && calibrationBudgetS > 0
+              ? `Run ${calibrationBudgetS}s Sweep & Optimize Workload`
+              : calibrationBudgetS === null
+                ? 'Run Exhaustive Sweep & Optimize Workload'
+                : objective === 'deadline'
+                  ? 'Optimize Workload for Deadline (Instant)'
+                  : objective === 'preference'
+                    ? 'Optimize for Preference Target (Instant)'
+                    : 'Explore Pareto Candidates (Instant)'}
         </button>
       </div>
 
