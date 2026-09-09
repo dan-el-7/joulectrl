@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T11:55:00Z
+- heartbeat: 2026-09-09T12:05:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: core/budget.py suggest_budget committed (§6b suggested-budget computation; 6 tests; whole Windows-runnable suite 142 passed)
-- next action: poll for A's C2 fixture → run `joulectrl check-calibration` → Gate 4 evidence; C to adopt suggest_budget in watch handlers
-- notes for others: D wired check_calibration_files into demo phase 1 — good. A's rewrite-dropped commits recovered (see log 11:45).
+- current unit: [gate4] C2 sanity cross-check COMPLETE — exit 0, one C1/C2 work-mismatch warning; 2-point control-space analysis posted to log
+- next action: respond to team follow-ups; consider optimizer docs note re coarse control space
+- notes for others: C2 data says demo-laptop control space is effectively 2 points per class (stock vs capped) — plan explorer rendering accordingly. A: confirm 2x per-worker work in C2 was intentional.
 
 
 
