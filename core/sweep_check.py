@@ -29,6 +29,7 @@ from typing import Optional
 C1_SCHEMA = "joulectrl.calibration_c1/1"
 C2_SCHEMA = "joulectrl.calibration_c2/1"
 C2E_SCHEMA = "joulectrl.calibration_c2_effective/1"
+C2A_SCHEMA = "joulectrl.calibration_c2_allcores/1"
 # Throughput may exceed a lower cap's by up to this fraction before we flag it.
 MONOTONICITY_TOLERANCE = 0.10
 
@@ -229,6 +230,101 @@ def check_calibration_c2_effective(doc: dict) -> SweepCheckReport:
     return report
 
 
+def check_calibration_c2_allcores(doc: dict) -> SweepCheckReport:
+    """Check the all-cores C2 fixture (layouts all8/all16, layout-keyed).
+
+    Rows carry (layout in {all8, all16}, control in {stock, base}, rep) with
+    per-layout kernel checksums, and the summary is keyed by layout then
+    control (not by class). Honesty rules mirror the other fixtures: same
+    kernel within a layout, summary medians must match the raw rows, energy
+    present everywhere, and a capped row must not use MORE energy than the
+    stock row of the same layout.
+    """
+    problems: list[str] = []
+    warnings: list[str] = []
+    if doc.get("schema") != C2A_SCHEMA:
+        problems.append(f"C2-allcores schema {doc.get('schema')!r} != {C2A_SCHEMA!r}")
+        return SweepCheckReport(ok=False, problems=problems, warnings=warnings)
+
+    rows = doc.get("rows") or []
+    if not rows:
+        problems.append("no rows")
+        return SweepCheckReport(ok=False, problems=problems, warnings=warnings)
+
+    layouts: dict[str, list[dict]] = {}
+    for r in rows:
+        layout = r.get("layout")
+        layouts.setdefault(layout, []).append(r)
+
+    for layout, lrows in sorted(layouts.items()):
+        by_control: dict[str, list[dict]] = {}
+        for r in lrows:
+            control = r.get("control")
+            by_control.setdefault(control, []).append(r)
+
+        # kernel checksum invariant per layout (chunks differ per worker
+        # count, so all8 and all16 legitimately carry different checksums).
+        checksums = {r.get("kernel_checksum") for r in lrows}
+        if len(checksums) > 1:
+            problems.append(
+                f"layout {layout}: kernel checksum drift within layout: {sorted(map(str, checksums))}"
+            )
+
+        for control, crows in by_control.items():
+            for r in crows:
+                energy = r.get("package_energy_j")
+                if energy is None or energy <= 0:
+                    problems.append(
+                        f"layout {layout} control {control}: missing/invalid energy"
+                    )
+            # reps numbered 1..n without gaps
+            reps = sorted(r.get("rep", 0) for r in crows)
+            if reps and reps != list(range(1, len(reps) + 1)):
+                warnings.append(
+                    f"layout {layout} control {control}: rep numbering {reps} not 1..n"
+                )
+
+        # summary medians must match the raw rows
+        summary = (doc.get("summary") or {}).get(layout) or {}
+        for control, crows in by_control.items():
+            entry = summary.get(control)
+            if not entry:
+                warnings.append(f"layout {layout}: summary missing control {control}")
+                continue
+            import statistics as _st
+            med_rt = _st.median([r["runtime_s"] for r in crows])
+            med_en = _st.median([r["package_energy_j"] for r in crows])
+            if abs(entry.get("median_runtime_s", -1) - med_rt) > 0.01:
+                problems.append(
+                    f"layout {layout} {control}: summary median_runtime_s "
+                    f"{entry.get('median_runtime_s')} != row median {med_rt:.4f}"
+                )
+            if abs(entry.get("median_energy_j", -1) - med_en) > 0.01:
+                problems.append(
+                    f"layout {layout} {control}: summary median_energy_j "
+                    f"{entry.get('median_energy_j')} != row median {med_en:.4f}"
+                )
+
+        # honesty: capped (base) should not cost more energy than stock
+        stock_energy = [
+            r["package_energy_j"] for r in by_control.get("stock") or []
+        ]
+        base_energy = [
+            r["package_energy_j"] for r in by_control.get("base") or []
+        ]
+        if stock_energy and base_energy:
+            import statistics as _st
+            if _st.median(base_energy) > _st.median(stock_energy):
+                problems.append(
+                    f"layout {layout}: base/energy-cap median energy "
+                    f"{_st.median(base_energy):.1f}J > stock {_st.median(stock_energy):.1f}J"
+                )
+
+    return SweepCheckReport(
+        ok=not problems, problems=problems, warnings=warnings
+    )
+
+
 def check_calibration_files(
     c2_path: str | Path, c1_path: str | Path | None = None
 ) -> Optional[SweepCheckReport]:
@@ -239,6 +335,8 @@ def check_calibration_files(
     doc = json.loads(c2_path.read_text())
     if doc.get("schema") == C2E_SCHEMA:
         return check_calibration_c2_effective(doc)
+    if doc.get("schema") == C2A_SCHEMA:
+        return check_calibration_c2_allcores(doc)
     c1_doc = None
     if c1_path is not None and Path(c1_path).exists():
         c1_doc = json.loads(Path(c1_path).read_text())

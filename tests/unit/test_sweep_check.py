@@ -225,3 +225,87 @@ def test_c2e_files_autodetect_by_schema(tmp_path):
     (tmp_path / "c2e.json").write_text(json.dumps(c2e_doc(GOOD_C2E, c2e_summary(GOOD_C2E))))
     report = check_calibration_files(tmp_path / "c2e.json")
     assert report is not None and report.ok, report.problems
+
+
+# ---------------------------------------------------------------------------
+# C2-allcores (all8/all16 layouts) checks
+# ---------------------------------------------------------------------------
+
+from core.sweep_check import C2A_SCHEMA, check_calibration_c2_allcores
+
+
+def c2a_row(layout, control, rep, runtime_s, energy_j, checksum="0xaa"):
+    return {
+        "layout": layout, "control": control, "rep": rep,
+        "runtime_s": runtime_s, "package_energy_j": energy_j,
+        "kernel_checksum": checksum, "boost": control == "stock",
+        "workers": 8 if layout == "all8" else 16, "cpus": [0],
+        "chunks": 65536, "boot_id": "b",
+    }
+
+
+GOOD_C2A = (
+    [c2a_row("all8", "stock", r, 5.6, 158.0) for r in (1, 2, 3)]
+    + [c2a_row("all8", "base", r, 10.8, 76.0) for r in (1, 2, 3)]
+    + [c2a_row("all16", "stock", r, 6.0, 195.0, checksum="0xbb") for r in (1, 2, 3)]
+    + [c2a_row("all16", "base", r, 11.0, 79.0, checksum="0xbb") for r in (1, 2, 3)]
+)
+
+
+def c2a_summary(rows):
+    import statistics as st
+    summary = {}
+    for row in rows:
+        key = (row["layout"], row["control"])
+        summary.setdefault(key, []).append((row["runtime_s"], row["package_energy_j"]))
+    out = {}
+    for (layout, control), vals in summary.items():
+        out.setdefault(layout, {})[control] = {
+            "median_runtime_s": st.median(v[0] for v in vals),
+            "median_energy_j": st.median(v[1] for v in vals),
+            "n": len(vals),
+        }
+    return out
+
+
+def test_c2a_good_passes_with_per_layout_checksums():
+    doc = {"schema": C2A_SCHEMA, "rows": GOOD_C2A, "summary": c2a_summary(GOOD_C2A)}
+    report = check_calibration_c2_allcores(doc)
+    assert report.ok, report.problems
+
+
+def test_c2a_checksum_drift_within_layout_fails():
+    rows = [dict(r) for r in GOOD_C2A]
+    rows[0]["kernel_checksum"] = "0xdead"
+    doc = {"schema": C2A_SCHEMA, "rows": rows, "summary": c2a_summary(rows)}
+    report = check_calibration_c2_allcores(doc)
+    assert not report.ok
+    assert any("checksum drift" in p for p in report.problems)
+
+
+def test_c2a_base_costing_more_energy_than_stock_fails():
+    rows = [dict(r) for r in GOOD_C2A]
+    for r in rows:
+        if r["layout"] == "all16" and r["control"] == "base":
+            r["package_energy_j"] = 400.0  # dishonest: cap should not cost more
+    doc = {"schema": C2A_SCHEMA, "rows": rows, "summary": c2a_summary(rows)}
+    report = check_calibration_c2_allcores(doc)
+    assert not report.ok
+    assert any("base/energy-cap median energy" in p for p in report.problems)
+
+
+def test_c2a_summary_mismatch_fails():
+    rows = [dict(r) for r in GOOD_C2A]
+    summary = c2a_summary(rows)
+    summary["all8"]["stock"]["median_runtime_s"] = 99.0
+    doc = {"schema": C2A_SCHEMA, "rows": rows, "summary": summary}
+    report = check_calibration_c2_allcores(doc)
+    assert not report.ok
+    assert any("summary median_runtime_s" in p for p in report.problems)
+
+
+def test_c2a_files_autodetect_by_schema(tmp_path):
+    doc = {"schema": C2A_SCHEMA, "rows": GOOD_C2A, "summary": c2a_summary(GOOD_C2A)}
+    (tmp_path / "c2a.json").write_text(json.dumps(doc))
+    report = check_calibration_files(tmp_path / "c2a.json")
+    assert report is not None and report.ok, report.problems
