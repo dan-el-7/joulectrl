@@ -74,11 +74,32 @@ def snapshot_state() -> Dict[str, Any]:
         snap["policies"][name] = {
             "scaling_min_freq": _read_int(f"{pd}/scaling_min_freq"),
             "scaling_max_freq": _read_int(f"{pd}/scaling_max_freq"),
+            "scaling_governor": _read_str(f"{pd}/scaling_governor"),
         }
     boost = Path(f"{BASE}/boost")
     if boost.exists():
         snap["boost"] = _read_int(str(boost))
     return snap
+
+
+def _read_str(path: str) -> Optional[str]:
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+_GOVERNORS: Optional[set] = None
+
+
+def _allowed_governors(pd: Path) -> set:
+    """Governors this policy accepts (from scaling_available_governors)."""
+    global _GOVERNORS
+    if _GOVERNORS is None:
+        v = _read_str(f"{pd}/scaling_available_governors") or ""
+        _GOVERNORS = set(v.split())
+    return _GOVERNORS
 
 
 def _read_int_retry(path: str, want: Optional[int], tries: int = 10, delay: float = 0.1) -> Optional[int]:
@@ -109,7 +130,18 @@ def apply_snapshot(snap: Dict[str, Any]) -> Dict[str, Any]:
         if vals.get("scaling_min_freq") is not None:
             _write_int(f"{pd}/scaling_min_freq", vals["scaling_min_freq"])
             _read_int_retry(f"{pd}/scaling_min_freq", vals["scaling_min_freq"])
+        if vals.get("scaling_governor") is not None:
+            _write_str(f"{pd}/scaling_governor", vals["scaling_governor"])
     return snapshot_state()  # readback
+
+
+def _write_str(path: str, value: str) -> bool:
+    try:
+        with open(path, "w") as f:
+            f.write(value)
+        return True
+    except OSError:
+        return False
 
 
 def op_begin_session(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -163,6 +195,16 @@ def op_apply_configuration(args: Dict[str, Any]) -> Dict[str, Any]:
             _write_int(f"{pd}/scaling_max_freq", int(khz))
             applied[f"{pname}/scaling_max_freq"] = _read_int_retry(
                 f"{pd}/scaling_max_freq", int(khz))
+        # optional per-policy governor switch (validated against available list)
+        governors = requested.get("policy_governors") or {}
+        for pname, gov in governors.items():
+            pd = Path(BASE) / str(pname)
+            if not pd.exists():
+                return {"ok": False, "error": f"unknown_policy:{pname}"}
+            if gov not in _allowed_governors(pd):
+                return {"ok": False, "error": f"governor_not_allowed:{pname}:{gov}"}
+            _write_str(f"{pd}/scaling_governor", gov)
+            applied[f"{pname}/scaling_governor"] = _read_str(f"{pd}/scaling_governor")
         return {"ok": True, "applied": applied}
 
 

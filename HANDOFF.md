@@ -45,11 +45,11 @@ pull --rebase before editing, push immediately after).
 
 ## Agent A — resume packet
 
-- **Done & verified:** repo bootstrapped; hour-0 checklist re-verified; energy/base.py + topology/discovery + fixtures + CI (73ed1b1); helper daemon unit (48e555e: apply/restore zero-mismatch live, watchdog, out-of-range rejection, 29 tests green); C1 calibration committed — fixtures/real/calibration_c1.json (fast 8.467s/74.99J/8.86W, efficient 12.280s/79.08J/6.44W, class map confirmed 1.45x). MACHINE FACTS: boost=0 clamps cpuinfo_max to 2.0 GHz both classes; amd-pstate readback async (retry needed); helper socket /run/joulectrl-helper.sock (passwordless pkexec via /etc/polkit-1/rules.d/49-joulectrl-helper.rules).
-- **In flight:** none — C1 unit closed.
-- **Resume here:** `cd ~/joulectrl-a && git pull --rebase origin main` — then write core/run_c2.py: C2 dense sweep (stock row first for scaling efficiency, then N cap points 623377..2000000 kHz boost=0 per class, 4 workers one SMT sibling each: fast layout CPUs [0,2,4,6], efficient [1,3,5,7]); bracket with [measuring] lines; commit fixtures/real/calibration_c2.json.
-- **Gotchas:** kernel point size: C2 should use chunks=32768 iters=200000 (~2x C1 work per worker? verify empirically — target 8-15s per point). Energy brackets run (e1 before launch, e2 after termination). run_c1.py's chunks/s parser fixed (value in parens). Helper daemon may need restart if machine rebooted: `pkexec /home/dan-el/joulectrl-a/helper/daemon.py` (passwordless).
-- **Handoffs owed / waiting on:** none open; C2 next. B's runner/CLI/watch landing — A co-signs watch baseline semantics on real hardware when B's detector is ready.
+- **Done & verified:** C1 (fixtures/real/calibration_c1.json) + C2 (fixtures/real/calibration_c2.json) committed. GATE B MAJOR FINDING: sub-base caps ignored under boost=0 (cur_freq ~1.99 GHz at any cap 623MHz-2GHz, both governors, busy-loop evidence per row). Effective control: stock(boost=1) vs base(boost=0) only, per class. Helper daemon extended: policy_governors support (validated, snapshot/restore), _write_str, 8 tests green. History rewritten once (owner-approved) for contribution attribution; agent-a commits keep agent-a author + dan-el-7 committer email going forward.
+- **In flight:** committing C2+findings unit.
+- **Resume here:** `cd ~/joulectrl-a && git pull --rebase origin main` — then (1) re-run C2 clean at the 2 real control points x 1/4 workers per class (16 runs, ~3 min) so B/C get uncontaminated Pareto data; (2) co-sign B's watch detector baseline semantics on real hardware.
+- **Gotchas:** daemon restart: kill old by exact path pgrep then `pkexec /home/dan-el/joulectrl-a/helper/daemon.py` (passwordless). pkexec for anything ELSE still prompts and may HANG in background shell — avoid. Governor writes must go through _write_str. Watchdog 30s: any lease-holder loop must heartbeat.
+- **Handoffs owed / waiting on:** B's watch detector ready for co-sign. C needs the 2-point curve shape for the explorer.
 
 
 ## Agent B — resume packet

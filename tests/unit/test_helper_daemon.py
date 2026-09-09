@@ -28,12 +28,17 @@ def daemon_ns(monkeypatch, tmp_path):
         "/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq": 5090910,
         "/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq": 623377,
         "/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq": 5090000,
+        "/sys/devices/system/cpu/cpufreq/policy0/scaling_governor": "performance",
+        "/sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors": "performance schedutil",
     }
     ns["_read_int"] = lambda p: fake.get(p)
+    ns["_read_str"] = lambda p: fake.get(p)
     def fake_write(path, value):
         fake[path] = value
         return True
     ns["_write_int"] = fake_write
+    ns["_write_str"] = fake_write
+    ns["_allowed_governors"] = lambda pd: {"performance", "schedutil"}
     class FakePolicyDir:
         name = "policy0"
         def __truediv__(self, other):

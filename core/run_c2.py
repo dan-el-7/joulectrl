@@ -57,6 +57,33 @@ def run_pinned(cpus, workers, params):
     }
 
 
+def sample_cur_freqs(policies, stop_evt, sink, interval=0.5):
+    """Sample scaling_cur_freq during a run (actual-effect evidence, Gate B)."""
+    import glob
+    while not stop_evt.is_set():
+        for p in policies:
+            try:
+                sink.append(int(open(f"/sys/devices/system/cpu/cpufreq/{p}/scaling_cur_freq").read()))
+            except (OSError, ValueError):
+                pass
+        time.sleep(interval)
+
+
+def with_freq_sampling(cpus, fn):
+    """Run fn() while sampling cur_freq of the class's policies.
+    Returns (fn_result, freqs)."""
+    import threading
+    policies = [f"policy{c}" for c in cpus]
+    sink, stop = [], threading.Event()
+    th = threading.Thread(target=sample_cur_freqs, args=(policies, stop, sink), daemon=True)
+    th.start()
+    try:
+        result = fn()
+    finally:
+        stop.set(); th.join(timeout=2)
+    return result, sink
+
+
 def cap_ladder(n):
     if n == 1:
         return [CAP_MAX_KHZ]
@@ -74,18 +101,28 @@ def main():
 
     rows = []
     try:
-        for cname, core_cpus in CLASSES.items():
+        for ci, (cname, core_cpus) in enumerate(CLASSES.items()):
+            if ci > 0:
+                # previous class's sweep left boost=0+caps; restore TRUE stock
+                rr = c.restore()
+                assert rr["ok"], f"inter-class restore failed: {rr}"
+                assert c.begin_session()["ok"], "re-lease after restore"
+                beat()
             # ---- stock row (boost=1, no caps) ----
             for rep in range(1, REPS + 1):
                 beat()
+                beat()
                 e1 = c.read_energy()
-                r = run_pinned(core_cpus, 4, PARAMS)
+                r, freqs = with_freq_sampling(core_cpus, lambda: run_pinned(core_cpus, 4, PARAMS))
                 e2 = c.read_energy()
                 ej = ((e2["uj"] - e1["uj"]) % WRAP) / 1e6 if e1.get("ok") and e2.get("ok") else None
+                import statistics as _st
                 rows.append({"class": cname, "layout": "C2", "cpus": core_cpus,
                              "workers": 4, "rep": rep,
                              "requested_control": {"boost": 1, "cap_khz": None},
                              "accepted_control": {"boost": 1, "cap_khz": None},
+                             "cur_freq_khz_median": _st.median(freqs) if freqs else None,
+                             "cur_freq_khz_max": max(freqs) if freqs else None,
                              "package_energy_j": round(ej, 4) if ej else None,
                              "boot_id": boot_id, "kernel_checksum": r["checksum"], **r})
                 print(f"{cname} STOCK rep{rep}: {r['runtime_s']}s {rows[-1]['package_energy_j']}J", flush=True)
@@ -104,12 +141,16 @@ def main():
                 time.sleep(0.5)  # settle after control change
                 for rep in range(1, REPS + 1):
                     beat()
+                    beat()
                     e1 = c.read_energy()
-                    r = run_pinned(core_cpus, 4, PARAMS)
+                    r, freqs = with_freq_sampling(core_cpus, lambda: run_pinned(core_cpus, 4, PARAMS))
                     e2 = c.read_energy()
                     ej = ((e2["uj"] - e1["uj"]) % WRAP) / 1e6 if e1.get("ok") and e2.get("ok") else None
+                    import statistics as _st
                     rows.append({"class": cname, "layout": "C2", "cpus": core_cpus,
                                  "workers": 4, "rep": rep,
+                                 "cur_freq_khz_median": _st.median(freqs) if freqs else None,
+                                 "cur_freq_khz_max": max(freqs) if freqs else None,
                                  "requested_control": {"boost": False, "cap_khz": cap},
                                  "accepted_control": {"boost": accepted.get("boost"),
                                                       "cap_khz": accepted.get(f"policy{core_cpus[0]}/scaling_max_freq")},

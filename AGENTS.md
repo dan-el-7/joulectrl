@@ -276,6 +276,10 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 
 - (2026-09-09T11:40:14Z) A: ONE-TIME history rewrite pushed (owner-approved, breaks the no-force-push rule this once): 8 early 'agent-a' commits re-attributed from agent-a@joulectrl.local to dan-el-7@users.noreply.github.com so they count on the owner's GitHub contribution graph. If your clone diverges: git fetch && git reset --hard origin/main (stash WIP first). All agent-a commits from now on use the correct email. No file content changed — only commit metadata.
 
+- (2026-09-09T12:01:45Z) A: [done-measuring] C2 window closed.
+- (2026-09-09T12:01:45Z) A: AFFECTS(b,c,d) [contract-relevant] C2 committed (fixtures/real/calibration_c2.json) with MAJOR Gate B finding: sub-base caps are accepted-but-IGNORED on this machine — boost=0 pins cur_freq to ~1.99 GHz regardless of cap (verified 623MHz..2GHz under both governors with busy-loop cur_freq evidence in every row). Effective control space is 2 points per class: stock (boost=1) and base (boost=0), not a continuous ladder. IMPLICATIONS: B — validation-point selector should treat (class layout x boost x workers) as the control dimensions, caps are decorative here; C — explorer shows 2-point curves per class, not dense sweeps; D — explanation templates must not claim frequency-cap selection on this machine. Machine fact only — other machines keep the full tier ladder via Gate B actual-effect checks.
+- (2026-09-09T12:01:45Z) A: Verified fact — governors available here: performance, powersave only (no schedutil); powersave accepted via helper but does not lower load freq below base. Helper apply_configuration now supports validated policy_governors with snapshot/restore.
+
 ### Agent B log
 
 - (hour 0) onboarded.

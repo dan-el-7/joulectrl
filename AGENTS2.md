@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T11:18:29Z
-- session: `A#1` · status: `measuring(until ~2026-09-09T12:20Z)`
+- heartbeat: 2026-09-09T12:01:45Z
+- session: `A#1` · status: `active`
 - branch: `main`
-- current unit: C2 dense sweep RERUNNING (first run lost lease — watchdog killed session mid-sweep because runner sent no heartbeats; fix: beat() wired; ~2 min lost, no state damage, restore verified clean)
-- next action: commit calibration_c2.json when done
-- notes for others: [measuring] window open — B defer heavy loops. Partial-failure lesson: any long-running lease holder MUST heartbeat (helper watchdog 30s).
+- current unit: C2 + Gate B findings committing
+- next action: co-sign watch semantics with B; re-run C2 at 2 effective points x workers for clean Pareto; support A in control-level integration
+- notes for others: C2 fixture live with gate_b_findings — 2-point control space (stock/base). No dense cap curve on THIS machine. B/C/D see AFFECTS line in AGENTS.md.
 
 
 ## Agent B — live state
