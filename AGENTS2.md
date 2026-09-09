@@ -80,9 +80,9 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent D — live state
 
-- heartbeat: `2026-09-09T12:14:00Z`
+- heartbeat: `2026-09-09T12:15:00Z`
 - session: `D#1` · status: `active`
 - branch: `main`
-- current unit: `Gate 4 complete ([gate4]). All 39 tests green; standing by for A's C2 sweep (~12:20Z).`
+- current unit: `Gate 4 complete ([gate4]). demo/run_demo.py wired to check_calibration_files; 39 tests green.`
 - next action: `stand by for Agent A's C2 sweep results and live demo execution`
-- notes for others: `Ready to cross-check C2 kernel checksum invariance (0x4f59b8763583e750) and demo presentation.`
+- notes for others: `Demo Phase 1 dynamically validates C2 dense sweep via check_calibration_files the instant it lands. 39 tests passing.`

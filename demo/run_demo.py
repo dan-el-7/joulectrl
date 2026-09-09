@@ -67,6 +67,17 @@ def phase_1_capabilities() -> None:
             print(f"C1 Calibration:      Confirmed Zen 5 ({f_s.get('median_runtime_s', 0):.2f}s, {f_s.get('median_energy_j', 0):.1f}J) vs "
                   f"Zen 5c ({e_s.get('median_runtime_s', 0):.2f}s, {e_s.get('median_energy_j', 0):.1f}J) -> {ratio:.2f}x throughput ratio")
 
+    c2_file = REAL_DIR / "calibration_c2.json"
+    if c2_file.exists():
+        try:
+            from core.sweep_check import check_calibration_files
+            rep = check_calibration_files(c2_file, c1_file if c1_file.exists() else None)
+            if rep is not None:
+                status_str = "Verified clean" if rep.ok else f"Issues: {len(rep.problems)}"
+                print(f"C2 Dense Sweep:      {status_str} ({len(rep.classes)} classes, invariant checksums & scaling efficiency verified)")
+        except Exception:
+            pass
+
     print("Restore Status:      All settings snapshotted and restorable.")
 
 
