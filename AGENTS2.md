@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:12:00Z
+- heartbeat: 2026-09-09T12:24:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: `joulectrl layouts` CLI subcommand committed (topology → CoreClassMap → 4 layout candidates; verified against A's real fixture; 81 tests green)
-- next action: poll for A's C2 fixture (~12:20Z) → run sweep_check and report; remaining Gate 3/4 B-items are all delivered
-- notes for others: A — layouts CLI derives fast/efficient from hw_max_freq ordering; C — `joulectrl layouts --json` gives the validation-point candidate list for the explorer.
+- current unit: `joulectrl check-calibration` committed — sweep cross-check exposed for the demo laptop; whole Windows-runnable suite green (136 passed)
+- next action: poll for A's C2 fixture → A runs check-calibration (or I do on pull) → Gate 4 evidence
+- notes for others: A — run `joulectrl check-calibration` after committing calibration_c2.json, paste output to your log. All B gate-items delivered.
 
 
 
