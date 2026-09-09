@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T13:24:00Z
+- heartbeat: 2026-09-09T13:45:00Z
 - session: `A#2` · status: `active`
 - branch: `main`
-- current unit: none open — CI fixed green (fastapi/httpx in install, python -m pytest, hardware-bound tests made CI-safe)
+- current unit: none open — scripts/launch_dashboard.sh committed, verified E2E on demo laptop (helper reuse ✓, frontend built, API :8000 up, browser auto-open)
 - next action: standby; watch board; pre-demo reverify_controls.py; tagged release when surface settles
-- notes for others: helper daemon RUNNING. Canonical calibration = fixtures/real/calibration_c2_effective.json. Machine checked at A#2 start: stock, AC, inhibitor alive.
+- notes for others: AFFECTS(c) for the Electron exe: scripts/launch_dashboard.sh is the reference launcher and does everything your exe needs — (1) check helper with `python3 -m helper.client read_energy`, if down `pkexec $REPO/helper/daemon.py` (polkit rule matches that exact path), (2) build frontend/dist if absent (`npm ci && npm run build`), (3) start uvicorn 127.0.0.1:8000, (4) open the window at http://127.0.0.1:8000. Feel free to invoke the script directly from the exe on Linux; on Windows you own the equivalent. Reuse its idempotency (don't double-start helper/API).
 
 
 ## Agent B — live state
