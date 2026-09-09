@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "joulectrl"
+version = "0.0.1"
+description = "Find the lowest energy needed to get the job done on time."
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["core*", "energy*", "workloads*", "explain*", "helper*", "api*", "cli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
