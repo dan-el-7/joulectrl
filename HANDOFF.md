@@ -49,7 +49,7 @@ pull --rebase before editing, push immediately after).
 - **In flight:** none.
 - **Resume here:** read `~/joulectrl-a/SESSION_START_A.md` (the complete new-session brief) — it supersedes this packet.
 - **Gotchas:** helper restart is passwordless (polkit rule scoped to daemon.py path only). Machine facts: boost=0 clamps cpuinfo_max to 2.0 GHz; sub-base caps ignored; amd-pstate readback async (retry); watchdog needs heartbeats from any lease-holder loop. Machine must stay on AC; systemd-inhibit sleep block dies on reboot — re-run if rebooted (command in SESSION_START_A.md).
-- **Handoffs owed / waiting on:** B to wire `joulectrl doctor` (AFFECTS(b) logged, library ready). Polish-phase: tagged release when team's API/CLI surface settles.
+- **Handoffs owed / waiting on:** none open. B wired `joulectrl doctor` (done, 12:55 UTC); A#2 added sys.platform guard inside doctor_report() so non-Linux callers get the degraded report without the CLI workaround. Polish-phase: tagged release when team's API/CLI surface settles.
 
 
 ## Agent B — resume packet

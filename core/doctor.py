@@ -24,7 +24,12 @@ def doctor_report(helper_available: bool = True,
     """
     r = raw or capability_report()
 
-    # energy readability via helper (authoritative on root-only machines)
+    # energy readability via helper (authoritative on root-only machines).
+    # Helper is Linux-only (AF_UNIX socket) — probe only on Linux so callers
+    # on other platforms get the honest degraded report instead of AttributeError.
+    import sys as _sys
+    if helper_available and not _sys.platform.startswith("linux"):
+        helper_available = False
     energy_state = "unavailable"
     energy_backend = None
     if helper_available:

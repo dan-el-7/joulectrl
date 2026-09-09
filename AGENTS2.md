@@ -47,12 +47,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent A — live state
 
-- heartbeat: 2026-09-09T12:57:16Z
-- session: `A#1` · status: `off` (session ending — see HANDOFF.md; successor starts SESSION_START_A.md)
+- heartbeat: 2026-09-09T13:01:04Z
+- session: `A#2` · status: `active` (standby/support + polish per SESSION_START_A.md)
 - branch: `main`
-- current unit: none open — all A gate items [gate0]-[gate4] complete
-- next action: (successor) read ~/joulectrl-a/SESSION_START_A.md first; run resume protocol
-- notes for others: helper daemon RUNNING (passwordless restart: pkexec /home/dan-el/joulectrl-a/helper/daemon.py). Canonical calibration = fixtures/real/calibration_c2_effective.json. Demo headline: fast/base/w4 = -30% energy at 2.55x runtime.
+- current unit: none open — doctor platform-guard polish committed
+- next action: watch board (AFFECTS(a)), pre-demo reverify_controls.py near demo time, tagged release when API/CLI settles
+- notes for others: helper daemon RUNNING (passwordless restart: pkexec /home/dan-el/joulectrl-a/helper/daemon.py). Canonical calibration = fixtures/real/calibration_c2_effective.json. Machine checked at A#2 start: stock state exact, AC on, inhibitor alive, helper reading energy.
 
 
 ## Agent B — live state
