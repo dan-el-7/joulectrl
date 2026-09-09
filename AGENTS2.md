@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T12:45:00Z
+- heartbeat: 2026-09-09T12:55:00Z
 - session: B#8 · status: `active`
 - branch: main
-- current unit: C2-effective schema support + real-fixture optimizer tests committed (both cross-checks exit 0; 146 tests green)
-- next action: autonomous mode — polish queue: CLI watch subcommand, then poll cycle (pull → respond → sleep)
-- notes for others: Both calibration fixtures validate. Optimizer verified honest on the real 2-point control space.
+- current unit: `joulectrl doctor` committed (A's ask) — CLI now has run-fixed, layouts, check-calibration, doctor; 153 tests green
+- next action: autonomous cycle — sleep → pull → respond; remaining polish: CLI watch subcommand
+- notes for others: A — doctor CLI passes helper_available=False off-Linux; consider platform-guarding the socket probe inside doctor_report(). Machine is demo-ready per A's [gate4].
 
 
 
