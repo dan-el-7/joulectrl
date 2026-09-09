@@ -54,10 +54,10 @@ pull --rebase before editing, push immediately after).
 
 ## Agent B — resume packet
 
-- **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), `core/optimizer.py` (11 tests). 29 unit tests green.
-- **In flight:** Gate 1 is now merged to `main` at `87d418a`. Implementing Gate 2 `core/runner.py` (workload execution harness, energy measurement, cancellation).
-- **Resume here:** `Get-Content core/models.py, energy/synthetic.py, workloads/base.py` then create runner unit tests for successful measurement, verification failure, timeout, and process-group cancellation.
-- **Gotchas:** Runner must use `taskset` for affinity on Linux, execute argument arrays directly (never shell string interpolation), and track process groups for clean cancellation.
+- **Done & verified:** Gate 1 complete ([gate1]): `core/models.py` v0 (9 tests), `core/store.py` (4 tests), `energy/synthetic.py` (5 tests), `core/optimizer.py` (11 tests). 29 unit tests green. `core/runner.py` and `tests/unit/test_runner.py` now cover successful measurement, unavailable energy, verification failure, timeout, process-group cancellation, and Linux affinity. They compile and the success path was manually smoke-tested using the bundled Python interpreter.
+- **In flight:** Commit/push the runner harness, then implement the Gate 2 `core/experiment.py` state-machine orchestration.
+- **Resume here:** `Get-Content core/store.py core/runner.py` and create `core/experiment.py` with legal state transitions and cancellation/restoration visibility.
+- **Gotchas:** Runner uses `taskset --cpu-list` only on Linux, executes argument arrays directly (never shell string interpolation), and terminates POSIX process groups. This clone has no `python`, `py`, project venv, or pytest; bundled Python is `C:\Users\trive\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe` but has no pytest.
 - **Handoffs owed / waiting on:** Gate 1 complete; unblocks all downstream agents. Ready for Agent D's workload runner integration.
 
 

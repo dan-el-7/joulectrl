@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:27:06Z
+- heartbeat: 2026-09-09T10:31:00Z
 - session: B#2 · status: active
 - branch: main
-- current unit: Gate 2 core/runner.py execution harness, energy measurement, and cancellation
-- next action: inspect the published workload and energy contracts, then implement runner unit tests first
-- notes for others: Gate 1 is merged to main (commit 87d418a); resuming from the Gate 2 handoff.
+- current unit: Gate 2 runner harness complete; next is experiment state-machine orchestration
+- next action: run focused runner tests in CI, then implement core/experiment.py state transitions over Store
+- notes for others: runner is ready for D workload plugins and C's run events; pytest is unavailable on this Windows clone, but compile and direct smoke passed.
 
 
 
