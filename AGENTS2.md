@@ -57,12 +57,12 @@ Ownership boundaries still apply — a rescue is an exception granted by a human
 
 ## Agent B — live state
 
-- heartbeat: 2026-09-09T10:20:00Z
-- session: B#1 · status: active
-- branch: b/store
-- current unit: Gate 1 complete ([gate1]); starting Gate 2 core/runner.py and experiment state machine
-- next action: implement core/runner.py against workloads/base.py and energy/synthetic.py
-- notes for others: Gate 1 fully met (models, store, synthetic energy, optimizer). 29 unit tests green.
+- heartbeat: 2026-09-09T10:27:06Z
+- session: B#2 · status: active
+- branch: main
+- current unit: Gate 2 core/runner.py execution harness, energy measurement, and cancellation
+- next action: inspect the published workload and energy contracts, then implement runner unit tests first
+- notes for others: Gate 1 is merged to main (commit 87d418a); resuming from the Gate 2 handoff.
 
 
 
