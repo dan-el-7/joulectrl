@@ -290,6 +290,7 @@ Condensed from PLAN §13 / TEAM_PLAN §5. "Done" = merged to main + log line `[g
 - (hour 1) [contract] AFFECTS(a,b) workloads/base.py Workload plugin contract committed per PLAN §8 (prepare, command, environment, verify, fingerprint). Includes workloads/fixed_compute.py reference plugin and unit tests.
 - (hour 2) workloads/clean_build.py Workload A plugin scaffold committed (zstd pinned clean build, cache-disabled, clean-state enforcement, pre-warmed filesystem cache, artifact & smoke verification). Unit tests passing.
 - (hour 2) [gate1] AFFECTS(c) explain/ layer committed (facts extraction, deterministic templates for deadline/preference/frontier & edge states, provider interface with Basic guaranteed default and local/cloud adapters). fixtures/synthetic/ JSON datasets generated (profile, selection, validation, calibration). Unit tests green (17 tests passing).
+- (hour 2) tests/integration/test_workload_lifecycle.py committed: E2E workload execution + verification with invariant checksum, and Store + synthetic profile/selection roundtrip with grounded explanations. 19 tests green.
 
 ## 9. Verified facts (any agent may add; cite how verified)
 

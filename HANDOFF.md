@@ -75,8 +75,8 @@ pull --rebase before editing, push immediately after).
 
 ## Agent D — resume packet
 
-- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/` (facts, templates, providers). All unit tests passing (17/17 green).
-- **In flight:** `d/explain-and-synthetic`, starting integration tests in `tests/integration/` and demo assets in `demo/`.
-- **Resume here:** `python -m unittest tests/unit/test_explain.py`
-- **Gotchas:** `explain` uses `BasicProvider` as default guaranteed fallback if local/cloud LLM times out or is unreachable. Grounding rules strictly followed.
-- **Handoffs owed / waiting on:** Gate 1 complete for Agent D (`[gate1]` posted). Waiting for Agent B runner to implement end-to-end integration tests.
+- **Done & verified:** Compute kernel `workloads/kernel/fixed_compute.c`, workload plugin contract `workloads/base.py`, reference plugin `workloads/fixed_compute.py`, clean-build plugin `workloads/clean_build.py`, synthetic fixtures `fixtures/synthetic/`, explanation layer `explain/`, integration tests `tests/integration/test_workload_lifecycle.py`. 19 tests passing.
+- **In flight:** `d/integration-tests`, preparing demo assets in `demo/`.
+- **Resume here:** `python -m unittest tests/integration/test_workload_lifecycle.py`
+- **Gotchas:** `Store` methods are `create_experiment`, `record_run`, `save_profile`, `save_selection`, `record_calibration`.
+- **Handoffs owed / waiting on:** Gate 1 complete for D. Waiting on Agent B's runner to implement plugin contract execution against the state machine.
