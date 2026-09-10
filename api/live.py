@@ -226,6 +226,13 @@ class WatchService:
         time_budget_s: Optional[float] = None,
         target_freq_khz: Optional[int] = None,
         store: Optional[Any] = None,
+        target_savings_pct: Optional[float] = None,
+        curve_baseline_energy_j: Optional[float] = None,
+        curve_baseline_runtime_s: Optional[float] = None,
+        curve_config_energy_j: Optional[float] = None,
+        curve_config_runtime_s: Optional[float] = None,
+        curve_experiment_id: Optional[str] = None,
+        curve_config_id: Optional[str] = None,
     ) -> None:
         self.store = store
         self.backend, self.source_info = (
@@ -243,6 +250,13 @@ class WatchService:
         self.recurrence_mode = recurrence_mode
         self.time_budget_s = time_budget_s
         self.target_freq_khz = target_freq_khz
+        self.target_savings_pct = target_savings_pct
+        self.curve_baseline_energy_j = curve_baseline_energy_j
+        self.curve_baseline_runtime_s = curve_baseline_runtime_s
+        self.curve_config_energy_j = curve_config_energy_j
+        self.curve_config_runtime_s = curve_config_runtime_s
+        self.curve_experiment_id = curve_experiment_id
+        self.curve_config_id = curve_config_id
         self.control_state = "stock_idle" if active_control else "idle"
 
         self.total_saved_energy_j: float = 0.0
@@ -324,7 +338,17 @@ class WatchService:
 
         helper = self._get_helper()
 
-        if self.optimization_objective == "performance":
+        if self.curve_config_id is not None and self.target_config:
+            # Curve-driven Auto-Pilot: apply exact matched Pareto hardware configuration!
+            self.control_state = "optimized_active"
+            if helper:
+                try:
+                    helper.begin_session()
+                    self._session_active = True
+                    helper.apply_configuration(self.target_config)
+                except Exception:
+                    pass
+        elif self.optimization_objective == "performance":
             # Sustained max performance: do not throttle! Keep stock boost.
             # Shield target process by pinning to Fast Zen 5 cores and pushing noise to Eco.
             self.control_state = "shielded_boost"
@@ -404,7 +428,23 @@ class WatchService:
         actual_j = segment.energy_j
         runtime_s = segment.runtime_s
 
-        if self.optimization_objective == "performance":
+        if self.curve_baseline_energy_j and self.curve_config_energy_j and self.curve_config_energy_j > 0:
+            # Exact empirical energy relation from measured Pareto curve!
+            ratio_stock_to_config = self.curve_baseline_energy_j / self.curve_config_energy_j
+            empirical_savings_pct = round(100.0 * (1.0 - self.curve_config_energy_j / self.curve_baseline_energy_j), 1)
+
+            if actual_j is not None and actual_j > 0:
+                est_stock_j = actual_j * ratio_stock_to_config
+                saved_j = max(0.0, est_stock_j - actual_j)
+                saved_pct = empirical_savings_pct
+            else:
+                base_w = self.curve_baseline_energy_j / self.curve_baseline_runtime_s if self.curve_baseline_runtime_s else 32.5
+                config_w = self.curve_config_energy_j / self.curve_config_runtime_s if self.curve_config_runtime_s else 18.0
+                est_stock_j = runtime_s * base_w
+                actual_est_j = runtime_s * config_w
+                saved_j = max(0.0, est_stock_j - actual_est_j)
+                saved_pct = empirical_savings_pct
+        elif self.optimization_objective == "performance":
             # Performance mode savings come from task shielding and avoiding contention
             est_stock_w = 32.5
             saved_j = max(0.0, runtime_s * 3.5)
@@ -689,6 +729,16 @@ class WatchService:
             "target_pid": self.target_pid,
             "target_process_name": self.target_process_name,
             "target_command": self.target_command,
+            "target_savings_pct": self.target_savings_pct,
+            "curve_experiment_id": self.curve_experiment_id,
+            "curve_config_id": self.curve_config_id,
+            "curve_baseline_energy_j": round(self.curve_baseline_energy_j, 2) if self.curve_baseline_energy_j else None,
+            "curve_baseline_runtime_s": round(self.curve_baseline_runtime_s, 4) if self.curve_baseline_runtime_s else None,
+            "curve_config_energy_j": round(self.curve_config_energy_j, 2) if self.curve_config_energy_j else None,
+            "curve_config_runtime_s": round(self.curve_config_runtime_s, 4) if self.curve_config_runtime_s else None,
+            "empirical_savings_pct": round(100.0 * (1.0 - self.curve_config_energy_j / self.curve_baseline_energy_j), 2) if (self.curve_baseline_energy_j and self.curve_config_energy_j and self.curve_baseline_energy_j > 0) else None,
+            "empirical_runtime_penalty_pct": round(100.0 * (self.curve_config_runtime_s / self.curve_baseline_runtime_s - 1.0), 2) if (self.curve_baseline_runtime_s and self.curve_config_runtime_s and self.curve_baseline_runtime_s > 0) else None,
+            "matched_power_w": round(self.curve_config_energy_j / self.curve_config_runtime_s, 2) if (self.curve_config_energy_j and self.curve_config_runtime_s and self.curve_config_runtime_s > 0) else None,
             "total_saved_energy_j": round(self.total_saved_energy_j, 1),
             "active_sessions_count": self.active_sessions_count,
             "savings_history": self.savings_history[-10:],

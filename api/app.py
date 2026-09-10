@@ -41,8 +41,13 @@ from api.calibration_runner import CalibrationRunner
 from api.live import WatchService, stream_experiment_events
 from core.events import default_bus
 from core.experiment import ExperimentStateMachine
-from core.models import ConfigSummary, CoreClassMap, Profile, Selection, ValidationPair, utc_now_iso
-from core.optimizer import select_deadline, select_preference
+from core.models import ConfigSummary, Configuration, CoreClassMap, Profile, Selection, ValidationPair, utc_now_iso
+from core.optimizer import (
+    select_deadline,
+    select_preference,
+    match_frontier_by_savings_target,
+    compute_pareto_frontier,
+)
 from core.store import Store
 from explain.facts import extract_explanation_facts
 from explain.templates import generate_explanation
@@ -264,6 +269,14 @@ class WatchArmRequest(BaseModel):
     recurrence_mode: str = "repeated"
     time_budget_s: Optional[float] = None
     target_freq_khz: Optional[int] = None
+    target_savings_pct: Optional[float] = None
+    curve_experiment_id: Optional[str] = None
+    curve_config_id: Optional[str] = None
+    curve_baseline_energy_j: Optional[float] = None
+    curve_baseline_runtime_s: Optional[float] = None
+    curve_config_energy_j: Optional[float] = None
+    curve_config_runtime_s: Optional[float] = None
+    target_config: Optional[dict[str, Any]] = None
 
 
 class WatchLaunchAndArmRequest(BaseModel):
@@ -284,7 +297,10 @@ class WatchLaunchAndArmRequest(BaseModel):
 
 
 class AutoPilotArmRequest(BaseModel):
-    objective: str = "efficiency"  # "efficiency" | "balanced" | "performance"
+    objective: str = "efficiency"  # "efficiency" | "balanced" | "performance" | "custom_curve"
+    experiment_id: Optional[str] = None
+    target_savings_pct: Optional[float] = None
+    max_runtime_penalty_pct: Optional[float] = None
     onset_s: float = 2.0
     idle_grace_s: float = 3.0
     poll_hz: float = 1.0
@@ -1709,11 +1725,19 @@ def arm_watch(req: WatchArmRequest) -> dict[str, Any]:
         active_control=True,
         target_pid=req.pid,
         target_process_name=proc_name,
+        target_config=req.target_config,
         focus_mode=req.focus_mode,
         optimization_objective=req.optimization_objective,
         recurrence_mode=req.recurrence_mode,
         time_budget_s=req.time_budget_s,
         target_freq_khz=req.target_freq_khz,
+        target_savings_pct=req.target_savings_pct,
+        curve_baseline_energy_j=req.curve_baseline_energy_j,
+        curve_baseline_runtime_s=req.curve_baseline_runtime_s,
+        curve_config_energy_j=req.curve_config_energy_j,
+        curve_config_runtime_s=req.curve_config_runtime_s,
+        curve_experiment_id=req.curve_experiment_id,
+        curve_config_id=req.curve_config_id,
         store=_STORE,
     )
     _ensure_autopilot_worker()
@@ -1904,6 +1928,126 @@ def disarm_watch() -> dict[str, Any]:
 # Dedicated Auto-Pilot Mode Endpoints
 # ---------------------------------------------------------------------------
 
+def _extract_summaries_from_experiment(exp_id: str) -> tuple[list[ConfigSummary], Optional[str], Optional[dict[str, Any]]]:
+    """Extract candidate ConfigSummary objects and baseline config ID from an experiment."""
+    full = _resolve_experiment(exp_id)
+    if not full:
+        return [], None, None
+    prof = full.get("profile") or {}
+    cfgs_dict = prof.get("configurations") or {}
+    baseline_id = prof.get("baseline_config_id")
+
+    summaries: list[ConfigSummary] = []
+    for cid, c in cfgs_dict.items():
+        cfg_dict = c.get("configuration") or {}
+        cfg_obj = Configuration.from_dict(cfg_dict)
+        rts = c.get("runtime_samples") or ([c.get("median_runtime_s")] if c.get("median_runtime_s") else [])
+        nrg = c.get("energy_samples") or ([c.get("median_energy_j")] if c.get("median_energy_j") else [])
+        med_rt = c.get("median_runtime_s") or (sum(rts) / len(rts) if rts else 0.0)
+        med_ej = c.get("median_energy_j") or (sum(nrg) / len(nrg) if nrg else None)
+        is_base = bool(c.get("is_baseline") or (baseline_id and cid == baseline_id))
+        if med_rt > 0 and med_ej is not None and med_ej > 0:
+            summaries.append(
+                ConfigSummary(
+                    config_id=cid,
+                    configuration=cfg_obj,
+                    runtime_samples=rts,
+                    energy_samples=nrg,
+                    median_runtime_s=med_rt,
+                    guarded_runtime_s=c.get("guarded_runtime_s") or med_rt,
+                    median_energy_j=med_ej,
+                    median_power_w=c.get("median_power_w"),
+                    profile_is_usable=True,
+                    total_runs=c.get("total_runs", len(rts)),
+                    is_baseline=is_base,
+                )
+            )
+    return summaries, baseline_id, full
+
+
+@app.get("/api/autopilot/curve-options")
+def get_autopilot_curve_options() -> dict[str, Any]:
+    """Return available calibration Pareto curves for curve-driven auto-pilot matching."""
+    experiments = _STORE.list_experiments()
+    curves = []
+
+    for exp_row in experiments:
+        exp_id = exp_row.get("id")
+        summaries, baseline_id, full = _extract_summaries_from_experiment(exp_id)
+        if len(summaries) < 2 or not full:
+            continue
+
+        workload_id = full.get("workload_id") or full.get("workload_name") or "custom"
+
+        # Find baseline config
+        base = None
+        if baseline_id:
+            for s in summaries:
+                if s.config_id == baseline_id:
+                    base = s
+                    break
+        if not base:
+            for s in summaries:
+                if s.is_baseline or (s.configuration and s.configuration.boost) or "stock" in s.config_id:
+                    base = s
+                    break
+            if not base:
+                base = min(summaries, key=lambda s: s.median_runtime_s)
+
+        base_e = base.median_energy_j
+        base_t = base.median_runtime_s
+        if not base_e or base_e <= 0 or base_t <= 0:
+            continue
+
+        frontier = compute_pareto_frontier(summaries)
+        if not frontier:
+            continue
+
+        pts = []
+        for f in frontier:
+            es = round(100.0 * (1.0 - f.median_energy_j / base_e), 1)
+            rp = round(100.0 * (f.median_runtime_s / base_t - 1.0), 1)
+            pts.append({
+                "config_id": f.config_id,
+                "energy_reduction_pct": es,
+                "runtime_increase_pct": rp,
+                "median_runtime_s": round(f.median_runtime_s, 3),
+                "median_energy_j": round(f.median_energy_j, 2),
+                "avg_power_w": round(f.median_energy_j / f.median_runtime_s, 2),
+                "configuration": f.configuration.to_dict() if f.configuration else {},
+            })
+
+        name_map = {
+            "clean_build": "C++ Compilation (clean_build)",
+            "fixed_compute": "Fixed Compute (Matrix Mult)",
+        }
+        display_name = name_map.get(workload_id, workload_id)
+        title = f"{display_name} — {len(summaries)} points ({len(pts)} frontier)"
+
+        curves.append({
+            "experiment_id": exp_id,
+            "workload_id": workload_id,
+            "title": title,
+            "total_configs": len(summaries),
+            "baseline": {
+                "config_id": base.config_id,
+                "median_runtime_s": round(base_t, 3),
+                "median_energy_j": round(base_e, 2),
+                "avg_power_w": round(base_e / base_t, 2),
+            },
+            "frontier_points": pts,
+            "max_savings_pct": max([p["energy_reduction_pct"] for p in pts], default=0.0),
+            "is_default": False,
+        })
+
+    # Sort curves: prefer curves with more frontier points, compilation sweeps first
+    curves.sort(key=lambda c: (c["workload_id"] == "clean_build", c["max_savings_pct"] >= 20.0, len(c["frontier_points"])), reverse=True)
+    if curves:
+        curves[0]["is_default"] = True
+
+    return {"curves": curves}
+
+
 @app.get("/api/autopilot/status")
 def get_autopilot_status() -> dict[str, Any]:
     """Inspect the live state of system-wide Auto-Pilot."""
@@ -1914,6 +2058,12 @@ def get_autopilot_status() -> dict[str, Any]:
             "state": "stopped",
             "control_state": "stopped",
             "objective": "efficiency",
+            "target_savings_pct": None,
+            "curve_experiment_id": None,
+            "curve_config_id": None,
+            "empirical_savings_pct": None,
+            "empirical_runtime_penalty_pct": None,
+            "matched_power_w": None,
             "current_power_w": None,
             "baseline_w": None,
             "threshold_w": None,
@@ -1922,11 +2072,18 @@ def get_autopilot_status() -> dict[str, Any]:
             "latest_savings": None,
         }
 
+    st = _WATCH_SERVICE.status_dict()
     return {
         "enabled": True,
         "state": _WATCH_SERVICE.detector.state,
         "control_state": _WATCH_SERVICE.control_state,
         "objective": _WATCH_SERVICE.optimization_objective,
+        "target_savings_pct": _WATCH_SERVICE.target_savings_pct,
+        "curve_experiment_id": _WATCH_SERVICE.curve_experiment_id,
+        "curve_config_id": _WATCH_SERVICE.curve_config_id,
+        "empirical_savings_pct": st.get("empirical_savings_pct"),
+        "empirical_runtime_penalty_pct": st.get("empirical_runtime_penalty_pct"),
+        "matched_power_w": st.get("matched_power_w"),
         "current_power_w": round(_WATCH_SERVICE.last_power_w, 2) if _WATCH_SERVICE.last_power_w is not None else None,
         "baseline_w": round(_WATCH_SERVICE.detector.baseline_w, 2) if _WATCH_SERVICE.detector.baseline_w is not None else None,
         "threshold_w": round(_WATCH_SERVICE.detector.threshold_w, 2) if _WATCH_SERVICE.detector.threshold_w is not None else None,
@@ -1945,6 +2102,60 @@ def arm_autopilot(req: Optional[AutoPilotArmRequest] = None) -> dict[str, Any]:
     if req is None:
         req = AutoPilotArmRequest()
 
+    target_config = None
+    curve_baseline_e = None
+    curve_baseline_t = None
+    curve_config_e = None
+    curve_config_t = None
+    matched_config_id = None
+    empirical_savings_pct = None
+    empirical_runtime_penalty_pct = None
+    chosen_exp_id = req.experiment_id
+
+    # If target savings is requested or custom curve objective, match against measured curve!
+    if req.target_savings_pct is not None or req.objective == "custom_curve" or req.experiment_id is not None:
+        target_savings = float(req.target_savings_pct if req.target_savings_pct is not None else 25.0)
+
+        # Resolve candidate curve
+        if not chosen_exp_id:
+            opts = get_autopilot_curve_options().get("curves", [])
+            if opts:
+                chosen_exp_id = opts[0]["experiment_id"]
+
+        if chosen_exp_id:
+            summaries, baseline_id, _ = _extract_summaries_from_experiment(chosen_exp_id)
+            if summaries:
+                match_res = match_frontier_by_savings_target(
+                    summaries,
+                    target_savings_pct=target_savings,
+                    baseline_config_id=baseline_id,
+                    max_runtime_penalty_pct=req.max_runtime_penalty_pct,
+                )
+                if match_res.get("ok"):
+                    selected = match_res["selected"]
+                    baseline = match_res["baseline"]
+                    matched_config_id = selected["config_id"]
+                    empirical_savings_pct = selected["energy_reduction_pct"]
+                    empirical_runtime_penalty_pct = selected["runtime_increase_pct"]
+                    curve_baseline_e = baseline["median_energy_j"]
+                    curve_baseline_t = baseline["median_runtime_s"]
+                    curve_config_e = selected["median_energy_j"]
+                    curve_config_t = selected["median_runtime_s"]
+
+                    cfg = selected.get("configuration") or {}
+                    target_config = {}
+                    if "boost" in cfg and cfg["boost"] is not None:
+                        target_config["boost"] = bool(cfg["boost"])
+                    else:
+                        target_config["boost"] = False
+
+                    if cfg.get("policy_freq_caps_khz"):
+                        target_config["policy_freq_caps_khz"] = cfg["policy_freq_caps_khz"]
+                        target_config["clamp_out_of_range"] = True
+                    elif cfg.get("freq_cap_khz"):
+                        target_config["policy_freq_caps_khz"] = {f"policy{i}": int(cfg["freq_cap_khz"]) for i in range(16)}
+                        target_config["clamp_out_of_range"] = True
+
     arm_req = WatchArmRequest(
         pid=None,
         process_name="System",
@@ -1954,6 +2165,14 @@ def arm_autopilot(req: Optional[AutoPilotArmRequest] = None) -> dict[str, Any]:
         poll_hz=req.poll_hz,
         optimization_objective=req.objective,
         recurrence_mode="repeated",
+        target_savings_pct=req.target_savings_pct,
+        curve_experiment_id=chosen_exp_id,
+        curve_config_id=matched_config_id,
+        curve_baseline_energy_j=curve_baseline_e,
+        curve_baseline_runtime_s=curve_baseline_t,
+        curve_config_energy_j=curve_config_e,
+        curve_config_runtime_s=curve_config_t,
+        target_config=target_config,
     )
     res = arm_watch(arm_req)
     return {
@@ -1961,6 +2180,11 @@ def arm_autopilot(req: Optional[AutoPilotArmRequest] = None) -> dict[str, Any]:
         "status": "armed",
         "objective": req.objective,
         "control_state": res.get("control_state", "stock_idle"),
+        "target_savings_pct": req.target_savings_pct,
+        "curve_experiment_id": chosen_exp_id,
+        "curve_config_id": matched_config_id,
+        "empirical_savings_pct": empirical_savings_pct,
+        "empirical_runtime_penalty_pct": empirical_runtime_penalty_pct,
         "message": f"Auto-Pilot armed ({req.objective}). Passively monitoring system power at Stock Boost.",
     }
 

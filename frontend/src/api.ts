@@ -256,11 +256,43 @@ export async function disarmWatch(): Promise<any> {
   return res.json();
 }
 
+export interface AutoPilotCurvePoint {
+  config_id: string;
+  energy_reduction_pct: number;
+  runtime_increase_pct: number;
+  median_runtime_s: number;
+  median_energy_j: number;
+  avg_power_w?: number | null;
+  configuration?: any;
+}
+
+export interface AutoPilotCurveOption {
+  experiment_id: string;
+  workload_id: string;
+  title: string;
+  total_configs: number;
+  baseline: {
+    config_id: string;
+    median_runtime_s: number;
+    median_energy_j: number;
+    avg_power_w?: number | null;
+  };
+  frontier_points: AutoPilotCurvePoint[];
+  max_savings_pct: number;
+  is_default: boolean;
+}
+
 export interface AutoPilotStatus {
   enabled: boolean;
   state: 'idle' | 'calibrating' | 'active' | 'stopped';
   control_state: 'stock_idle' | 'optimized_active' | 'shielded_boost' | 'stopped';
-  objective: 'efficiency' | 'balanced' | 'performance';
+  objective: 'efficiency' | 'balanced' | 'performance' | 'custom_curve' | string;
+  target_savings_pct?: number | null;
+  curve_experiment_id?: string | null;
+  curve_config_id?: string | null;
+  empirical_savings_pct?: number | null;
+  empirical_runtime_penalty_pct?: number | null;
+  matched_power_w?: number | null;
   current_power_w: number | null;
   baseline_w: number | null;
   threshold_w: number | null;
@@ -281,8 +313,18 @@ export async function fetchAutoPilotStatus(): Promise<AutoPilotStatus> {
   return res.json();
 }
 
+export async function fetchAutoPilotCurveOptions(): Promise<AutoPilotCurveOption[]> {
+  const res = await fetch(`${API_BASE}/autopilot/curve-options`);
+  if (!res.ok) throw new Error(`Failed to fetch autopilot curve options: ${res.statusText}`);
+  const data = await res.json();
+  return data.curves || [];
+}
+
 export async function armAutoPilot(params?: {
-  objective?: 'efficiency' | 'balanced' | 'performance';
+  objective?: 'efficiency' | 'balanced' | 'performance' | 'custom_curve' | string;
+  experiment_id?: string;
+  target_savings_pct?: number;
+  max_runtime_penalty_pct?: number;
   onset_s?: number;
   idle_grace_s?: number;
 }): Promise<any> {

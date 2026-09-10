@@ -530,3 +530,111 @@ def select_configuration(
             experiment_id=profile.experiment_id,
             task_duration_s=task_duration_s,
         )
+
+
+def match_frontier_by_savings_target(
+    configs: list[ConfigSummary],
+    target_savings_pct: float,
+    baseline_config_id: Optional[str] = None,
+    max_runtime_penalty_pct: Optional[float] = None,
+) -> dict[str, Any]:
+    """Find the Pareto frontier configuration achieving the target energy savings with minimal runtime penalty.
+    
+    Args:
+        configs: List of ConfigSummary objects from the profile curve.
+        target_savings_pct: Desired energy reduction percentage relative to baseline (e.g. 25.0%).
+        baseline_config_id: Optional ID of baseline configuration.
+        max_runtime_penalty_pct: Optional ceiling on allowable runtime increase (e.g. 20.0%).
+        
+    Returns:
+        Structured dictionary with baseline metrics, selected config, empirical tradeoffs,
+        and all available frontier points for visual tradeoff inspection.
+    """
+    if not configs:
+        return {"ok": False, "error": "no_configs"}
+
+    baseline: Optional[ConfigSummary] = None
+    if baseline_config_id:
+        for c in configs:
+            if c.config_id == baseline_config_id:
+                baseline = c
+                break
+    if not baseline:
+        for c in configs:
+            if c.is_baseline or (c.configuration and c.configuration.boost) or "stock" in c.config_id:
+                baseline = c
+                break
+        if not baseline:
+            baseline = configs[0]
+
+    base_e = baseline.median_energy_j
+    base_t = baseline.median_runtime_s
+
+    if base_e is None or base_e <= 0 or base_t <= 0:
+        return {"ok": False, "error": "invalid_baseline"}
+
+    frontier = compute_pareto_frontier(configs)
+    if not frontier:
+        frontier = [c for c in configs if c.profile_is_usable and c.median_energy_j is not None and c.median_runtime_s > 0]
+        frontier.sort(key=lambda x: (x.median_runtime_s, x.median_energy_j or 0.0))
+
+    if not frontier:
+        return {"ok": False, "error": "no_usable_frontier"}
+
+    frontier_details = []
+    for c in frontier:
+        assert c.median_energy_j is not None
+        e_saved_pct = 100.0 * (1.0 - c.median_energy_j / base_e)
+        t_penalty_pct = 100.0 * (c.median_runtime_s / base_t - 1.0)
+        power_w = c.median_energy_j / c.median_runtime_s if c.median_runtime_s > 0 else None
+        frontier_details.append({
+            "config_id": c.config_id,
+            "energy_reduction_pct": round(e_saved_pct, 2),
+            "runtime_increase_pct": round(t_penalty_pct, 2),
+            "median_runtime_s": round(c.median_runtime_s, 4),
+            "median_energy_j": round(c.median_energy_j, 2),
+            "avg_power_w": round(power_w, 2) if power_w else None,
+            "configuration": c.configuration.to_dict() if c.configuration else {},
+            "_summary": c,
+        })
+
+    target_val = float(target_savings_pct)
+    meeting = [p for p in frontier_details if p["energy_reduction_pct"] >= target_val]
+    if max_runtime_penalty_pct is not None:
+        meeting_with_penalty = [p for p in meeting if p["runtime_increase_pct"] <= max_runtime_penalty_pct]
+        if meeting_with_penalty:
+            meeting = meeting_with_penalty
+
+    if meeting:
+        winner = min(meeting, key=lambda p: (p["runtime_increase_pct"], -p["energy_reduction_pct"]))
+        achieved = True
+    else:
+        winner = max(frontier_details, key=lambda p: (p["energy_reduction_pct"], -p["runtime_increase_pct"]))
+        achieved = False
+
+    base_power = base_e / base_t if base_t > 0 else None
+    return {
+        "ok": True,
+        "target_savings_pct": target_val,
+        "achieved_target": achieved,
+        "baseline": {
+            "config_id": baseline.config_id,
+            "median_runtime_s": round(base_t, 4),
+            "median_energy_j": round(base_e, 2),
+            "avg_power_w": round(base_power, 2) if base_power else None,
+            "configuration": baseline.configuration.to_dict() if baseline.configuration else {},
+        },
+        "selected": {
+            "config_id": winner["config_id"],
+            "energy_reduction_pct": winner["energy_reduction_pct"],
+            "runtime_increase_pct": winner["runtime_increase_pct"],
+            "median_runtime_s": winner["median_runtime_s"],
+            "median_energy_j": winner["median_energy_j"],
+            "avg_power_w": winner["avg_power_w"],
+            "configuration": winner["configuration"],
+        },
+        "frontier_points": [
+            {k: v for k, v in p.items() if k != "_summary"}
+            for p in frontier_details
+        ],
+    }
