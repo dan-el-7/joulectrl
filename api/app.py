@@ -1691,8 +1691,8 @@ class MeasureCommandRequest(BaseModel):
         description="If True, runs Stock Boost vs Energy-Optimized configurations side-by-side."
     )
     mode: str = Field(
-        "auto",
-        description="Demo mode when command is omitted: 'auto', 'kernel', or 'zstd'."
+        "standard",
+        description="Demo mode when command is omitted: 'standard' (10-15s), 'extended' (20-30s), or 'quick' (CI only)."
     )
     workers: Optional[int] = Field(
         None,
@@ -1711,7 +1711,7 @@ class MeasureCommandRequest(BaseModel):
         description="Target CPU frequency cap clamp in kHz."
     )
     timeout_s: float = Field(
-        120.0,
+        240.0,
         description="Execution timeout in seconds."
     )
 
@@ -1852,7 +1852,7 @@ def measure_command_endpoint(req: Optional[MeasureCommandRequest] = None) -> dic
 
 class LaunchTerminalRequest(BaseModel):
     command: Optional[str] = Field(None, description="Custom command to run. If empty, runs GCC compile demo.")
-    mode: str = Field("auto", description="GCC demo mode: 'auto', 'kernel', or 'zstd'.")
+    mode: str = Field("standard", description="GCC demo mode: 'standard' (10-15s), 'extended' (20-30s), or 'quick' (CI only).")
     compare: bool = Field(True, description="Run side-by-side comparison (Stock Boost vs Energy-Optimized).")
     workers: Optional[int] = Field(None, description="Worker count.")
     cap_khz: Optional[int] = Field(None, description="Frequency cap clamp in kHz.")
@@ -1877,10 +1877,10 @@ def launch_terminal_endpoint(req: Optional[LaunchTerminalRequest] = None) -> dic
         cli_args = [str(py_bin), "-m", "cli.main", "measure", req.command.strip()]
     else:
         cli_args = [str(py_bin), "-m", "cli.main", "compile-demo"]
-        if req.mode == "kernel":
+        if req.mode in ("extended", "heavy"):
+            cli_args.append("--extended")
+        elif req.mode == "quick":
             cli_args.append("--quick")
-        elif req.mode == "zstd":
-            cli_args.append("--full")
 
     if req.compare:
         cli_args.append("--compare")

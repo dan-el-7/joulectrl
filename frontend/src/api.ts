@@ -367,7 +367,7 @@ export async function stopCalibration(): Promise<{ ok: boolean; message: string;
 
 export interface LaunchTerminalParams {
   command?: string;
-  mode?: 'auto' | 'kernel' | 'zstd';
+  mode?: 'standard' | 'extended' | 'quick' | 'auto' | 'kernel' | 'zstd';
   compare?: boolean;
   workers?: number;
   cap_khz?: number;
@@ -397,7 +397,7 @@ export async function launchDemoTerminal(params: LaunchTerminalParams): Promise<
 export interface MeasureCommandParams {
   command?: string;
   compare_stock?: boolean;
-  mode?: 'auto' | 'kernel' | 'zstd';
+  mode?: 'standard' | 'extended' | 'quick' | 'auto' | 'kernel' | 'zstd';
   workers?: number;
   cpu_affinity?: number[];
   boost?: boolean;

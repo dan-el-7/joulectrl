@@ -7,8 +7,8 @@ export const DemoView: React.FC = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const [preset, setPreset] = useState<'kernel' | 'zstd' | 'custom'>('kernel');
-  const [customCommand, setCustomCommand] = useState<string>("gcc -O3 -Wall workloads/kernel/fixed_compute.c -o /tmp/demo_bin");
+  const [preset, setPreset] = useState<'standard' | 'extended' | 'custom'>('standard');
+  const [customCommand, setCustomCommand] = useState<string>("make -C workloads/build_target/zstd -j16");
   const [compareStock, setCompareStock] = useState<boolean>(true);
   const [workers, setWorkers] = useState<number>(16);
 
@@ -18,7 +18,8 @@ export const DemoView: React.FC = () => {
 
   const [runResult, setRunResult] = useState<any | null>(null);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
-    '$ joulectrl ready. Choose a compilation target and launch in terminal or execute in-app.',
+    '$ joulectrl ready. Genuine multi-threaded compilation benchmark initialized.',
+    '$ Default target: Full Zstandard project build (50+ C source files, clean rebuild outside measurement window).',
   ]);
 
   const handleLaunchTerminal = async () => {
@@ -34,9 +35,10 @@ export const DemoView: React.FC = () => {
       setTerminalMsg(`Launched native terminal (${res.terminal}, PID: ${res.pid})`);
       setTerminalLogs((prev) => [
         ...prev,
-        `[Terminal] Spawning external desktop terminal: ${res.terminal}`,
+        `------------------------------------------------------------`,
+        `[Terminal] Spawning desktop terminal: ${res.terminal}`,
         `$ ${res.command}`,
-        `[Terminal] Session running in standalone window.`,
+        `[Terminal] Heavy compilation running in standalone terminal window.`,
       ]);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to spawn terminal');
@@ -48,18 +50,19 @@ export const DemoView: React.FC = () => {
     setTerminalMsg(null);
     setIsRunning(true);
     const cmdDisplay =
-      preset === 'kernel'
-        ? 'gcc -O3 -Wall workloads/kernel/fixed_compute.c -o /tmp/gcc_demo_bin'
-        : preset === 'zstd'
-        ? `make -C workloads/build_target/zstd/lib -j${workers}`
+      preset === 'standard'
+        ? `make -C workloads/build_target/zstd -j${workers}`
+        : preset === 'extended'
+        ? `make -C workloads/build_target/zstd all test-programs -j${workers}`
         : customCommand;
 
     setTerminalLogs((prev) => [
       ...prev,
-      `------------------------------------------------------------`,
-      `[Run] Measuring workload: ${cmdDisplay}`,
-      `[Mode] ${compareStock ? 'Stock Boost vs Energy-Optimized Comparison' : 'Single Configuration'}`,
-      `[Wait] Running hardware RAPL measurement bracket...`,
+      `============================================================`,
+      `[Run] Launching genuine compilation: ${cmdDisplay}`,
+      `[Target] Clean tree rebuild across ${workers} worker threads`,
+      `[Mode] ${compareStock ? 'Side-by-Side: Stock Boost vs Energy-Optimized' : 'Single Configuration'}`,
+      `[Wait] Compiling full project and sampling hardware energy counters (10s–30s)...`,
     ]);
 
     try {
@@ -86,7 +89,7 @@ export const DemoView: React.FC = () => {
           `  - Opt Avg Power:     ${comp.avg_power_opt_w?.toFixed(2)} W (Power: ${pSavedPct})`,
           comp.energy_saved_pct && comp.energy_saved_pct > 0
             ? `[Result] SUCCESS: ${comp.energy_saved_pct}% energy reduction verified on hardware!`
-            : `[Result] Completed.`,
+            : `[Result] Benchmark completed.`,
         ]);
       } else if (data.run) {
         const r = data.run;
@@ -123,7 +126,7 @@ export const DemoView: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 600, color: c.primaryText, margin: 0 }}>
-            Real-Work & GCC Compilation Demo
+            Real-World GCC Compilation Demo & Power Benchmark
           </h1>
           <span
             style={{
@@ -138,11 +141,11 @@ export const DemoView: React.FC = () => {
               letterSpacing: '0.05em',
             }}
           >
-            Live Terminal
+            10s+ Sustained Workload
           </span>
         </div>
         <p style={{ color: c.secondaryText, fontSize: '14px', marginTop: '6px' }}>
-          Execute genuine compiler workloads or custom CLI applications with hardware RAPL energy tracking and real average wattage ($P = E / T$).
+          Execute genuine multi-file C compilation workloads (50+ files) under hardware RAPL energy tracking and sustained package wattage ($P = E / T$).
         </p>
       </div>
 
@@ -150,7 +153,7 @@ export const DemoView: React.FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(340px, 420px) 1fr',
+          gridTemplateColumns: 'minmax(360px, 440px) 1fr',
           gap: '24px',
           alignItems: 'start',
         }}
@@ -169,44 +172,56 @@ export const DemoView: React.FC = () => {
         >
           <div>
             <label style={{ fontSize: '13px', fontWeight: 600, color: c.primaryText, display: 'block', marginBottom: '8px' }}>
-              Target Workload
+              Target Compilation Workload
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => setPreset('kernel')}
+                onClick={() => setPreset('standard')}
                 style={{
                   textAlign: 'left',
-                  padding: '10px 12px',
+                  padding: '12px 14px',
                   borderRadius: radii.md,
-                  border: `1px solid ${preset === 'kernel' ? c.accent : c.border}`,
-                  backgroundColor: preset === 'kernel' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  border: `1px solid ${preset === 'standard' ? c.accent : c.border}`,
+                  backgroundColor: preset === 'standard' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
                   color: c.primaryText,
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: '13px' }}>⚡ GCC Quick C Kernel</div>
-                <div style={{ fontSize: '12px', color: c.secondaryText, marginTop: '2px', fontFamily: fonts.mono }}>
-                  gcc -O3 -Wall fixed_compute.c
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 600, fontSize: '13px' }}>🚀 Full C Project Build (Zstandard)</div>
+                  <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>~11s (600+ J)</span>
+                </div>
+                <div style={{ fontSize: '12px', color: c.secondaryText, marginTop: '3px', fontFamily: fonts.mono }}>
+                  make -C workloads/build_target/zstd -j{workers}
+                </div>
+                <div style={{ fontSize: '11px', color: c.secondaryText, marginTop: '4px' }}>
+                  Compiles 50+ source files, dynamic/static libraries & CLI executable from clean tree
                 </div>
               </button>
 
               <button
                 type="button"
-                onClick={() => setPreset('zstd')}
+                onClick={() => setPreset('extended')}
                 style={{
                   textAlign: 'left',
-                  padding: '10px 12px',
+                  padding: '12px 14px',
                   borderRadius: radii.md,
-                  border: `1px solid ${preset === 'zstd' ? c.accent : c.border}`,
-                  backgroundColor: preset === 'zstd' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  border: `1px solid ${preset === 'extended' ? c.accent : c.border}`,
+                  backgroundColor: preset === 'extended' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
                   color: c.primaryText,
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: '13px' }}>🚀 Full C Library (zstd/lib)</div>
-                <div style={{ fontSize: '12px', color: c.secondaryText, marginTop: '2px', fontFamily: fonts.mono }}>
-                  make -C workloads/build_target/zstd/lib -j{workers}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 600, fontSize: '13px' }}>⚡ Extended Multi-Target Suite</div>
+                  <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: 600 }}>~25s–35s</span>
+                </div>
+                <div style={{ fontSize: '12px', color: c.secondaryText, marginTop: '3px', fontFamily: fonts.mono }}>
+                  make -C workloads/build_target/zstd all test-programs
+                </div>
+                <div style={{ fontSize: '11px', color: c.secondaryText, marginTop: '4px' }}>
+                  Heavy sustained multi-threaded compilation of full library, CLI, and test harnesses
                 </div>
               </button>
 
@@ -215,7 +230,7 @@ export const DemoView: React.FC = () => {
                 onClick={() => setPreset('custom')}
                 style={{
                   textAlign: 'left',
-                  padding: '10px 12px',
+                  padding: '12px 14px',
                   borderRadius: radii.md,
                   border: `1px solid ${preset === 'custom' ? c.accent : c.border}`,
                   backgroundColor: preset === 'custom' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
@@ -225,7 +240,7 @@ export const DemoView: React.FC = () => {
               >
                 <div style={{ fontWeight: 600, fontSize: '13px' }}>🛠️ Custom Command / App</div>
                 <div style={{ fontSize: '12px', color: c.secondaryText, marginTop: '2px' }}>
-                  Execute arbitrary CLI binary, build command, or benchmark
+                  Execute arbitrary compiler invocation, build script, or command
                 </div>
               </button>
             </div>
@@ -234,13 +249,13 @@ export const DemoView: React.FC = () => {
           {preset === 'custom' && (
             <div>
               <label style={{ fontSize: '13px', fontWeight: 600, color: c.primaryText, display: 'block', marginBottom: '6px' }}>
-                Command Line
+                Custom Command Line
               </label>
               <input
                 type="text"
                 value={customCommand}
                 onChange={(e) => setCustomCommand(e.target.value)}
-                placeholder="e.g. gcc -O2 main.c -o /tmp/test"
+                placeholder="e.g. make -C my_repo -j16"
                 style={{
                   width: '100%',
                   padding: '8px 10px',
@@ -336,7 +351,7 @@ export const DemoView: React.FC = () => {
                 opacity: isRunning ? 0.6 : 1,
               }}
             >
-              <span>{isRunning ? '⏳ Running Benchmark…' : '▶️ Run Benchmark in App'}</span>
+              <span>{isRunning ? '⏳ Running 10s+ Compilation Benchmark…' : '▶️ Run Benchmark in App'}</span>
             </button>
           </div>
 
@@ -372,7 +387,7 @@ export const DemoView: React.FC = () => {
                     : 'Measured'}
                 </div>
                 <div style={{ fontSize: '12px', color: c.secondaryText }}>
-                  {runResult.comparison.energy_stock_j?.toFixed(2)} J → {runResult.comparison.energy_opt_j?.toFixed(2)} J
+                  {runResult.comparison.energy_stock_j?.toFixed(1)} J → {runResult.comparison.energy_opt_j?.toFixed(1)} J
                 </div>
               </div>
 
@@ -389,12 +404,12 @@ export const DemoView: React.FC = () => {
               </div>
 
               <div style={{ backgroundColor: c.cardBg, border: `1px solid ${c.border}`, borderRadius: radii.lg, padding: '14px' }}>
-                <div style={{ fontSize: '12px', color: c.secondaryText }}>Runtime Trade-off</div>
+                <div style={{ fontSize: '12px', color: c.secondaryText }}>Runtime Duration</div>
                 <div style={{ fontSize: '20px', fontWeight: 700, color: c.primaryText, margin: '4px 0' }}>
-                  {runResult.comparison.runtime_delta_pct > 0 ? `+${runResult.comparison.runtime_delta_pct}%` : '0%'}
+                  {runResult.comparison.runtime_stock_s?.toFixed(1)}s vs {runResult.comparison.runtime_opt_s?.toFixed(1)}s
                 </div>
                 <div style={{ fontSize: '12px', color: c.secondaryText }}>
-                  {runResult.comparison.runtime_stock_s?.toFixed(3)}s → {runResult.comparison.runtime_opt_s?.toFixed(3)}s
+                  Trade-off: +{runResult.comparison.runtime_delta_pct?.toFixed(1)}% time for {runResult.comparison.energy_saved_pct?.toFixed(1)}% energy
                 </div>
               </div>
             </div>
@@ -426,7 +441,7 @@ export const DemoView: React.FC = () => {
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block' }} />
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
                 <span style={{ marginLeft: '10px', fontSize: '12px', color: '#94a3b8', fontFamily: fonts.mono }}>
-                  terminal ~ joulectrl demo
+                  terminal ~ joulectrl compiler benchmark
                 </span>
               </div>
               <button
@@ -467,7 +482,7 @@ export const DemoView: React.FC = () => {
               ))}
               {isRunning && (
                 <div style={{ color: '#fbbf24', marginTop: '6px' }}>
-                  ⏳ Executing compilation and capturing energy counters...
+                  ⏳ Compiling full project across all threads (10s–30s) and reading hardware energy counters...
                 </div>
               )}
             </div>

@@ -343,7 +343,12 @@ def run_measure_command(args: argparse.Namespace) -> int:
 
     cmd_str = getattr(args, "target_command", None) or getattr(args, "command_arg", None)
     if not cmd_str or getattr(args, "demo", False):
-        demo_mode = "zstd" if getattr(args, "full", False) else ("kernel" if getattr(args, "quick", False) else "auto")
+        if getattr(args, "extended", False) or getattr(args, "heavy", False):
+            demo_mode = "extended"
+        elif getattr(args, "quick", False):
+            demo_mode = "quick"
+        else:
+            demo_mode = "standard"
         workload = get_gcc_compile_demo_workload(mode=demo_mode)
     else:
         workload = CustomCommandWorkload(cmd_str)
@@ -434,29 +439,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="command to execute (defaults to GCC compile demo if omitted)",
     )
     measure.add_argument("--demo", action="store_true", help="run default GCC compile demo")
-    measure.add_argument("--full", action="store_true", help="compile full zstd multi-threaded library")
-    measure.add_argument("--quick", action="store_true", help="compile single-file C kernel")
+    measure.add_argument("--extended", "--heavy", action="store_true", help="compile full zstd project + test suites (~25s)")
+    measure.add_argument("--quick", action="store_true", help="quick compile kernel (CI testing only)")
     measure.add_argument("--compare", action="store_true", help="compare Stock Boost vs Energy-Optimized side-by-side")
     measure.add_argument("--workers", type=int, default=None, help="worker count (default: all cores)")
     measure.add_argument("--cpus", default=None, help="comma-separated CPU IDs (e.g. 0,1,2,3)")
     measure.add_argument("--boost", choices=["on", "off"], default=None, help="force boost state")
     measure.add_argument("--cap-khz", type=int, default=None, help="frequency cap clamp in kHz")
-    measure.add_argument("--timeout", type=float, default=120.0, help="timeout in seconds")
+    measure.add_argument("--timeout", type=float, default=180.0, help="timeout in seconds")
     measure.add_argument("--socket", default="/run/joulectrl-helper.sock", help="helper socket path")
     measure.add_argument("--json", action="store_true", help="emit JSON report")
     measure.set_defaults(handler=run_measure_command)
 
     compile_demo = sub.add_parser(
         "compile-demo",
-        help="run real GCC C compilation demo with live wattage & energy tracking",
+        help="run real GCC C compilation demo (10s+ multi-core benchmark) with live wattage & energy tracking",
     )
-    compile_demo.add_argument("--full", action="store_true", help="compile full zstd multi-threaded library")
-    compile_demo.add_argument("--quick", action="store_true", help="compile single-file C kernel")
+    compile_demo.add_argument("--extended", "--heavy", action="store_true", help="compile full zstd project + test suites (~25s)")
+    compile_demo.add_argument("--quick", action="store_true", help="quick compile kernel (CI testing only)")
     compile_demo.add_argument("--compare", action="store_true", help="compare Stock Boost vs Energy-Optimized side-by-side")
     compile_demo.add_argument("--workers", type=int, default=None, help="worker count (default: all cores)")
     compile_demo.add_argument("--cpus", default=None, help="comma-separated CPU IDs (e.g. 0,1,2,3)")
     compile_demo.add_argument("--cap-khz", type=int, default=None, help="frequency cap clamp in kHz")
-    compile_demo.add_argument("--timeout", type=float, default=120.0, help="timeout in seconds")
+    compile_demo.add_argument("--timeout", type=float, default=180.0, help="timeout in seconds")
     compile_demo.add_argument("--socket", default="/run/joulectrl-helper.sock", help="helper socket path")
     compile_demo.add_argument("--json", action="store_true", help="emit JSON report")
     compile_demo.set_defaults(handler=run_compile_demo)

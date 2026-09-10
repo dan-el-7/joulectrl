@@ -81,6 +81,28 @@ class CustomCommandWorkload(Workload):
                 )
             except Exception:
                 pass
+        elif len(self._cmd_list) > 0 and self._cmd_list[0] == "make" and "clean" not in self._cmd_list:
+            # Auto-clean before make build so repetitions do not become 0-second cached incremental no-ops
+            dir_arg = None
+            for i, arg in enumerate(self._cmd_list):
+                if arg == "-C" and i + 1 < len(self._cmd_list):
+                    dir_arg = self._cmd_list[i + 1]
+                    break
+                elif arg.startswith("-C") and len(arg) > 2:
+                    dir_arg = arg[2:]
+                    break
+            if dir_arg:
+                try:
+                    import subprocess
+                    subprocess.run(
+                        ["make", "-C", dir_arg, "clean"],
+                        cwd=self._working_dir or run_context.working_dir or ".",
+                        check=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except Exception:
+                    pass
 
     def command(self, workers: int) -> list[str]:
         # Expand any worker placeholders
@@ -116,36 +138,49 @@ class CustomCommandWorkload(Workload):
 
 def get_gcc_compile_demo_workload(
     workdir: Optional[str] = None,
-    mode: str = "auto",  # "auto" | "kernel" | "zstd"
+    mode: str = "standard",  # "standard" (10-15s) | "extended" (20-30s) | "quick" (CI only)
 ) -> Workload:
-    """Build a real GCC compilation workload.
+    """Build a genuine GCC C compilation workload that stresses cores for at least 10 seconds.
 
-    - "kernel": Compiles workloads/kernel/fixed_compute.c with gcc -O3
-    - "zstd": Compiles real multi-threaded C library with make -j{workers}
-    - "auto": Compiles zstd if present, otherwise kernel
+    - "standard" (default): Full compilation of zstd library + programs/zstd CLI binary (~10-15s).
+    - "extended": Full compilation of zstd library + programs + tests (~20-30s).
+    - "quick": Compiles single-file kernel for fast unit tests.
     """
     repo_root = Path(__file__).resolve().parent.parent
-    c_source = repo_root / "workloads" / "kernel" / "fixed_compute.c"
-    zstd_dir = repo_root / "workloads" / "build_target" / "zstd" / "lib"
+    zstd_root = repo_root / "workloads" / "build_target" / "zstd"
 
-    if mode == "zstd" or (mode == "auto" and zstd_dir.exists() and (zstd_dir / "Makefile").exists()):
-        build_cmd = ["make", "-C", str(zstd_dir), "-j{workers}"]
-        clean_cmd = ["make", "-C", str(zstd_dir), "clean"]
+    if mode in ("extended", "heavy") and zstd_root.exists():
+        build_cmd = ["make", "-C", str(zstd_root), "all", "test-programs", "-j{workers}"]
+        clean_cmd = ["make", "-C", str(zstd_root), "clean"]
         return CustomCommandWorkload(
             build_cmd,
             name="gcc_compile_demo",
-            description=f"Real GCC C compilation of zstd library (-j{{workers}}) in {zstd_dir}",
+            description=f"Heavy multi-threaded GCC compilation of full zstd project & test suite (-j{{workers}}) (~20-30s)",
             working_dir=str(repo_root),
             prepare_cmd=clean_cmd,
+            output_file_to_check=str(zstd_root / "programs" / "zstd"),
+        )
+
+    if (mode in ("standard", "auto", "zstd") or mode not in ("quick", "kernel")) and zstd_root.exists() and (zstd_root / "Makefile").exists():
+        build_cmd = ["make", "-C", str(zstd_root), "-j{workers}"]
+        clean_cmd = ["make", "-C", str(zstd_root), "clean"]
+        return CustomCommandWorkload(
+            build_cmd,
+            name="gcc_compile_demo",
+            description=f"Real GCC multi-threaded compilation of full zstd project (lib + cli binary) (-j{{workers}}) (~10-15s)",
+            working_dir=str(repo_root),
+            prepare_cmd=clean_cmd,
+            output_file_to_check=str(zstd_root / "programs" / "zstd"),
         )
 
     out_dir = Path(workdir or tempfile.gettempdir())
     out_bin = str(out_dir / "gcc_demo_bin")
+    c_source = repo_root / "workloads" / "kernel" / "fixed_compute.c"
     build_cmd = ["gcc", "-O3", "-Wall", "-Wextra", "-pthread", str(c_source), "-o", out_bin]
     return CustomCommandWorkload(
         build_cmd,
         name="gcc_compile_demo",
-        description=f"Real GCC C compilation: gcc -O3 fixed_compute.c -o {out_bin}",
+        description=f"Fast GCC compilation of single-file kernel: gcc -O3 fixed_compute.c -o {out_bin}",
         working_dir=str(repo_root),
         output_file_to_check=out_bin,
     )
