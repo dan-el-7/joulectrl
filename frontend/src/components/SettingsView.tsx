@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../ThemeContext';
 import { getThemeColors, fonts, radii } from '../design';
 import { fetchOllamaModels, testOllamaModel, OllamaModelInfo } from '../api';
+import { CapabilitiesResponse } from '../types';
 
 interface SettingsViewProps {
+  capabilities?: CapabilitiesResponse | null;
   expPassiveCaps: boolean;
   onChangeExpPassiveCaps: (val: boolean) => void;
   repetitions: number;
@@ -13,6 +15,7 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
+  capabilities,
   expPassiveCaps,
   onChangeExpPassiveCaps,
   repetitions,
@@ -547,18 +550,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1rem', color: c.textPrimary, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>🛡️</span> Hardware Diagnostics & Storage
         </h3>
-        <div style={{ fontSize: '0.78rem', color: c.textTertiary, marginBottom: '1rem' }}>
-          Physical hardware sensors and persistence status.
+        <div style={{ fontSize: '0.78rem', color: c.textTertiary, marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Physical hardware sensors and persistence status (dynamically discovered via sysfs).</span>
+          {capabilities?.source && (
+            <span style={{ fontSize: '0.7rem', color: c.emerald, fontFamily: fonts.mono, background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: radii.full, border: `1px solid ${c.emerald}` }}>
+              ● {capabilities.source === 'live' ? 'Live System Discovered' : 'Fixture Mode'}
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
           <div style={{ padding: '0.75rem', borderRadius: radii.md, background: c.surfaceElevated, border: `1px solid ${c.border}` }}>
             <div style={{ fontSize: '0.72rem', color: c.textTertiary, textTransform: 'uppercase', fontWeight: 600 }}>Energy Counter Source</div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: c.emerald, marginTop: 4, fontFamily: fonts.mono }}>
-              /sys/class/powercap/intel-rapl:0/energy_uj
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: c.emerald, marginTop: 4, fontFamily: fonts.mono, wordBreak: 'break-all' }}>
+              {typeof capabilities?.energy?.backend === 'object'
+                ? (capabilities.energy.backend as any)?.path || '/sys/class/powercap/intel-rapl:0/energy_uj'
+                : (capabilities?.energy?.backend || '/sys/class/powercap/intel-rapl:0/energy_uj')}
             </div>
             <div style={{ fontSize: '0.72rem', color: c.textTertiary, marginTop: 4 }}>
-              package-0 (Zen 5 + Zen 5c + SoC Fabric)
+              {capabilities?.energy?.domain || 'package-0'} {capabilities?.machine?.cpu_model ? `(${capabilities.machine.cpu_model})` : ''}
             </div>
           </div>
 
@@ -575,10 +585,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div style={{ padding: '0.75rem', borderRadius: radii.md, background: c.surfaceElevated, border: `1px solid ${c.border}` }}>
             <div style={{ fontSize: '0.72rem', color: c.textTertiary, textTransform: 'uppercase', fontWeight: 600 }}>CPU Governor & Driver</div>
             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: c.textPrimary, marginTop: 4, fontFamily: fonts.mono }}>
-              amd_pstate (active)
+              {capabilities?.topology?.driver || 'cpufreq driver'}
+              {capabilities?.topology?.governor ? ` (${capabilities.topology.governor})` : ''}
             </div>
             <div style={{ fontSize: '0.72rem', color: c.textTertiary, marginTop: 4 }}>
-              16 independent per-core sysfs policies
+              {capabilities?.topology?.cpufreq_policies_count ?? capabilities?.topology?.logical_cores ?? 16} independent per-core sysfs policies
+              {capabilities?.topology?.logical_cores ? ` (${capabilities.topology.logical_cores} threads)` : ''}
             </div>
           </div>
         </div>

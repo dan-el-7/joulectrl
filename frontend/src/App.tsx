@@ -390,6 +390,7 @@ const AppContent: React.FC = () => {
 
         {activeTab === 'settings' && (
           <SettingsView
+            capabilities={capabilities}
             expPassiveCaps={expPassiveCaps}
             onChangeExpPassiveCaps={setExpPassiveCaps}
             repetitions={repetitions}
