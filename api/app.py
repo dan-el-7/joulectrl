@@ -34,6 +34,7 @@ from api.fixtures import (
     get_fixture_capabilities,
     get_fixture_workloads,
 )
+from api.calibration_runner import CalibrationRunner
 from api.live import WatchService, stream_experiment_events
 from core.events import default_bus
 from core.experiment import ExperimentStateMachine
@@ -874,6 +875,35 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             row["class"] = "all_logical"
         c2_rows.append(row)
 
+    # Merge in live points from current or recent calibration sweep
+    live_cal = CalibrationRunner.get_instance()
+    for lp in live_cal.points_measured:
+        c2_rows.append({
+            "class": lp["class"],
+            "control": lp["control"],
+            "workers": lp["workers"],
+            "cpus": lp["cpus"],
+            "runtime_s": lp["runtime_s"],
+            "package_energy_j": lp["package_energy_j"],
+            "chunks": lp["throughput"] * lp["runtime_s"] if lp.get("throughput") and lp.get("runtime_s") else 65536,
+        })
+
+    # Also merge in stored calibration records
+    try:
+        stored_cals = _STORE.get_calibrations()
+        for cr in stored_cals:
+            c2_rows.append({
+                "class": cr.core_class,
+                "control": (cr.requested_control or {}).get("cap_khz") and f"{cr.requested_control['cap_khz']/1e6:.2f}GHz" or ("stock" if (cr.requested_control or {}).get("boost") else "base"),
+                "workers": len(cr.cpus),
+                "cpus": cr.cpus,
+                "runtime_s": cr.runtime_s,
+                "package_energy_j": cr.package_energy_j,
+                "chunks": cr.work_units or 65536,
+            })
+    except Exception:
+        pass
+
     def med(rows: list[dict[str, Any]], key: str) -> Optional[float]:
         vals = [r[key] for r in rows if r.get(key) is not None]
         return median(vals) if vals else None
@@ -957,6 +987,61 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
         "current_experiment_id": selected_exp_id,
         "note": "Fixture fallback: faster completion gives higher score. Identical runs are averaged.",
     }
+
+
+class StartCalibrationRequest(BaseModel):
+    tier: str = "quick"  # "quick" | "standard" | "exhaustive"
+    classes: Optional[list[str]] = None
+    quiet_background: bool = True
+
+
+@app.post("/api/calibration/start")
+def start_calibration(req: StartCalibrationRequest) -> dict[str, Any]:
+    """Start a multithreaded frequency calibration sweep across core classes."""
+    if req.tier not in ("quick", "standard", "exhaustive"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tier '{req.tier}'. Must be 'quick', 'standard', or 'exhaustive'.",
+        )
+    runner = CalibrationRunner.get_instance()
+    res = runner.start(
+        tier=req.tier,
+        classes=req.classes,
+        quiet_background=req.quiet_background,
+        store=_STORE,
+    )
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to start calibration"))
+    return res
+
+
+@app.post("/api/calibration/stop")
+def stop_calibration() -> dict[str, Any]:
+    """Stop active calibration sweep immediately and restore hardware to stock."""
+    runner = CalibrationRunner.get_instance()
+    return runner.stop()
+
+
+@app.get("/api/calibration/status")
+def get_calibration_status() -> dict[str, Any]:
+    """Get status, progress, time estimate, and latest point of calibration sweep."""
+    runner = CalibrationRunner.get_instance()
+    return runner.get_status()
+
+
+@app.get("/api/calibration/events")
+async def get_calibration_events() -> StreamingResponse:
+    """Stream real-time SSE progress events for calibration sweeps."""
+    agen = stream_experiment_events("calibration")
+    return StreamingResponse(
+        agen,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/system/processes")

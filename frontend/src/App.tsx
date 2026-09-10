@@ -391,6 +391,7 @@ const AppContent: React.FC = () => {
             latestWatchedSegment={latestWatchedSegment}
             onOpenWatchTab={() => setActiveTab('watch')}
             onOpenTasksTab={() => setActiveTab('tasks')}
+            onOpenCalibrationTab={() => setActiveTab('calibration')}
             targetedProcess={targetedProcess}
             onSelectTargetProcess={setTargetedProcess}
           />

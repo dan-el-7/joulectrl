@@ -306,5 +306,51 @@ export async function setFocusSwitch(params: {
   return res.json();
 }
 
+export type CalibrationTier = 'quick' | 'standard' | 'exhaustive';
 
+export interface CalibrationStatusResponse {
+  is_running: boolean;
+  session_id?: string | null;
+  tier: CalibrationTier;
+  tier_name: string;
+  current_step: number;
+  total_steps: number;
+  percent: number;
+  elapsed_s: number;
+  eta_s: number;
+  status_message: string;
+  latest_point?: any;
+  points_count: number;
+  error?: string | null;
+}
 
+export async function fetchCalibrationStatus(): Promise<CalibrationStatusResponse> {
+  const res = await fetch(`${API_BASE}/calibration/status`);
+  if (!res.ok) throw new Error(`Failed to fetch calibration status: ${res.statusText}`);
+  return res.json();
+}
+
+export async function startCalibration(params: {
+  tier: CalibrationTier;
+  classes?: string[];
+  quiet_background?: boolean;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/calibration/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to start calibration');
+  }
+  return res.json();
+}
+
+export async function stopCalibration(): Promise<{ ok: boolean; message: string; points_saved: number }> {
+  const res = await fetch(`${API_BASE}/calibration/stop`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Failed to stop calibration: ${res.statusText}`);
+  return res.json();
+}

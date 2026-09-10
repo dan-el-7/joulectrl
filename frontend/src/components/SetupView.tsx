@@ -94,6 +94,7 @@ interface SetupViewProps {
   } | null;
   onOpenWatchTab?: () => void;
   onOpenTasksTab?: () => void;
+  onOpenCalibrationTab?: () => void;
   targetedProcess?: { pid: number; name: string } | null;
   onSelectTargetProcess?: (p: { pid: number; name: string } | null) => void;
   focusMode?: FocusMode;
@@ -128,6 +129,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
   latestWatchedSegment,
   onOpenWatchTab,
   onOpenTasksTab,
+  onOpenCalibrationTab,
   targetedProcess,
   onSelectTargetProcess,
 }) => {
@@ -885,6 +887,31 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   <NumField value={perfFloorPct} onCommit={onChangePerfFloor} unit="%" />
                 </div>
               </div>
+              <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '0.375rem', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: '0.2rem' }}>
+                <span style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
+                  💡 <strong>Preference Mode operates on empirical curves</strong>. Run multithreaded frequency calibration first to map real efficiency frontiers.
+                </span>
+                {onOpenCalibrationTab && (
+                  <button
+                    type="button"
+                    onClick={onOpenCalibrationTab}
+                    style={{
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: 4,
+                      background: colors.accentBg,
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Open Calibration Suite →
+                  </button>
+                )}
+              </div>
+
               <div style={{ fontSize: '0.72rem', color: colors.textTertiary }}>
                 Spec §6c: Reports closest honest outcome explicitly if no single candidate satisfies both constraints.
               </div>

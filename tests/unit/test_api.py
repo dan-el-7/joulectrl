@@ -821,6 +821,56 @@ def test_explain_with_ollama_provider(client):
     assert data["fallback"] is True
 
 
+def test_calibration_status_endpoint(client):
+    """GET /api/calibration/status returns current runner state."""
+    res = client.get("/api/calibration/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "is_running" in data
+    assert "tier" in data
+    assert "status_message" in data
 
 
+def test_calibration_invalid_tier(client):
+    """POST /api/calibration/start rejects invalid tier."""
+    res = client.post("/api/calibration/start", json={"tier": "ultra_fast_bogus"})
+    assert res.status_code == 400
+    assert "Invalid tier" in res.json()["detail"]
 
+
+def test_calibration_start_and_stop(client, monkeypatch):
+    """POST /api/calibration/start starts a sweep and stop terminates it safely."""
+    from api.calibration_runner import CalibrationRunner
+    monkeypatch.setattr(
+        CalibrationRunner,
+        "_execute_pinned",
+        lambda self, cpus, workers, chunks: {"runtime_s": 0.01, "checksum": "0x123", "returncode": 0},
+    )
+    monkeypatch.setattr(
+        CalibrationRunner,
+        "_get_helper",
+        lambda self: None,
+    )
+
+    start_res = client.post("/api/calibration/start", json={"tier": "quick", "quiet_background": False})
+    assert start_res.status_code == 200
+    start_data = start_res.json()
+    assert start_data["ok"] is True
+    assert "session_id" in start_data
+    assert "estimated_duration_s" in start_data
+
+    # Check status reports running
+    status_res = client.get("/api/calibration/status")
+    assert status_res.status_code == 200
+    assert status_res.json()["is_running"] is True
+
+    # Stop calibration
+    stop_res = client.post("/api/calibration/stop")
+    assert stop_res.status_code == 200
+    stop_data = stop_res.json()
+    assert stop_data["ok"] is True
+
+    # Verify status is now idle
+    status_res2 = client.get("/api/calibration/status")
+    assert status_res2.status_code == 200
+    assert status_res2.json()["is_running"] is False
