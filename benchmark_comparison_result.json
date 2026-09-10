@@ -1,0 +1,123 @@
+{
+  "workload": "Developer Multi-Stage Active Workflow",
+  "timestamp": "2026-09-10T11:51:26Z",
+  "target_savings_pct": 20.0,
+  "matched_config_id": "cfg_zen5_8t_4000",
+  "empirical_predicted_savings_pct": 23.42,
+  "empirical_predicted_runtime_penalty_pct": 21.05,
+  "stock": {
+    "total_wall_s": 28.37,
+    "total_energy_j": 1046.6,
+    "avg_power_w": 36.9,
+    "stages": [
+      {
+        "name": "Parallel Compilation (zstd -j8)",
+        "duration_s": 10.629,
+        "energy_j": 652.0,
+        "power_w": 61.34
+      },
+      {
+        "name": "Developer Think Time (Idle 4s)",
+        "duration_s": 4.0,
+        "energy_j": 47.62,
+        "power_w": 11.9
+      },
+      {
+        "name": "Arithmetic Compute Kernel (16 workers)",
+        "duration_s": 5.006,
+        "energy_j": 176.7,
+        "power_w": 35.3
+      },
+      {
+        "name": "Review Pause (Idle 3s)",
+        "duration_s": 3.0,
+        "energy_j": 28.63,
+        "power_w": 9.54
+      },
+      {
+        "name": "Compression Benchmark (zstd -b3 -i2)",
+        "duration_s": 5.077,
+        "energy_j": 126.6,
+        "power_w": 24.94
+      }
+    ]
+  },
+  "autopilot": {
+    "total_wall_s": 43.43,
+    "total_energy_j": 733.4,
+    "avg_power_w": 16.89,
+    "stages": [
+      {
+        "name": "Parallel Compilation (zstd -j8)",
+        "duration_s": 20.988,
+        "energy_j": 454.63,
+        "power_w": 21.66
+      },
+      {
+        "name": "Developer Think Time (Idle 4s)",
+        "duration_s": 4.0,
+        "energy_j": 38.35,
+        "power_w": 9.59
+      },
+      {
+        "name": "Arithmetic Compute Kernel (16 workers)",
+        "duration_s": 8.508,
+        "energy_j": 122.29,
+        "power_w": 14.37
+      },
+      {
+        "name": "Review Pause (Idle 3s)",
+        "duration_s": 3.0,
+        "energy_j": 27.33,
+        "power_w": 9.11
+      },
+      {
+        "name": "Compression Benchmark (zstd -b3 -i2)",
+        "duration_s": 6.311,
+        "energy_j": 77.61,
+        "power_w": 12.3
+      }
+    ],
+    "service_status": {
+      "enabled": true,
+      "state": "active",
+      "control_state": "optimized_active",
+      "objective": "efficiency",
+      "target_savings_pct": 20.0,
+      "curve_experiment_id": "exp_20260909T190056_clean_build",
+      "curve_config_id": "cfg_zen5_8t_4000",
+      "empirical_savings_pct": 23.42,
+      "empirical_runtime_penalty_pct": 21.05,
+      "matched_power_w": 35.07,
+      "current_power_w": 7.25,
+      "baseline_w": 9.6,
+      "threshold_w": 13.1,
+      "total_saved_j": 144.5,
+      "active_sessions_count": 3,
+      "latest_savings": {
+        "session_id": 3,
+        "timestamp": "2026-09-10T11:51:23Z",
+        "runtime_s": 0.0,
+        "actual_energy_j": 0.0,
+        "estimated_stock_j": 0.0,
+        "saved_energy_j": 0.0,
+        "saved_pct": 23.4,
+        "target_pid": null,
+        "target_process_name": "System",
+        "objective": "efficiency"
+      }
+    }
+  },
+  "comparison": {
+    "energy_saved_j": 313.3,
+    "savings_pct": 29.9,
+    "runtime_delta_s": 15.06,
+    "runtime_stretch_pct": 53.1,
+    "power_reduction_pct": 54.2,
+    "stock_edp": 29.69,
+    "auto_edp": 31.85,
+    "battery_hours_stock": 1.63,
+    "battery_hours_autopilot": 3.55,
+    "extra_battery_mins": 115.6
+  }
+}
