@@ -78,6 +78,12 @@ function waitForServer(cb, tries = 0) {
   }
 }
 
+// Disable hardware acceleration to eliminate Linux Chromium GPU compositor crashes
+// during 100% CPU multi-threaded compute workloads. Software rasterization for 2D UI
+// uses negligible CPU and never drops window surfaces.
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('disable-http-cache');
 
 async function createWindow() {
@@ -90,6 +96,27 @@ async function createWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   Menu.setApplicationMenu(null);
+
+  // Crash recovery: automatically reload the dashboard if the renderer dies under extreme load
+  win.webContents.on('render-process-gone', (event, details) => {
+    console.error('[desktop] Render process gone:', details);
+    if (details.reason !== 'clean-exit' && win && !win.isDestroyed()) {
+      console.log('[desktop] Automatically reloading dashboard after renderer crash...');
+      setTimeout(() => {
+        if (win && !win.isDestroyed()) {
+          win.loadURL(`http://127.0.0.1:${PORT}/?_v=${Date.now()}`);
+        }
+      }, 500);
+    }
+  });
+
+  win.webContents.on('unresponsive', () => {
+    console.warn('[desktop] Renderer temporarily unresponsive during heavy compute benchmark');
+  });
+
+  win.webContents.on('responsive', () => {
+    console.log('[desktop] Renderer responsive again');
+  });
 
   // Clear HTTP and memory cache to ensure updated frontend assets load immediately
   try {
@@ -117,6 +144,10 @@ async function createWindow() {
 
   win.loadURL(`http://127.0.0.1:${PORT}/?_v=${Date.now()}`);
 }
+
+app.on('child-process-gone', (event, details) => {
+  console.warn('[desktop] Child process gone:', details.type, details.reason);
+});
 
 app.whenReady().then(() => {
   startServer();

@@ -77,6 +77,17 @@ class LiveEngine:
         ev = cls._cancel_events.get(exp_id)
         return ev.is_set() if ev else False
 
+    @classmethod
+    def is_experiment_running(cls, exp_id: str) -> bool:
+        """Return whether a background thread is actively executing for this experiment."""
+        t = cls._threads.get(exp_id)
+        if t and t.is_alive():
+            return True
+        val_t = cls._threads.get(f"val-{exp_id}")
+        if val_t and val_t.is_alive():
+            return True
+        return False
+
     def __init__(self, bus, store_bridge_mod, overlays: Optional[dict[str, dict[str, Any]]] = None, store: Optional[Any] = None):
         self.bus = bus
         self.sb = store_bridge_mod
@@ -691,12 +702,19 @@ class LiveEngine:
             key=lambda item: (item[1].get("hw_max_freq") or 0) if isinstance(item[1], dict) else 0,
             reverse=True,
         )
+        def _extract_cpus(val: Any) -> list[int]:
+            if isinstance(val, dict):
+                return val.get("cpus") or []
+            if isinstance(val, (list, tuple)):
+                return list(val)
+            return []
+
         if len(sorted_classes) >= 2:
-            fast = sorted_classes[0][1].get("cpus") or [0, 2, 4, 6]
-            eff = sorted_classes[1][1].get("cpus") or [1, 3, 5, 7]
+            fast = _extract_cpus(sorted_classes[0][1]) or [0, 2, 4, 6]
+            eff = _extract_cpus(sorted_classes[1][1]) or [1, 3, 5, 7]
         elif "fast" in cls_map and "efficient" in cls_map:
-            fast = cls_map["fast"].get("cpus") or [0, 2, 4, 6]
-            eff = cls_map["efficient"].get("cpus") or [1, 3, 5, 7]
+            fast = _extract_cpus(cls_map["fast"]) or [0, 2, 4, 6]
+            eff = _extract_cpus(cls_map["efficient"]) or [1, 3, 5, 7]
         else:
             try:
                 from core.topology import read_topology, read_core_class_map

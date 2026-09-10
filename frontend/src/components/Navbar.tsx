@@ -70,9 +70,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const c = getThemeColors(theme);
   const restored = restorationStatus === 'restored' || restorationStatus === 'not_required';
-  const isRunning = !!experimentState && RUNNING_STATES[experimentState] !== undefined;
-  const stateLabel = experimentState
-    ? RUNNING_STATES[experimentState] ?? experimentState.replace('_', ' ').toLowerCase()
+  const stateUpper = (experimentState || '').toUpperCase();
+  const isRunning = !!stateUpper && RUNNING_STATES[stateUpper] !== undefined;
+  const stateLabel = stateUpper && RUNNING_STATES[stateUpper]
+    ? RUNNING_STATES[stateUpper]
+    : experimentState
+    ? experimentState.replace('_', ' ').toLowerCase()
     : null;
 
   const [thermal, setThermal] = React.useState<SystemThermalStatus | null>(null);

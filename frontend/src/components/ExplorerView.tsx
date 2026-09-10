@@ -19,14 +19,16 @@ interface ValidationPointCandidate {
   measured: boolean;
 }
 
-function formatDuration(sec: number): string {
+function formatDuration(sec: number | null | undefined): string {
+  if (sec == null || !Number.isFinite(sec)) return '—';
   if (sec < 60) return `${sec.toFixed(1)}s`;
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}m ${s.toString().padStart(2, '0')}s`;
 }
 
-function formatEnergy(j: number): string {
+function formatEnergy(j: number | null | undefined): string {
+  if (j == null || !Number.isFinite(j)) return '—';
   if (j >= 1e6) return `${(j / 1e6).toFixed(2)} MJ`;
   if (j >= 1000) return `${(j / 1000).toFixed(1)} kJ`;
   return `${Math.round(j)} J`;

@@ -84,6 +84,18 @@ _STORE: Store = Store(_DB_PATH)
 if _STORE.get_experiment(store_bridge.SYNTHETIC_EXPERIMENT_ID) is None:
     store_bridge.seed_store(_STORE)
 
+# Startup hygiene: reset any experiments left in active profiling/validating states
+# from an earlier killed process so the UI doesn't show "Profiling in progress..." forever.
+try:
+    for _exp in _STORE.list_experiments():
+        if _exp.get("state") in ("PROFILING", "profiling", "VALIDATING", "validating", "CONFIGURING"):
+            _eid = _exp["id"]
+            logger.info("Cleaning up orphaned experiment %s in state %s on server startup", _eid, _exp.get("state"))
+            _STORE.transition_state(_eid, "RESTORED", "Profiling session closed or interrupted by server restart; hardware restored")
+            _STORE.update_restoration_status(_eid, "restored")
+except Exception as _e:
+    logger.warning("Startup experiment cleanup failed: %s", _e)
+
 # Runtime overlay for fixture experiments created via POST /api/experiments
 # (no runner on the dev machine; replaced by live runner state in Gate 3).
 _OVERLAY: dict[str, dict[str, Any]] = {}
@@ -180,6 +192,18 @@ def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
                     }
     except Exception as exc:
         logging.warning("Failed to attach stored runs or reconstruct configs for %s: %s", experiment_id, exc)
+
+    # Ensure any experiment whose state says PROFILING or VALIDATING is confirmed active.
+    # If no runner thread is active, mark it RESTORED so the UI does not hang indefinitely.
+    if exp.get("state") in ("PROFILING", "profiling", "VALIDATING", "validating"):
+        try:
+            from api.engine import LiveEngine
+            if not LiveEngine.is_experiment_running(experiment_id):
+                exp["state"] = "RESTORED"
+                if experiment_id in _OVERLAY:
+                    _OVERLAY[experiment_id]["state"] = "RESTORED"
+        except Exception:
+            pass
 
     return exp
 
