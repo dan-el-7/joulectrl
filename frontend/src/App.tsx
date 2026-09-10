@@ -291,16 +291,22 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleReselect = async (budgetS: number) => {
+  const handleReselect = async (budgetS: number, taskDurationS?: number | null) => {
     if (!experiment) return;
     try {
       const updatedSel = await reselectConfiguration(experiment.id, {
         objective: experiment.objective,
         runtime_budget_s: budgetS,
+        task_duration_s: taskDurationS,
         preference: experiment.preference,
         headroom_pct: 5.0,
       });
-      setExperiment((prev) => (prev ? { ...prev, selection: updatedSel, runtime_budget_s: budgetS } : null));
+      setExperiment((prev) => (prev ? {
+        ...prev,
+        selection: updatedSel,
+        runtime_budget_s: budgetS,
+        task_duration_s: taskDurationS !== undefined ? taskDurationS : prev.task_duration_s,
+      } : null));
     } catch (e) {
       console.error('Failed to reselect:', e);
     }

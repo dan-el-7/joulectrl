@@ -57,14 +57,13 @@ const NumField: React.FC<{
   );
 };
 
-/** Clear warning when a runtime budget is very tight or broad vs the task. */
+/** Clear warning when a runtime budget is very tight vs the task. */
 const budgetWarning = (budgetS: number | null, estTaskS?: number | null): string | null => {
   if (budgetS === null) return null;
   if (budgetS < 1) return 'Sub-second budget: likely infeasible for this workload.';
   if (budgetS < 5) return 'Very tight budget: requires high-power configurations with minimal energy savings.';
   if (estTaskS && budgetS < estTaskS * 0.5)
     return `Budget is <50% of baseline (~${estTaskS.toFixed(1)}s) — likely infeasible.`;
-  if (budgetS > 3600) return 'Budget over 1 hour: energy savings plateau with unconstrained runtime.';
   return null;
 };
 
@@ -1278,9 +1277,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 <input
                   type="range"
                   min="1"
-                  max="300"
-                  step="0.5"
-                  value={Math.min(Math.max(runtimeBudgetS ?? 45, 1), 300)}
+                  max={Math.max(300, Math.round((runtimeBudgetS ?? 45) * 1.5))}
+                  step={runtimeBudgetS && runtimeBudgetS > 100 ? (runtimeBudgetS > 1000 ? 10 : 5) : 0.5}
+                  value={runtimeBudgetS ?? 45}
                   disabled={runtimeBudgetS === null}
                   onChange={(e) => onChangeRuntimeBudget(parseFloat(e.target.value))}
                   style={{ flex: 1, accentColor: colors.emerald }}

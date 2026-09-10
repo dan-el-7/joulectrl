@@ -129,7 +129,15 @@ export interface Selection {
     guarded_runtime_s: number;
     median_energy_j: number;
     energy_savings_pct: number;
+    task_duration_s?: number | null;
+    projected_runtime_s?: number | null;
+    projected_guarded_runtime_s?: number | null;
+    projected_energy_j?: number | null;
   };
+  task_duration_s?: number | null;
+  projected_runtime_s?: number | null;
+  projected_guarded_runtime_s?: number | null;
+  projected_energy_j?: number | null;
   preference_outcomes?: {
     energy_target_met: boolean;
     perf_floor_met: boolean;
@@ -166,6 +174,7 @@ export interface Experiment {
   workload_id: string;
   objective: string;
   runtime_budget_s?: number | null;
+  task_duration_s?: number | null;
   preference?: {
     energy_target_pct: number;
     perf_floor_pct: number;

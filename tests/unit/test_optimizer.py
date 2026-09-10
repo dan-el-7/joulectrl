@@ -202,3 +202,57 @@ def test_select_configuration_with_profile_object():
     sel = select_configuration(profile, objective_mode="deadline", deadline_s=12.0)
     assert sel.selected_config_id == "cfg_opt"
     assert sel.energy_reduction_pct == pytest.approx(30.0)
+
+
+def test_select_deadline_with_task_extrapolation_rejects_slow_config():
+    """Test that a 900s task with 1200s deadline rejects a 1.4x slow config that raw benchmark wouldn't reject."""
+    # Baseline: 10s benchmark, 500J
+    c_base = make_summary("cfg_base", [10.0, 10.0, 10.0], [500.0, 500.0, 500.0], is_baseline=True)
+    # c_fast: 11s benchmark (1.10x slowdown, guarded 11.55s), 400J
+    c_fast = make_summary("cfg_fast", [11.0, 11.0, 11.0], [400.0, 400.0, 400.0])
+    # c_slow: 14s benchmark (1.40x slowdown, guarded 14.70s), 300J (lowest raw power)
+    c_slow = make_summary("cfg_slow", [14.0, 14.0, 14.0], [300.0, 300.0, 300.0])
+
+    # 1. Raw deadline without task extrapolation:
+    # Because 14.7s <= 1200s, c_slow erroneously wins on raw seconds
+    sel_raw = select_deadline([c_base, c_fast, c_slow], deadline_s=1200.0, baseline_config_id="cfg_base")
+    assert sel_raw.selected_config_id == "cfg_slow"
+
+    # 2. Grounded task extrapolation for 900s task with 1200s deadline:
+    # c_fast guarded on real task: 900 * (11.55 / 10.0) = 1039.5s <= 1200s -> FEASIBLE
+    # c_slow guarded on real task: 900 * (14.70 / 10.0) = 1323.0s > 1200s -> INFEASIBLE!
+    sel_ext = select_deadline(
+        [c_base, c_fast, c_slow],
+        deadline_s=1200.0,
+        baseline_config_id="cfg_base",
+        task_duration_s=900.0,
+    )
+    assert sel_ext.status == "selected"
+    assert sel_ext.selected_config_id == "cfg_fast"
+    assert sel_ext.task_duration_s == 900.0
+    assert sel_ext.projected_runtime_s == pytest.approx(990.0)  # 900 * 1.10
+    assert sel_ext.projected_guarded_runtime_s == pytest.approx(1039.5)  # 900 * 1.155
+    assert sel_ext.projected_energy_j == pytest.approx(36000.0)  # 400 * (900 / 10)
+    assert sel_ext.energy_reduction_pct == pytest.approx(20.0)
+
+    # Check candidate summary decoration
+    sums = {s["config_id"]: s for s in sel_ext.candidate_summaries}
+    assert sums["cfg_slow"]["is_feasible"] is False
+    assert sums["cfg_slow"]["projected_guarded_runtime_s"] == pytest.approx(1323.0)
+    assert sums["cfg_fast"]["is_feasible"] is True
+
+
+def test_select_deadline_with_task_extrapolation_no_feasible_point():
+    """Test that when deadline is tighter than fastest config on the real task, status is no_feasible_point."""
+    c_base = make_summary("cfg_base", [10.0], [500.0], is_baseline=True)
+    c_slow = make_summary("cfg_slow", [12.0], [400.0])
+
+    # 900s task: baseline guarded is 900 * 1.05 = 945s. Deadline is 920s -> none meet it.
+    sel = select_deadline(
+        [c_base, c_slow],
+        deadline_s=920.0,
+        baseline_config_id="cfg_base",
+        task_duration_s=900.0,
+    )
+    assert sel.status == "no_feasible_point"
+    assert "No configuration can complete the 900.0s task within the deadline (920.0s)" in sel.status_message

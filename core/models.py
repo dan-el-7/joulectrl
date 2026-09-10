@@ -421,6 +421,10 @@ class Selection:
     # Deadline mode fields
     deadline_s: Optional[float] = None
     margin: float = 0.05
+    task_duration_s: Optional[float] = None
+    projected_runtime_s: Optional[float] = None
+    projected_guarded_runtime_s: Optional[float] = None
+    projected_energy_j: Optional[float] = None
     
     # Preference mode fields (§6c)
     energy_target_pct: Optional[float] = None  # e.g. 70.0 (<= 70% baseline energy)

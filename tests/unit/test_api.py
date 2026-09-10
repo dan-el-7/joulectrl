@@ -786,6 +786,19 @@ def test_select_configuration_with_candidate_summaries(client):
     assert data2["config_id"] == "cfg_eco"
     assert data2["runtime_budget_s"] == 20.0
 
+    # With task_duration_s=900.0 and budget 1200.0:
+    # cfg_eco (10s on 5s base = 2x) takes 1800s > 1200s, so cfg_fast must be selected!
+    res3 = client.post(f"/api/experiments/{exp_id}/select", json={
+        "runtime_budget_s": 1200.0,
+        "task_duration_s": 900.0,
+    })
+    assert res3.status_code == 200
+    data3 = res3.json()
+    assert data3["config_id"] == "cfg_fast"
+    assert data3["task_duration_s"] == 900.0
+    assert data3["projected_runtime_s"] == 900.0
+    assert data3["metrics"]["projected_runtime_s"] == 900.0
+
 
 def test_llm_models_offline_fallback(client):
     """GET /api/llm/models should handle unreachable endpoint gracefully."""

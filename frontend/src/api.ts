@@ -30,6 +30,7 @@ export async function createExperiment(payload: {
   workload_id: string;
   objective: string;
   runtime_budget_s?: number | null;
+  task_duration_s?: number | null;
   preference?: { energy_target_pct: number; perf_floor_pct: number };
   calibration_budget_s?: number | null;
   experimental_passive_caps?: boolean;
@@ -50,6 +51,7 @@ export async function reselectConfiguration(
   payload: {
     objective: string;
     runtime_budget_s?: number | null;
+    task_duration_s?: number | null;
     preference?: { energy_target_pct: number; perf_floor_pct: number };
     headroom_pct?: number;
   }

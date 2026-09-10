@@ -204,6 +204,7 @@ class CreateExperimentRequest(BaseModel):
     workload_params: dict[str, Any] = Field(default_factory=dict)
     objective: str = "deadline"  # "deadline" | "preference" | "frontier" | "explore"
     runtime_budget_s: Optional[float] = 45.0
+    task_duration_s: Optional[float] = None  # Reference stock duration for extrapolation
     preference: Optional[PreferenceSpec] = None
     calibration_budget_s: Optional[float] = 120.0
     # EXPERIMENTAL (dev option, off by default): profile with amd_pstate in
@@ -219,6 +220,7 @@ class CreateExperimentRequest(BaseModel):
 class SelectRequest(BaseModel):
     objective: str = "deadline"  # "deadline" | "preference" | "frontier" | "explore"
     runtime_budget_s: Optional[float] = None
+    task_duration_s: Optional[float] = None  # Full task/workload reference duration for extrapolation
     preference: Optional[PreferenceSpec] = None
     headroom_pct: float = 5.0
 
@@ -397,6 +399,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
             "objective": req.objective,
             "state": "profiling",
             "runtime_budget_s": req.runtime_budget_s,
+            "task_duration_s": req.task_duration_s,
             "preference": req.preference.model_dump() if req.preference else None,
             "created_at": utc_now_iso(),
             "profile": {
@@ -420,6 +423,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
         if engine.start_experiment(exp_id, {
             "workload_id": req.workload_id, "objective": req.objective,
             "runtime_budget_s": req.runtime_budget_s,
+            "task_duration_s": req.task_duration_s,
             "calibration_budget_s": req.calibration_budget_s,
             "preference": req.preference.model_dump() if req.preference else None,
             "experimental_passive_caps": req.experimental_passive_caps,
@@ -445,11 +449,14 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
         exp["workload_id"] = req.workload_id
         exp["objective"] = req.objective
         exp["runtime_budget_s"] = req.runtime_budget_s
+        exp["task_duration_s"] = req.task_duration_s
         if req.preference:
             exp["preference"] = req.preference.model_dump()
         row = store_bridge.persist_experiment_dict(_STORE, exp)
         _OVERLAY[exp_id] = store_bridge.experiment_to_api(row)
         _OVERLAY[exp_id]["_selection_model"] = row.get("selection")
+        if req.task_duration_s is not None:
+            _OVERLAY[exp_id]["task_duration_s"] = req.task_duration_s
 
     return {
         "id": exp_id,
@@ -458,6 +465,7 @@ def create_experiment(req: CreateExperimentRequest) -> dict[str, Any]:
         "workload_id": req.workload_id,
         "objective": req.objective,
         "runtime_budget_s": req.runtime_budget_s,
+        "task_duration_s": req.task_duration_s,
     }
 
 
@@ -587,10 +595,20 @@ def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
         )
     else:
         budget = req.runtime_budget_s if req.runtime_budget_s is not None else 45.0
-        sel = select_deadline(configs, budget, baseline_id, margin=margin, experiment_id=id)
+        task_dur = req.task_duration_s if req.task_duration_s is not None else exp.get("task_duration_s")
+        sel = select_deadline(
+            configs,
+            budget,
+            baseline_id,
+            margin=margin,
+            experiment_id=id,
+            task_duration_s=task_dur,
+        )
 
     # Persist the re-selection so every reader (UI, export, explain) sees the same evidence
     api_sel = store_bridge.selection_to_api(sel.to_dict())
+    if req.task_duration_s is not None and id in _OVERLAY:
+        _OVERLAY[id]["task_duration_s"] = req.task_duration_s
     if _STORE.get_experiment(id) is not None:
         _STORE.save_selection(sel)
         if id in _OVERLAY:

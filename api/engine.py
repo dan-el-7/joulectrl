@@ -474,6 +474,7 @@ class LiveEngine:
         # in capability report). Restored with everything else.
         passive = bool(request.get("experimental_passive_caps"))
         budget = request.get("runtime_budget_s") or 45.0
+        task_duration_s = request.get("task_duration_s")
         cal_budget = request.get("calibration_budget_s")
         # Time budget for profiling: use calibration_budget_s if positive;
         # if explicitly None (user checked "Exhaustive"), allow 1800s ceiling;
@@ -513,7 +514,7 @@ class LiveEngine:
                     measured_keys.add(key)
                 cal_rows = self._profile_rows(cal, [], cls_map, workload_id)
                 if cal_rows:
-                    cal_sel = self._select(cal_rows, objective, budget, preference, exp_id)
+                    cal_sel = self._select(cal_rows, objective, budget, preference, exp_id, task_duration_s=task_duration_s)
                     # If no sweep budget was allotted, fast-path complete immediately!
                     if time_limit_s <= 0:
                         self._persist(exp_id, seeded, [], cal_rows, cal_sel, True, state="selected")
@@ -610,7 +611,7 @@ class LiveEngine:
                     current_rows = self._profile_rows(cal if repetitions == 1 else None, runs, cls_map, workload_id)
                     if current_rows:
                         try:
-                            current_sel = self._select(current_rows, objective, budget, preference, exp_id)
+                            current_sel = self._select(current_rows, objective, budget, preference, exp_id, task_duration_s=task_duration_s)
                             self._persist(exp_id, seeded, runs, current_rows, current_sel, cal is not None and repetitions == 1, state="profiling")
                         except Exception as e:
                             logger.warning(f"intermediate persist failed: {e}")
@@ -649,7 +650,7 @@ class LiveEngine:
                 self._emit(exp_id, "experiment_state", {"state": "failed", "message": "no usable profile rows"})
                 return
 
-            selection = self._select(profile_rows, objective, budget, preference, exp_id)
+            selection = self._select(profile_rows, objective, budget, preference, exp_id, task_duration_s=task_duration_s)
             self._persist(exp_id, seeded, runs, profile_rows, selection, cal is not None and not runs, state="selected")
             self._emit(exp_id, "experiment_state", {"state": "selected", "message": "Selection complete (live)"})
 
@@ -947,7 +948,7 @@ class LiveEngine:
             })
         return out
 
-    def _select(self, rows, objective, budget, preference, exp_id):
+    def _select(self, rows, objective, budget, preference, exp_id, task_duration_s=None):
         from core.models import Selection, ConfigSummary
 
         summaries = []
@@ -985,7 +986,8 @@ class LiveEngine:
                 experiment_id=exp_id,
             )
         return select_deadline(summaries, deadline_s=budget,
-                               baseline_config_id=baseline.config_id, experiment_id=exp_id)
+                               baseline_config_id=baseline.config_id, experiment_id=exp_id,
+                               task_duration_s=task_duration_s)
 
     def _persist(self, exp_id, seeded, runs, rows, selection, used_calibration, state: str = "selected"):
         """Update the overlay with live results so GET /experiments/{id} reflects them."""

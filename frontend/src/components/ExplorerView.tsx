@@ -19,9 +19,22 @@ interface ValidationPointCandidate {
   measured: boolean;
 }
 
+function formatDuration(sec: number): string {
+  if (sec < 60) return `${sec.toFixed(1)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
+function formatEnergy(j: number): string {
+  if (j >= 1e6) return `${(j / 1e6).toFixed(2)} MJ`;
+  if (j >= 1000) return `${(j / 1000).toFixed(1)} kJ`;
+  return `${Math.round(j)} J`;
+}
+
 interface ExplorerViewProps {
   experiment: Experiment;
-  onReselect: (budgetS: number) => void;
+  onReselect: (budgetS: number, taskDurationS?: number | null) => void;
   onNavigateValidation: () => void;
 }
 
@@ -33,7 +46,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   const { profile } = experiment;
   const selection = experiment.selection as Partial<Selection> | null | undefined;
   const initialBudget = selection?.runtime_budget_s ?? experiment?.runtime_budget_s ?? 45.0;
+  const initialTaskDuration = (selection as any)?.task_duration_s ?? experiment?.task_duration_s ?? null;
   const [tempBudget, setTempBudget] = useState<number>(initialBudget);
+  const [taskDuration, setTaskDuration] = useState<number | null>(initialTaskDuration);
+  const [isExtrapolating, setIsExtrapolating] = useState<boolean>(initialTaskDuration != null && initialTaskDuration > 0);
   const [candidates, setCandidates] = useState<ValidationPointCandidate[] | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
@@ -46,14 +62,44 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     }
   }, [experiment.id, selection?.runtime_budget_s, experiment?.runtime_budget_s]);
 
+  useEffect(() => {
+    const dur = (selection as any)?.task_duration_s ?? experiment?.task_duration_s;
+    if (dur != null && Number.isFinite(dur) && dur > 0) {
+      setTaskDuration(dur);
+      setIsExtrapolating(true);
+    }
+  }, [experiment.id, (selection as any)?.task_duration_s, experiment?.task_duration_s]);
+
   const handleSliderChange = (val: number) => {
     setTempBudget(val);
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      onReselect(val);
+      onReselect(val, isExtrapolating ? (taskDuration || 900) : null);
     }, 120);
+  };
+
+  const triggerReselect = (budgetVal: number, durationVal?: number | null) => {
+    setTempBudget(budgetVal);
+    onReselect(budgetVal, durationVal !== undefined ? durationVal : (isExtrapolating ? (taskDuration || 900) : null));
+  };
+
+  const handleTaskDurationChange = (val: number | null) => {
+    setTaskDuration(val);
+    if (val && val > 0) {
+      setIsExtrapolating(true);
+      let newBudget = tempBudget;
+      // If current budget was for benchmark (e.g. <= 60s) but task is long (e.g. 900s), adapt budget
+      if (tempBudget <= 60 && val > 60) {
+        newBudget = Math.round(val * 1.33);
+        setTempBudget(newBudget);
+      }
+      onReselect(newBudget, val);
+    } else {
+      setIsExtrapolating(false);
+      onReselect(tempBudget, null);
+    }
   };
 
   useEffect(() => {
@@ -187,15 +233,17 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>Dynamic Budget Slider</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: colors.emerald }}>{tempBudget}s</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: colors.emerald }}>
+              {isExtrapolating && taskDuration ? `${formatDuration(tempBudget)} (${tempBudget}s)` : `${tempBudget}s`}
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
               type="range"
-              min="1"
-              max="300"
-              step="0.5"
-              value={Math.min(Math.max(tempBudget, 1), 300)}
+              min={isExtrapolating && taskDuration ? Math.max(1, Math.round(taskDuration * 0.5)) : 1}
+              max={isExtrapolating && taskDuration ? Math.round(taskDuration * 2.5) : 300}
+              step={isExtrapolating && taskDuration && taskDuration > 100 ? (taskDuration > 1000 ? 10 : 5) : 0.5}
+              value={tempBudget}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
                 if (Number.isFinite(val)) handleSliderChange(val);
@@ -204,9 +252,9 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 if (debounceTimerRef.current) {
                   clearTimeout(debounceTimerRef.current);
                 }
-                onReselect(tempBudget);
+                onReselect(tempBudget, isExtrapolating ? (taskDuration || 900) : null);
               }}
-              style={{ width: '140px', accentColor: colors.emerald, cursor: 'pointer' }}
+              style={{ width: '160px', accentColor: colors.emerald, cursor: 'pointer' }}
             />
             <input
               type="text"
@@ -217,14 +265,14 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 if (Number.isFinite(v) && v > 0) {
                   setTempBudget(v);
                   if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-                  debounceTimerRef.current = setTimeout(() => onReselect(v), 300);
+                  debounceTimerRef.current = setTimeout(() => onReselect(v, isExtrapolating ? (taskDuration || 900) : null), 300);
                 }
               }}
               onBlur={(e) => {
                 const v = parseFloat(e.target.value);
                 if (Number.isFinite(v) && v > 0) {
                   setTempBudget(v);
-                  onReselect(v);
+                  onReselect(v, isExtrapolating ? (taskDuration || 900) : null);
                 }
               }}
               onKeyDown={(e) => {
@@ -232,13 +280,13 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   const v = parseFloat((e.target as HTMLInputElement).value);
                   if (Number.isFinite(v) && v > 0) {
                     setTempBudget(v);
-                    onReselect(v);
+                    onReselect(v, isExtrapolating ? (taskDuration || 900) : null);
                   }
                   (e.target as HTMLInputElement).blur();
                 }
               }}
               style={{
-                width: 64, padding: '2px 6px', borderRadius: 4,
+                width: 68, padding: '2px 6px', borderRadius: 4,
                 border: `1px solid ${colors.border}`, background: colors.surfaceElevated,
                 color: colors.textPrimary, fontSize: '0.8rem',
               }}
@@ -246,6 +294,159 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>s</span>
           </div>
         </div>
+      </div>
+
+      {/* Workload Scaling / Task Duration Extrapolation Toolbar */}
+      <div
+        style={{
+          background: colors.surface,
+          padding: '0.85rem 1.25rem',
+          borderRadius: '0.75rem',
+          border: `1px solid ${colors.border}`,
+          boxShadow: colors.cardShadow,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.65rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600, color: colors.textPrimary }}>
+              Workload Extrapolation & Scaling
+            </span>
+            <span style={{ fontSize: '0.74rem', color: colors.textTertiary }}>
+              Measured micro-benchmark: <strong>~{(baseCfg?.median_runtime_s ?? 5.5).toFixed(1)}s</strong>
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={() => handleTaskDurationChange(null)}
+              style={{
+                padding: '0.25rem 0.65rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid ' + (!isExtrapolating ? colors.emerald : colors.border),
+                background: !isExtrapolating ? 'rgba(16, 185, 129, 0.15)' : colors.surfaceElevated,
+                color: !isExtrapolating ? colors.emerald : colors.textTertiary,
+              }}
+            >
+              Native Benchmark (~{(baseCfg?.median_runtime_s ?? 5.5).toFixed(1)}s)
+            </button>
+            <button
+              onClick={() => handleTaskDurationChange(taskDuration || 900)}
+              style={{
+                padding: '0.25rem 0.65rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid ' + (isExtrapolating ? colors.accentHover : colors.border),
+                background: isExtrapolating ? 'rgba(56, 189, 248, 0.15)' : colors.surfaceElevated,
+                color: isExtrapolating ? colors.accentHover : colors.textTertiary,
+              }}
+            >
+              Scale to Real Task Duration
+            </button>
+          </div>
+        </div>
+
+        {isExtrapolating && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              paddingTop: '0.5rem',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            {/* Reference Stock Duration Input */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.76rem', color: colors.textSecondary }}>Reference Stock Duration:</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={taskDuration ?? 900}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v) && v > 0) {
+                    setTaskDuration(v);
+                    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                    debounceTimerRef.current = setTimeout(() => handleTaskDurationChange(v), 400);
+                  }
+                }}
+                style={{
+                  width: 70, padding: '2px 6px', borderRadius: 4,
+                  border: `1px solid ${colors.border}`, background: colors.surfaceElevated,
+                  color: colors.textPrimary, fontSize: '0.8rem', fontWeight: 600,
+                }}
+              />
+              <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>
+                s ({formatDuration(taskDuration ?? 900)})
+              </span>
+              <div style={{ display: 'flex', gap: '0.25rem', marginLeft: '0.4rem' }}>
+                {[
+                  { label: '5m', sec: 300 },
+                  { label: '15m (900s)', sec: 900 },
+                  { label: '30m', sec: 1800 },
+                  { label: '1h', sec: 3600 },
+                ].map((p) => (
+                  <button
+                    key={p.sec}
+                    onClick={() => handleTaskDurationChange(p.sec)}
+                    style={{
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: 4,
+                      border: '1px solid ' + (taskDuration === p.sec ? colors.accentHover : colors.border),
+                      background: taskDuration === p.sec ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                      color: taskDuration === p.sec ? colors.accentHover : colors.textTertiary,
+                      fontSize: '0.7rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Slack Presets */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>Quick Slack:</span>
+              {[
+                { label: '+0% (Strict)', mult: 1.0 },
+                { label: '+10%', mult: 1.10 },
+                { label: '+20%', mult: 1.20 },
+                { label: '+33% (1200s)', mult: 1.3333 },
+                { label: '+50%', mult: 1.50 },
+              ].map((slack) => {
+                const targetS = Math.round((taskDuration || 900) * slack.mult);
+                const isActive = Math.abs(tempBudget - targetS) <= 1;
+                return (
+                  <button
+                    key={slack.label}
+                    onClick={() => triggerReselect(targetS, taskDuration || 900)}
+                    style={{
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: 4,
+                      border: '1px solid ' + (isActive ? colors.emerald : colors.border),
+                      background: isActive ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                      color: isActive ? colors.emerald : colors.textTertiary,
+                      fontSize: '0.7rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {slack.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Comparison Cards */}
@@ -263,11 +464,19 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: colors.textTertiary }}>Runtime:</span>
-            <span style={{ fontWeight: 600 }}>{baseCfg?.median_runtime_s}s</span>
+            <span style={{ fontWeight: 600 }}>
+              {isExtrapolating && taskDuration
+                ? `${formatDuration(taskDuration)} (${taskDuration}s)`
+                : `${baseCfg?.median_runtime_s}s`}
+            </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
             <span style={{ color: colors.textTertiary }}>Package Energy:</span>
-            <span style={{ fontWeight: 600, color: colors.red }}>{baseCfg?.median_energy_j} J</span>
+            <span style={{ fontWeight: 600, color: colors.red }}>
+              {isExtrapolating && taskDuration && baseCfg?.median_runtime_s
+                ? formatEnergy((baseCfg.median_energy_j ?? 0) * (taskDuration / baseCfg.median_runtime_s))
+                : `${baseCfg?.median_energy_j} J`}
+            </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
             <span style={{ color: colors.textTertiary }}>Avg Power:</span>
@@ -276,78 +485,123 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         </div>
 
         {/* Card 2: Lowest Energy Overall */}
-        <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ fontSize: '0.75rem', color: colors.amber, fontWeight: 600, textTransform: 'uppercase' }}>
-            Lowest Energy Overall
-          </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.2rem' }}>
-            {lowestEnergyCfg ? lowestEnergyCfg.config_id : '—'}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-            {describeConfig(lowestEnergyCfg)}
-          </div>
-          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: colors.textTertiary }}>Runtime:</span>
-            <span style={{ fontWeight: 600 }}>{lowestEnergyCfg?.median_runtime_s}s</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: colors.textTertiary }}>Package Energy:</span>
-            <span style={{ fontWeight: 600, color: colors.amber }}>{lowestEnergyCfg?.median_energy_j} J</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: colors.textTertiary }}>Energy Delta:</span>
-            <span style={{ fontWeight: 600, color: colors.emerald }}>
-              -{Math.round(100 * (1 - (lowestEnergyCfg?.median_energy_j ?? 1) / (baseCfg?.median_energy_j ?? 1)))}%
-            </span>
-          </div>
-        </div>
+        {(() => {
+          const baseRt = baseCfg?.median_runtime_s || 1;
+          const lowestRt = lowestEnergyCfg?.median_runtime_s || 1;
+          const lowestGuarded = lowestEnergyCfg?.guarded_runtime_s || lowestRt * 1.05;
+          const extLowestRt = isExtrapolating && taskDuration ? taskDuration * (lowestRt / baseRt) : lowestRt;
+          const extLowestGuarded = isExtrapolating && taskDuration ? taskDuration * (lowestGuarded / baseRt) : lowestGuarded;
+          const extLowestEnergy = isExtrapolating && taskDuration
+            ? (lowestEnergyCfg?.median_energy_j ?? 0) * (taskDuration / baseRt)
+            : (lowestEnergyCfg?.median_energy_j ?? 0);
+          const isLowestFeasible = extLowestGuarded <= tempBudget;
+
+          return (
+            <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: `1px solid ${!isLowestFeasible ? 'rgba(239, 68, 68, 0.35)' : 'rgba(255,255,255,0.08)'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: colors.amber, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Lowest Energy Overall
+                </span>
+                {!isLowestFeasible && (
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, color: colors.red }}>
+                    ⚠ Infeasible for {tempBudget}s budget
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.textPrimary, marginTop: '0.2rem' }}>
+                {lowestEnergyCfg ? lowestEnergyCfg.config_id : '—'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
+                {describeConfig(lowestEnergyCfg)}
+              </div>
+              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: colors.textTertiary }}>Runtime:</span>
+                <span style={{ fontWeight: 600, color: !isLowestFeasible ? colors.red : colors.textPrimary }}>
+                  {isExtrapolating && taskDuration
+                    ? `${formatDuration(extLowestRt)} (guarded: ${formatDuration(extLowestGuarded)})`
+                    : `${lowestEnergyCfg?.median_runtime_s}s`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                <span style={{ color: colors.textTertiary }}>Package Energy:</span>
+                <span style={{ fontWeight: 600, color: colors.amber }}>
+                  {isExtrapolating && taskDuration ? formatEnergy(extLowestEnergy) : `${lowestEnergyCfg?.median_energy_j} J`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                <span style={{ color: colors.textTertiary }}>Energy Delta:</span>
+                <span style={{ fontWeight: 600, color: colors.emerald }}>
+                  -{Math.round(100 * (1 - (lowestEnergyCfg?.median_energy_j ?? 1) / (baseCfg?.median_energy_j ?? 1)))}%
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Card 3: Selected Within Budget */}
-        <div style={{ background: 'rgba(16,185,129,0.12)', borderRadius: '0.75rem', padding: '1rem', border: '1.5px solid ' + colors.emerald }}>
-          <div style={{ fontSize: '0.75rem', color: colors.emerald, fontWeight: 600, textTransform: 'uppercase' }}>
-            Selected Within Budget ★
-          </div>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.emerald, marginTop: '0.2rem' }}>
-            {selCfg ? selCfg.config_id : selectedId ? selectedId : 'Profiling in progress…'}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-            {describeConfig(selCfg)}
-          </div>
-          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: colors.textTertiary }}>Guarded Runtime:</span>
-            <span style={{ fontWeight: 700, color: colors.emerald }}>
-              {guardedRuntime != null ? `${guardedRuntime.toFixed(2)}s (≤ ${tempBudget}s)` : 'Measuring…'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-            <span style={{ color: colors.textTertiary }}>Energy Savings:</span>
-            <span style={{ fontWeight: 700, color: colors.emerald, fontSize: '1rem' }}>
-              {selection?.savings_vs_baseline_pct != null
-                ? `-${selection.savings_vs_baseline_pct}%`
-                : selection?.energy_reduction_pct != null
-                ? `-${selection.energy_reduction_pct.toFixed(1)}%`
-                : '—'}
-            </span>
-          </div>
-          <button
-            onClick={onNavigateValidation}
-            disabled={!selCfg && !selectedId}
-            style={{
-              width: '100%',
-              marginTop: '0.6rem',
-              padding: '0.4rem',
-              borderRadius: '0.375rem',
-              border: 'none',
-              backgroundColor: (selCfg || selectedId) ? colors.emerald : colors.surfaceElevated,
-              color: (selCfg || selectedId) ? colors.textPrimary : colors.textTertiary,
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: (selCfg || selectedId) ? 'pointer' : 'default',
-            }}
-          >
-            Verify with Fresh Validation Runs →
-          </button>
-        </div>
+        {(() => {
+          const baseRt = baseCfg?.median_runtime_s || 1;
+          const selRt = selCfg?.median_runtime_s || 1;
+          const extSelRt = isExtrapolating && taskDuration ? taskDuration * (selRt / baseRt) : selRt;
+          const extSelGuarded = isExtrapolating && taskDuration && guardedRuntime != null
+            ? taskDuration * (guardedRuntime / baseRt)
+            : guardedRuntime;
+          const extSelEnergy = isExtrapolating && taskDuration
+            ? (selCfg?.median_energy_j ?? 0) * (taskDuration / baseRt)
+            : (selCfg?.median_energy_j ?? 0);
+
+          return (
+            <div style={{ background: 'rgba(16,185,129,0.12)', borderRadius: '0.75rem', padding: '1rem', border: '1.5px solid ' + colors.emerald }}>
+              <div style={{ fontSize: '0.75rem', color: colors.emerald, fontWeight: 600, textTransform: 'uppercase' }}>
+                Selected Within Budget ★
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.emerald, marginTop: '0.2rem' }}>
+                {selCfg ? selCfg.config_id : selectedId ? selectedId : 'Profiling in progress…'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
+                {describeConfig(selCfg)}
+              </div>
+              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: colors.textTertiary }}>Guarded Runtime:</span>
+                <span style={{ fontWeight: 700, color: colors.emerald }}>
+                  {isExtrapolating && taskDuration && extSelGuarded != null
+                    ? `${formatDuration(extSelGuarded)} (≤ ${formatDuration(tempBudget)})`
+                    : guardedRuntime != null
+                    ? `${guardedRuntime.toFixed(2)}s (≤ ${tempBudget}s)`
+                    : 'Measuring…'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                <span style={{ color: colors.textTertiary }}>Energy Savings:</span>
+                <span style={{ fontWeight: 700, color: colors.emerald, fontSize: '1rem' }}>
+                  {selection?.savings_vs_baseline_pct != null
+                    ? `-${selection.savings_vs_baseline_pct}%`
+                    : selection?.energy_reduction_pct != null
+                    ? `-${selection.energy_reduction_pct.toFixed(1)}%`
+                    : '—'}
+                </span>
+              </div>
+              <button
+                onClick={onNavigateValidation}
+                disabled={!selCfg && !selectedId}
+                style={{
+                  width: '100%',
+                  marginTop: '0.6rem',
+                  padding: '0.4rem',
+                  borderRadius: '0.375rem',
+                  border: 'none',
+                  backgroundColor: (selCfg || selectedId) ? colors.emerald : colors.surfaceElevated,
+                  color: (selCfg || selectedId) ? colors.textPrimary : colors.textTertiary,
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: (selCfg || selectedId) ? 'pointer' : 'default',
+                }}
+              >
+                Verify with Fresh Validation Runs →
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Main Pareto Scatter Chart */}
@@ -356,6 +610,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         selectedConfigId={selectedId}
         baselineConfigId={baselineId}
         deadlineS={tempBudget}
+        taskDurationS={isExtrapolating ? (taskDuration || 900) : null}
         frontierConfigIds={selection?.frontier_config_ids ?? []}
         onSelectConfig={(cid) => {
           // Point click selection

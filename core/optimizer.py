@@ -80,12 +80,19 @@ def select_deadline(
     baseline_config_id: Optional[str] = None,
     margin: float = 0.05,
     experiment_id: str = "",
+    task_duration_s: Optional[float] = None,
 ) -> Selection:
     """Deterministic selection under a runtime deadline.
     
     Rule:
     - Feasible: profile_is_usable and T_guard <= deadline_s and median_energy_j is not None
     - Winner: argmin (median_energy, T_guard, config_id)
+
+    When task_duration_s is provided (> 0) and baseline runtime is known:
+    - Extrapolates candidate guarded runtime: T_guard,proj = task_duration_s * (T_guard,c / T_base)
+    - Enforces deadline feasibility: T_guard,proj <= deadline_s
+    - Extrapolates projected task runtime: T_proj = task_duration_s * (T_c / T_base)
+    - Extrapolates projected package energy: E_proj = E_c * (task_duration_s / T_base)
     """
     baseline: Optional[ConfigSummary] = None
     if baseline_config_id:
@@ -93,36 +100,88 @@ def select_deadline(
             if c.config_id == baseline_config_id:
                 baseline = c
                 break
-
-    # Check candidate feasibility
-    feasible: list[ConfigSummary] = []
-    for c in configs:
-        if not c.profile_is_usable:
-            continue
-        if c.median_energy_j is None or not c.runtime_samples:
-            continue
-        # Ensure guarded runtime is up to date with requested margin
-        guarded = compute_guarded_runtime(c.runtime_samples, margin)
-        if guarded <= deadline_s:
-            feasible.append(c)
-
-    frontier = compute_pareto_frontier(configs)
-    frontier_ids = [c.config_id for c in frontier]
-    candidate_summaries = [c.to_dict() for c in configs]
+    if not baseline and configs:
+        baseline = next((c for c in configs if c.is_baseline), configs[0])
 
     # Baseline metrics
     base_energy = baseline.median_energy_j if baseline and baseline.median_energy_j is not None else None
     base_runtime = baseline.median_runtime_s if baseline and baseline.median_runtime_s > 0 else None
 
+    # Determine if workload duration extrapolation is active
+    extrapolate = (
+        task_duration_s is not None
+        and task_duration_s > 0
+        and base_runtime is not None
+        and base_runtime > 0
+    )
+
+    # Check candidate feasibility and decorate summaries
+    feasible: list[ConfigSummary] = []
+    candidate_summaries: list[dict[str, Any]] = []
+
+    for c in configs:
+        raw_dict = c.to_dict()
+        if not c.profile_is_usable or c.median_energy_j is None or not c.runtime_samples:
+            raw_dict["is_feasible"] = False
+            candidate_summaries.append(raw_dict)
+            continue
+
+        guarded = compute_guarded_runtime(c.runtime_samples, margin)
+
+        if extrapolate:
+            slowdown_median = c.median_runtime_s / base_runtime
+            slowdown_guarded = guarded / base_runtime
+
+            proj_runtime = task_duration_s * slowdown_median
+            proj_guarded = task_duration_s * slowdown_guarded
+            proj_energy = (
+                c.median_energy_j * (task_duration_s / base_runtime)
+                if c.median_energy_j is not None
+                else None
+            )
+
+            is_feasible = proj_guarded <= deadline_s
+            raw_dict["projected_runtime_s"] = proj_runtime
+            raw_dict["projected_guarded_runtime_s"] = proj_guarded
+            raw_dict["projected_energy_j"] = proj_energy
+            raw_dict["is_feasible"] = is_feasible
+
+            if is_feasible:
+                feasible.append(c)
+        else:
+            is_feasible = guarded <= deadline_s
+            raw_dict["is_feasible"] = is_feasible
+            if is_feasible:
+                feasible.append(c)
+
+        candidate_summaries.append(raw_dict)
+
+    frontier = compute_pareto_frontier(configs)
+    frontier_ids = [c.config_id for c in frontier]
+
     # Edge state: No feasible point meets deadline
     if not feasible:
+        if extrapolate:
+            fastest_guarded_proj = min(
+                (task_duration_s * (compute_guarded_runtime(c.runtime_samples, margin) / base_runtime))
+                for c in configs if c.profile_is_usable and c.runtime_samples
+            ) if any(c.profile_is_usable and c.runtime_samples for c in configs) else 0.0
+            msg = (
+                f"No configuration can complete the {task_duration_s:.1f}s task within the "
+                f"deadline ({deadline_s:.1f}s) with margin ({margin * 100:.1f}%). "
+                f"Fastest configuration requires {fastest_guarded_proj:.1f}s."
+            )
+        else:
+            msg = f"No measured configuration meets the deadline ({deadline_s:.2f}s) with margin ({margin * 100:.1f}%)."
+
         return Selection(
             experiment_id=experiment_id,
             objective_mode="deadline",
             status="no_feasible_point",
-            status_message=f"No measured configuration meets the deadline ({deadline_s:.2f}s) with margin ({margin * 100:.1f}%).",
+            status_message=msg,
             deadline_s=deadline_s,
             margin=margin,
+            task_duration_s=task_duration_s if extrapolate else None,
             baseline_config_id=baseline_config_id,
             baseline_median_energy_j=base_energy,
             baseline_median_runtime_s=base_runtime,
@@ -143,6 +202,14 @@ def select_deadline(
 
     winner_guarded = compute_guarded_runtime(winner.runtime_samples, margin)
     assert winner.median_energy_j is not None
+
+    winner_proj_runtime = None
+    winner_proj_guarded = None
+    winner_proj_energy = None
+    if extrapolate:
+        winner_proj_runtime = task_duration_s * (winner.median_runtime_s / base_runtime)
+        winner_proj_guarded = task_duration_s * (winner_guarded / base_runtime)
+        winner_proj_energy = winner.median_energy_j * (task_duration_s / base_runtime)
 
     # Comparisons vs baseline
     energy_reduction_pct: Optional[float] = None
@@ -181,6 +248,10 @@ def select_deadline(
         runtime_increase_pct=runtime_increase_pct,
         deadline_s=deadline_s,
         margin=margin,
+        task_duration_s=task_duration_s if extrapolate else None,
+        projected_runtime_s=winner_proj_runtime,
+        projected_guarded_runtime_s=winner_proj_guarded,
+        projected_energy_j=winner_proj_energy,
         frontier_config_ids=frontier_ids,
         candidate_summaries=candidate_summaries,
         created_at_iso=utc_now_iso(),
@@ -392,6 +463,7 @@ def select_configuration(
     energy_target_pct: Optional[float] = None,
     perf_floor_pct: Optional[float] = None,
     margin: float = 0.05,
+    task_duration_s: Optional[float] = None,
 ) -> Selection:
     """Main optimizer dispatch function for an experiment Profile."""
     # Check profile validity
@@ -456,4 +528,5 @@ def select_configuration(
             baseline_config_id=profile.baseline_config_id,
             margin=margin,
             experiment_id=profile.experiment_id,
+            task_duration_s=task_duration_s,
         )

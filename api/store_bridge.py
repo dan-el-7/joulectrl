@@ -152,6 +152,10 @@ def selection_to_api(sel: Optional[dict[str, Any]]) -> dict[str, Any]:
             "guarded_runtime_s": sel.get("selected_guarded_runtime_s"),
             "median_energy_j": sel.get("selected_median_energy_j"),
             "energy_savings_pct": round(e_red, 1) if e_red is not None else 0.0,
+            "task_duration_s": sel.get("task_duration_s"),
+            "projected_runtime_s": sel.get("projected_runtime_s"),
+            "projected_guarded_runtime_s": sel.get("projected_guarded_runtime_s"),
+            "projected_energy_j": sel.get("projected_energy_j"),
         },
         "preference_outcomes": {
             "energy_target_met": energy_met,
@@ -160,6 +164,10 @@ def selection_to_api(sel: Optional[dict[str, Any]]) -> dict[str, Any]:
             "closest_perf_config_id": selected_id if perf_met else closest_perf_id,
         },
         # Additive: full model fields for grounded explanations and honest edge states
+        "task_duration_s": sel.get("task_duration_s"),
+        "projected_runtime_s": sel.get("projected_runtime_s"),
+        "projected_guarded_runtime_s": sel.get("projected_guarded_runtime_s"),
+        "projected_energy_j": sel.get("projected_energy_j"),
         "selected_median_energy_j": sel.get("selected_median_energy_j"),
         "selected_median_runtime_s": sel.get("selected_median_runtime_s"),
         "selected_guarded_runtime_s": sel.get("selected_guarded_runtime_s"),
