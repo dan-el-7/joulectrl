@@ -127,6 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             const active = activeTab === item.id;
             return (
               <button
+                id={`nav-tab-${item.id}`}
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
                 style={{

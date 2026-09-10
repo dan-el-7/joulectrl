@@ -56,6 +56,9 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
   // Active Pinning & Launch state
   const [launchCmd, setLaunchCmd] = useState<string>('make -C scratch/zstd clean && make -C scratch/zstd -j8');
   const [launchInTerminal, setLaunchInTerminal] = useState<boolean>(true);
+  const [watchObjective, setWatchObjective] = useState<'efficiency' | 'deadline' | 'performance'>('efficiency');
+  const [watchRecurrence, setWatchRecurrence] = useState<'repeated' | 'once'>('repeated');
+  const [watchTimeBudgetS, setWatchTimeBudgetS] = useState<number>(20);
   const [processes, setProcesses] = useState<UserProcess[]>([]);
   const [selectedPid, setSelectedPid] = useState<string>('');
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -155,9 +158,18 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       const res = await launchAndArm({
         command: launchCmd.trim(),
         launch_in_terminal: launchInTerminal,
+        optimization_objective: watchObjective,
+        recurrence_mode: watchRecurrence,
+        time_budget_s: watchObjective === 'deadline' ? watchTimeBudgetS : undefined,
         baseline_w: status?.baseline_median_w ?? 10.0,
       });
-      setActionFeedback(`🚀 Launched PID ${res.pid} at Stock Boost. Watcher armed!`);
+      const modeDesc =
+        watchObjective === 'efficiency'
+          ? 'Max Efficiency (2.0 GHz)'
+          : watchObjective === 'deadline'
+          ? `Deadline ${watchTimeBudgetS}s`
+          : 'Sustained Boost + Core Shielding';
+      setActionFeedback(`🚀 Launched PID ${res.pid} at Stock Boost! Watcher armed: ${modeDesc} (${watchRecurrence === 'repeated' ? 'Continuous Watcher' : 'One-Shot'}).`);
       await refreshStatus();
     } catch (e: any) {
       setActionFeedback(`❌ Launch error: ${e.message}`);
@@ -177,9 +189,18 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         pid: pidNum,
         process_name: proc?.name,
         focus_mode: 'on',
+        optimization_objective: watchObjective,
+        recurrence_mode: watchRecurrence,
+        time_budget_s: watchObjective === 'deadline' ? watchTimeBudgetS : undefined,
         baseline_w: status?.baseline_median_w ?? 10.0,
       });
-      setActionFeedback(`🎯 Watcher armed for ${proc?.name ?? 'PID ' + pidNum} at Stock Boost!`);
+      const modeDesc =
+        watchObjective === 'efficiency'
+          ? 'Max Efficiency (2.0 GHz)'
+          : watchObjective === 'deadline'
+          ? `Deadline ${watchTimeBudgetS}s`
+          : 'Sustained Boost + Core Shielding';
+      setActionFeedback(`🎯 Watcher armed for ${proc?.name ?? 'PID ' + pidNum}: ${modeDesc} (${watchRecurrence === 'repeated' ? 'Continuous Watcher' : 'One-Shot'})!`);
       await refreshStatus();
     } catch (e: any) {
       setActionFeedback(`❌ Arm error: ${e.message}`);
@@ -288,9 +309,13 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
                 }}
               >
                 {isClamped
-                  ? 'ACTIVE CLAMP ENGAGED (2.0 GHz Sweet Spot)'
+                  ? (status?.optimization_objective === 'performance'
+                      ? 'ACTIVE SHIELD ENGAGED (Fast Cores Stock Boost)'
+                      : status?.optimization_objective === 'deadline'
+                      ? `ACTIVE CLAMP ENGAGED (Deadline Target ${status?.time_budget_s || 20}s)`
+                      : 'ACTIVE CLAMP ENGAGED (2.0 GHz Sweet Spot)')
                   : isArmed
-                  ? 'ARMED · STOCK BOOST (Waiting for Spike)'
+                  ? `ARMED · STOCK BOOST (${status?.recurrence_mode === 'once' ? 'One-Shot' : 'Continuous'} · ${status?.optimization_objective === 'performance' ? 'Max Perf' : status?.optimization_objective === 'deadline' ? `Deadline ${status?.time_budget_s || 20}s` : 'Max Efficiency'})`
                   : 'STANDBY / DISARMED'}
               </span>
             </div>
@@ -347,6 +372,124 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             {actionFeedback}
           </div>
         )}
+
+        {/* Watcher Strategy: Objective + Recurrence Pattern */}
+        <div
+          style={{
+            background: 'rgba(16,185,129,0.06)',
+            borderRadius: '0.5rem',
+            padding: '1rem',
+            border: '1px solid rgba(16,185,129,0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.85rem',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>⚙️</span> Watcher Optimization Strategy
+            </div>
+            <div style={{ fontSize: '0.74rem', color: colors.textTertiary }}>
+              Applied dynamically the moment sustained heavy compute is detected (&ge; 2s)
+            </div>
+          </div>
+
+          {/* Objective Selector */}
+          <div>
+            <div style={{ fontSize: '0.75rem', color: colors.textTertiary, fontWeight: 600, marginBottom: '0.4rem' }}>
+              Optimization Policy on Power Spike:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+              {[
+                { id: 'efficiency', title: '⚡ Max Efficiency (2.0 GHz)', desc: 'Clamps to 2.0 GHz base clock. ~59% power reduction, whisper quiet fans.' },
+                { id: 'deadline', title: '⏱️ Time Budget / Deadline', desc: `Target runtime cap: complete task within user deadline.` },
+                { id: 'performance', title: '🏎️ Sustained Max Perf', desc: '100% Stock Boost (5.09 GHz) maintained + isolated on Zen 5 fast cores.' },
+              ].map((pol) => {
+                const isSel = watchObjective === pol.id;
+                return (
+                  <button
+                    key={pol.id}
+                    type="button"
+                    onClick={() => setWatchObjective(pol.id as any)}
+                    style={{
+                      padding: '0.55rem 0.65rem',
+                      borderRadius: '0.375rem',
+                      border: `1px solid ${isSel ? colors.emerald : colors.border}`,
+                      background: isSel ? 'rgba(16,185,129,0.18)' : colors.surfaceElevated,
+                      color: isSel ? colors.textPrimary : colors.textSecondary,
+                      fontSize: '0.76rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: isSel ? colors.emerald : colors.textPrimary }}>{pol.title}</div>
+                    <div style={{ fontSize: '0.68rem', color: colors.textTertiary, marginTop: '0.2rem', lineHeight: 1.35 }}>{pol.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Time Budget inline input for deadline mode */}
+          {watchObjective === 'deadline' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: colors.surfaceElevated, padding: '0.55rem 0.75rem', borderRadius: '0.375rem', border: `1px solid ${colors.border}` }}>
+              <span style={{ fontSize: '0.78rem', color: colors.textSecondary }}>Maximum Acceptable Runtime:</span>
+              <input
+                type="number"
+                min={3}
+                max={300}
+                value={watchTimeBudgetS}
+                onChange={(e) => setWatchTimeBudgetS(Math.max(1, parseInt(e.target.value, 10) || 10))}
+                style={{
+                  width: '65px',
+                  padding: '3px 8px',
+                  borderRadius: '0.25rem',
+                  background: colors.inputBg,
+                  border: `1px solid ${colors.inputBorder}`,
+                  color: colors.textPrimary,
+                  fontSize: '0.82rem',
+                  textAlign: 'center',
+                }}
+              />
+              <span style={{ fontSize: '0.76rem', color: colors.textTertiary }}>seconds (applies lowest Pareto frequency meeting this deadline)</span>
+            </div>
+          )}
+
+          {/* Recurrence Mode Selector */}
+          <div>
+            <div style={{ fontSize: '0.75rem', color: colors.textTertiary, fontWeight: 600, marginBottom: '0.4rem' }}>
+              Workload Recurrence Pattern:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              {[
+                { id: 'repeated', title: '🔄 Repeating Workload (Continuous Watcher)', desc: 'Stays armed across repeated tasks (e.g. recompiles on save, incremental renders). Automatically optimizes each burst and logs running receipts.' },
+                { id: 'once', title: '🎯 Single Workload (One-Shot Task)', desc: 'Optimizes once on the next sustained power spike, restores stock boost when task returns to idle, and auto-disarms.' },
+              ].map((rec) => {
+                const isSel = watchRecurrence === rec.id;
+                return (
+                  <button
+                    key={rec.id}
+                    type="button"
+                    onClick={() => setWatchRecurrence(rec.id as any)}
+                    style={{
+                      padding: '0.55rem 0.65rem',
+                      borderRadius: '0.375rem',
+                      border: `1px solid ${isSel ? colors.accent : colors.border}`,
+                      background: isSel ? 'rgba(113,112,255,0.18)' : colors.surfaceElevated,
+                      color: isSel ? colors.textPrimary : colors.textSecondary,
+                      fontSize: '0.76rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: isSel ? colors.accentHover : colors.textPrimary }}>{rec.title}</div>
+                    <div style={{ fontSize: '0.68rem', color: colors.textTertiary, marginTop: '0.2rem', lineHeight: 1.35 }}>{rec.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* Launch & Pin Controls */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>

@@ -181,6 +181,81 @@ def test_watch_service_active_control_workflow():
     assert st["active_control"] is True
     assert st["control_state"] == "stock_idle"
     assert st["target_pid"] == 99999
+    assert st["optimization_objective"] == "efficiency"
+    assert st["recurrence_mode"] == "repeated"
+
+
+def test_watch_service_recurrence_once():
+    from unittest.mock import MagicMock
+    from api.live import WatchService
+
+    mock_helper = MagicMock()
+    service = WatchService(
+        onset_s=1.0,
+        idle_grace_s=2.0,
+        initial_baseline_w=10.0,
+        active_control=True,
+        recurrence_mode="once",
+    )
+    service._helper = mock_helper
+
+    # Spike
+    service.detector.observe(45.0, 1000000, 0.0)
+    service.detector.observe(45.0, 2000000, 1.5)
+    assert service.control_state == "optimized_active"
+
+    # Idle return -> should disarm and become "completed"
+    service.detector.observe(10.0, 3000000, 2.0)
+    service.detector.observe(10.0, 4000000, 3.0)
+    service.detector.observe(10.0, 5000000, 4.5)
+
+    assert service.control_state == "completed"
+    assert service.active_control is False
+
+
+def test_watch_service_performance_objective():
+    from unittest.mock import MagicMock
+    from api.live import WatchService
+
+    mock_helper = MagicMock()
+    service = WatchService(
+        onset_s=1.0,
+        idle_grace_s=2.0,
+        initial_baseline_w=10.0,
+        active_control=True,
+        optimization_objective="performance",
+    )
+    service._helper = mock_helper
+
+    # Spike
+    service.detector.observe(45.0, 1000000, 0.0)
+    service.detector.observe(45.0, 2000000, 1.5)
+    assert service.control_state == "shielded_boost"
+    # Should NOT throttle frequency
+    mock_helper.apply_configuration.assert_not_called()
+
+
+def test_watch_service_deadline_objective():
+    from unittest.mock import MagicMock
+    from api.live import WatchService
+
+    mock_helper = MagicMock()
+    service = WatchService(
+        onset_s=1.0,
+        idle_grace_s=2.0,
+        initial_baseline_w=10.0,
+        active_control=True,
+        optimization_objective="deadline",
+        time_budget_s=12.0,
+    )
+    service._helper = mock_helper
+
+    # Spike
+    service.detector.observe(45.0, 1000000, 0.0)
+    service.detector.observe(45.0, 2000000, 1.5)
+    assert service.control_state == "optimized_active"
+    mock_helper.apply_configuration.assert_called_once()
+
 
 
 

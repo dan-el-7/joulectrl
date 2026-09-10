@@ -186,6 +186,10 @@ export async function armWatch(params: {
   idle_grace_s?: number;
   baseline_w?: number;
   poll_hz?: number;
+  optimization_objective?: 'efficiency' | 'deadline' | 'performance';
+  recurrence_mode?: 'repeated' | 'once';
+  time_budget_s?: number;
+  target_freq_khz?: number;
 }): Promise<any> {
   const res = await fetch(`${API_BASE}/watch/arm`, {
     method: 'POST',
@@ -221,6 +225,10 @@ export async function launchAndArm(params: {
   launch_in_terminal?: boolean;
   pin_lane?: string;
   arm_watcher?: boolean;
+  optimization_objective?: 'efficiency' | 'deadline' | 'performance';
+  recurrence_mode?: 'repeated' | 'once';
+  time_budget_s?: number;
+  target_freq_khz?: number;
 }): Promise<any> {
   const res = await fetch(`${API_BASE}/watch/launch-and-arm`, {
     method: 'POST',

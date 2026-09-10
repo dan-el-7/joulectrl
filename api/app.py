@@ -253,6 +253,10 @@ class WatchArmRequest(BaseModel):
     idle_grace_s: float = 4.0
     baseline_w: Optional[float] = None
     poll_hz: float = 1.0
+    optimization_objective: str = "efficiency"
+    recurrence_mode: str = "repeated"
+    time_budget_s: Optional[float] = None
+    target_freq_khz: Optional[int] = None
 
 
 class WatchLaunchAndArmRequest(BaseModel):
@@ -266,6 +270,10 @@ class WatchLaunchAndArmRequest(BaseModel):
     launch_in_terminal: bool = False
     pin_lane: Optional[str] = None  # 'fast', 'eco', 'normal', or None
     arm_watcher: bool = True
+    optimization_objective: str = "efficiency"
+    recurrence_mode: str = "repeated"
+    time_budget_s: Optional[float] = None
+    target_freq_khz: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -1671,6 +1679,10 @@ def arm_watch(req: WatchArmRequest) -> dict[str, Any]:
         target_pid=req.pid,
         target_process_name=proc_name,
         focus_mode=req.focus_mode,
+        optimization_objective=req.optimization_objective,
+        recurrence_mode=req.recurrence_mode,
+        time_budget_s=req.time_budget_s,
+        target_freq_khz=req.target_freq_khz,
     )
     return {
         "ok": True,
@@ -1678,6 +1690,8 @@ def arm_watch(req: WatchArmRequest) -> dict[str, Any]:
         "control_state": _WATCH_SERVICE.control_state,
         "target_pid": req.pid,
         "target_process_name": proc_name,
+        "optimization_objective": req.optimization_objective,
+        "recurrence_mode": req.recurrence_mode,
         "message": f"Watcher armed for PID {req.pid or 'system'} at Stock Boost. Monitoring for sustained power spike.",
     }
 
@@ -1714,29 +1728,14 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
             if shutil.which(cand):
                 term_bin = cand
                 break
-
         if not term_bin:
-            raise HTTPException(status_code=500, detail="No supported desktop terminal emulator found")
+            term_bin = "x-terminal-emulator"
 
-        bash_script = (
-            f"cd {shlex.quote(cwd_path)} && "
-            f"echo -e '\\033[1;36m============================================================\\033[0m' && "
-            f"echo -e '\\033[1;32m      joulectrl — App Launched with Power-Spike Watcher     \\033[0m' && "
-            f"echo -e '\\033[1;36m============================================================\\033[0m\\n' && "
-            f"{cmd_str}; "
-            f"echo; echo -e '\\033[1;33m[Process finished] Press Enter to close this window...\\033[0m'; read dummy"
-        )
-
-        if term_bin == "ptyxis":
-            spawn_cmd = ["ptyxis", "--new-window", "-T", f"joulectrl: {cmd_str[:25]}", "--", "bash", "-c", bash_script]
-        elif term_bin == "gnome-terminal":
-            spawn_cmd = ["gnome-terminal", f"--title=joulectrl: {cmd_str[:25]}", "--", "bash", "-c", bash_script]
-        elif term_bin in ("kgx", "xfce4-terminal"):
-            spawn_cmd = [term_bin, "-T", f"joulectrl: {cmd_str[:25]}", "-e", f"bash -c {shlex.quote(bash_script)}"]
-        elif term_bin == "konsole":
-            spawn_cmd = ["konsole", "-p", f"tabtitle=joulectrl: {cmd_str[:25]}", "-e", "bash", "-c", bash_script]
-        elif term_bin in ("kitty", "alacritty", "foot"):
-            spawn_cmd = [term_bin, "-T", f"joulectrl: {cmd_str[:25]}", "bash", "-c", bash_script]
+        bash_script = f"echo -e '\\033[1;36m[joulectrl]\\033[0m Launching: {cmd_str}'; {cmd_str}; echo -e '\\n\\033[1;32m[joulectrl]\\033[0m Command completed. Press Enter to close.'; read line"
+        if "ptyxis" in term_bin:
+            spawn_cmd = [term_bin, "--", "bash", "-c", bash_script]
+        elif "gnome-terminal" in term_bin or "kgx" in term_bin:
+            spawn_cmd = [term_bin, "--", "bash", "-c", bash_script]
         else:
             spawn_cmd = [term_bin, "-title", f"joulectrl: {cmd_str[:25]}", "-e", f"bash -c {shlex.quote(bash_script)}"]
 
@@ -1792,6 +1791,10 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
             target_process_name=comm,
             target_command=cmd_str,
             focus_mode=req.focus_mode,
+            optimization_objective=req.optimization_objective,
+            recurrence_mode=req.recurrence_mode,
+            time_budget_s=req.time_budget_s,
+            target_freq_khz=req.target_freq_khz,
         )
         ctrl_state = _WATCH_SERVICE.control_state
 
@@ -1801,6 +1804,8 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
         "pid": pid,
         "command": cmd_str,
         "control_state": ctrl_state,
+        "optimization_objective": req.optimization_objective,
+        "recurrence_mode": req.recurrence_mode,
         "message": f"Launched '{comm}' (PID {pid}) at Stock Boost." + (" Watcher armed for heavy load." if req.arm_watcher else ""),
     }
 

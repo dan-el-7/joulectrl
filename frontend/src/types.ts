@@ -210,6 +210,10 @@ export interface WatchStatus {
   completed_segments_count: number;
   active_control?: boolean;
   control_state?: string;
+  optimization_objective?: 'efficiency' | 'deadline' | 'performance';
+  recurrence_mode?: 'repeated' | 'once';
+  time_budget_s?: number | null;
+  target_freq_khz?: number | null;
   target_pid?: number | null;
   target_process_name?: string | null;
   target_command?: string | null;

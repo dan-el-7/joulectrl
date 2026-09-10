@@ -146,6 +146,9 @@ export const SetupView: React.FC<SetupViewProps> = ({
   const [searchApp, setSearchApp] = React.useState<string>('');
   const [launchInTerminal, setLaunchInTerminal] = React.useState<boolean>(true);
   const [launchWatchMode, setLaunchWatchMode] = React.useState<boolean>(true);
+  const [launchObjective, setLaunchObjective] = React.useState<'efficiency' | 'deadline' | 'performance'>('efficiency');
+  const [launchRecurrence, setLaunchRecurrence] = React.useState<'repeated' | 'once'>('repeated');
+  const [launchTimeBudgetS, setLaunchTimeBudgetS] = React.useState<number>(20);
   const [launchLane, setLaunchLane] = React.useState<'fast' | 'eco' | 'all'>('fast');
   const [launchFeedback, setLaunchFeedback] = React.useState<string | null>(null);
   const [isLaunchingApp, setIsLaunchingApp] = React.useState<boolean>(false);
@@ -195,10 +198,19 @@ export const SetupView: React.FC<SetupViewProps> = ({
         launch_in_terminal: launchInTerminal,
         pin_lane: launchLane === 'all' ? undefined : launchLane,
         arm_watcher: launchWatchMode,
+        optimization_objective: launchObjective,
+        recurrence_mode: launchRecurrence,
+        time_budget_s: launchObjective === 'deadline' ? launchTimeBudgetS : undefined,
         baseline_w: 10.0,
       });
       setLaunchedPid(res.pid);
-      setLaunchFeedback(`🚀 Launched PID ${res.pid} at Stock Boost! ${launchWatchMode ? 'Watcher armed to clamp sweet-spot during heavy compute.' : ''}`);
+      const modeDesc =
+        launchObjective === 'efficiency'
+          ? 'Max Efficiency (2.0 GHz)'
+          : launchObjective === 'deadline'
+          ? `Deadline ${launchTimeBudgetS}s`
+          : 'Sustained Boost + Core Shielding';
+      setLaunchFeedback(`🚀 Launched PID ${res.pid} at Stock Boost! ${launchWatchMode ? `Watcher armed: ${modeDesc} (${launchRecurrence === 'repeated' ? 'Continuous Watcher' : 'One-Shot'}).` : ''}`);
     } catch (e: any) {
       setLaunchFeedback(`❌ Failed to launch: ${e.message}`);
     } finally {
@@ -388,6 +400,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             <span>📦</span> Benchmark Workload
           </button>
           <button
+            id="mode-btn-launch"
             type="button"
             onClick={() => {
               setWorkloadMode('launch');
@@ -685,13 +698,13 @@ export const SetupView: React.FC<SetupViewProps> = ({
             {/* Launch Settings: Watcher + Terminal + Core Lane */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', borderTop: `1px solid ${colors.border}`, paddingTop: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 600, color: colors.emerald, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.84rem', fontWeight: 600, color: colors.emerald, cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={launchWatchMode}
                     onChange={(e) => setLaunchWatchMode(e.target.checked)}
                   />
-                  <span>⚡ Arm Power-Spike Watcher (Stock Boost → 2.0 GHz Sweet Spot)</span>
+                  <span>⚡ Arm Power-Spike Watcher (Stock Boost → Dynamic Optimization)</span>
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: colors.textSecondary, cursor: 'pointer' }}>
@@ -703,6 +716,112 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   <span>Open in native desktop terminal window</span>
                 </label>
               </div>
+
+              {launchWatchMode && (
+                <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '0.375rem', padding: '0.75rem', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: colors.textSecondary, lineHeight: 1.4 }}>
+                    <strong style={{ color: colors.emerald }}>How It Works:</strong> Starts at <strong>100% Stock Boost (5.09 GHz)</strong> for zero UI lag. When heavy compute begins (power spikes &ge; 2s above baseline), Joulectrl dynamically applies your chosen policy, and instantly restores Stock Boost when the app returns to idle.
+                  </div>
+
+                  {/* Optimization Policy Choice */}
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: colors.textTertiary, fontWeight: 600, marginBottom: '0.35rem' }}>
+                      Optimization Target during Heavy Compute:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      {[
+                        { id: 'efficiency', title: '⚡ Max Energy Savings', desc: 'Clamps to 2.0 GHz base (~59% power cut, quiet fans)' },
+                        { id: 'deadline', title: '⏱️ Time Budget Constraint', desc: `Target runtime cap: complete within budget` },
+                        { id: 'performance', title: '🏎️ Sustained Max Perf', desc: '100% Stock Boost + isolate on fast cores' },
+                      ].map((pol) => {
+                        const isSel = launchObjective === pol.id;
+                        return (
+                          <button
+                            key={pol.id}
+                            type="button"
+                            onClick={() => setLaunchObjective(pol.id as any)}
+                            style={{
+                              padding: '0.45rem 0.55rem',
+                              borderRadius: '0.25rem',
+                              border: `1px solid ${isSel ? colors.emerald : colors.border}`,
+                              background: isSel ? 'rgba(16,185,129,0.18)' : colors.surface,
+                              color: isSel ? colors.textPrimary : colors.textSecondary,
+                              fontSize: '0.73rem',
+                              fontWeight: isSel ? 600 : 400,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, color: isSel ? colors.emerald : colors.textPrimary }}>{pol.title}</div>
+                            <div style={{ fontSize: '0.66rem', color: colors.textTertiary, marginTop: '0.15rem' }}>{pol.desc}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* If deadline mode, show time budget input */}
+                  {launchObjective === 'deadline' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: colors.surface, padding: '0.5rem 0.75rem', borderRadius: '0.25rem', border: `1px solid ${colors.border}` }}>
+                      <span style={{ fontSize: '0.76rem', color: colors.textSecondary }}>Maximum Acceptable Runtime:</span>
+                      <input
+                        type="number"
+                        min={3}
+                        max={300}
+                        value={launchTimeBudgetS}
+                        onChange={(e) => setLaunchTimeBudgetS(Math.max(1, parseInt(e.target.value, 10) || 10))}
+                        style={{
+                          width: '60px',
+                          padding: '2px 6px',
+                          borderRadius: '0.25rem',
+                          background: colors.inputBg,
+                          border: `1px solid ${colors.inputBorder}`,
+                          color: colors.textPrimary,
+                          fontSize: '0.8rem',
+                          textAlign: 'center',
+                        }}
+                      />
+                      <span style={{ fontSize: '0.76rem', color: colors.textTertiary }}>seconds (lowest frequency meeting deadline is applied)</span>
+                    </div>
+                  )}
+
+                  {/* Recurrence Mode */}
+                  <div>
+                    <div style={{ fontSize: '0.74rem', color: colors.textTertiary, fontWeight: 600, marginBottom: '0.35rem' }}>
+                      Workload Recurrence Pattern:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      {[
+                        { id: 'repeated', title: '🔄 Repeating Workload (Continuous Watcher)', desc: 'Keeps watching across repeated tasks (e.g. recompiles on save, incremental renders). Logs running savings per session.' },
+                        { id: 'once', title: '🎯 Single Workload (One-Shot)', desc: 'Optimizes once on the next sustained power spike, restores stock boost on idle, and auto-disarms.' },
+                      ].map((rec) => {
+                        const isSel = launchRecurrence === rec.id;
+                        return (
+                          <button
+                            key={rec.id}
+                            type="button"
+                            onClick={() => setLaunchRecurrence(rec.id as any)}
+                            style={{
+                              padding: '0.45rem 0.55rem',
+                              borderRadius: '0.25rem',
+                              border: `1px solid ${isSel ? colors.accent : colors.border}`,
+                              background: isSel ? 'rgba(113,112,255,0.18)' : colors.surface,
+                              color: isSel ? colors.textPrimary : colors.textSecondary,
+                              fontSize: '0.73rem',
+                              fontWeight: isSel ? 600 : 400,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, color: isSel ? colors.accentHover : colors.textPrimary }}>{rec.title}</div>
+                            <div style={{ fontSize: '0.66rem', color: colors.textTertiary, marginTop: '0.15rem' }}>{rec.desc}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Core Lane Priority */}
               <div>
@@ -1844,7 +1963,11 @@ export const SetupView: React.FC<SetupViewProps> = ({
               ? !launchCommand.trim()
                 ? 'Enter a Command or Select an App Above to Launch'
                 : launchWatchMode
-                  ? '🚀 Launch App & Arm Power-Spike Watcher'
+                  ? launchObjective === 'efficiency'
+                    ? `🚀 Launch App & Arm Watcher (Max Efficiency · 2.0 GHz · ${launchRecurrence === 'repeated' ? 'Continuous' : 'One-Shot'})`
+                    : launchObjective === 'deadline'
+                    ? `🚀 Launch App & Arm Watcher (Deadline ${launchTimeBudgetS}s · ${launchRecurrence === 'repeated' ? 'Continuous' : 'One-Shot'})`
+                    : `🚀 Launch App & Arm Watcher (Sustained Boost + Fast Cores · ${launchRecurrence === 'repeated' ? 'Continuous' : 'One-Shot'})`
                   : `🚀 Launch App on ${launchLane === 'fast' ? 'Fast Cores' : launchLane === 'eco' ? 'Eco Cores' : 'All Cores'}`
               : workloadMode === 'process'
                 ? targetProcess
