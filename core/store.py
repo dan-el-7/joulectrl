@@ -106,11 +106,44 @@ class Store:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS savings_ledger (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    workload_name TEXT,
+                    app_name TEXT,
+                    target_pid INTEGER,
+                    objective TEXT,
+                    runtime_s REAL NOT NULL,
+                    stock_energy_j REAL NOT NULL,
+                    optimized_energy_j REAL NOT NULL,
+                    saved_energy_j REAL NOT NULL,
+                    saved_pct REAL NOT NULL,
+                    stock_avg_power_w REAL,
+                    optimized_avg_power_w REAL,
+                    saved_avg_power_w REAL,
+                    timestamp_iso TEXT NOT NULL,
+                    metadata_json TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    key TEXT PRIMARY KEY,
+                    value_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_runs_exp ON runs (experiment_id);
                 CREATE INDEX IF NOT EXISTS idx_transitions_exp ON state_transitions (experiment_id);
                 CREATE INDEX IF NOT EXISTS idx_cal_fingerprint ON calibrations (machine_fingerprint);
+                CREATE INDEX IF NOT EXISTS idx_savings_timestamp ON savings_ledger (timestamp_iso);
                 """
             )
+        if self.db_path != ":memory:":
+            try:
+                self.conn.execute("PRAGMA journal_mode=WAL;")
+                self.conn.execute("PRAGMA synchronous=NORMAL;")
+            except Exception:
+                pass
         self._migrate_runs_composite_key()
 
     def _migrate_runs_composite_key(self) -> None:
@@ -399,3 +432,248 @@ class Store:
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(dumped)
         return dumped
+
+    # -----------------------------------------------------------------------
+    # User Preferences (Opt-in & Settings)
+    # -----------------------------------------------------------------------
+
+    def get_preference(self, key: str, default: Any = None) -> Any:
+        """Retrieve a stored user preference by key."""
+        cur = self.conn.execute("SELECT value_json FROM user_preferences WHERE key = ?", (key,))
+        row = cur.fetchone()
+        if not row:
+            return default
+        try:
+            return json.loads(row["value_json"])
+        except Exception:
+            return default
+
+    def set_preference(self, key: str, value: Any) -> None:
+        """Store or update a user preference by key."""
+        now = utc_now_iso()
+        val_json = json.dumps(value)
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO user_preferences (key, value_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
+                """,
+                (key, val_json, now),
+            )
+
+    # -----------------------------------------------------------------------
+    # Energy Savings Ledger & Analytics
+    # -----------------------------------------------------------------------
+
+    def record_savings_entry(
+        self, entry: dict[str, Any], enforce_opt_in: bool = True
+    ) -> Optional[int]:
+        """Record an energy savings receipt to the persistent ledger.
+
+        Args:
+            entry: Dict containing session_id, source, workload_name, app_name,
+                   target_pid, objective, runtime_s, stock_energy_j,
+                   optimized_energy_j, saved_energy_j, saved_pct, stock_avg_power_w,
+                   optimized_avg_power_w, saved_avg_power_w, metadata.
+            enforce_opt_in: If True, checks if 'energy_savings_opt_in' is enabled
+                            before writing. Returns None if disabled.
+        """
+        if enforce_opt_in and not self.get_preference("energy_savings_opt_in", False):
+            return None
+
+        now = entry.get("timestamp_iso") or utc_now_iso()
+        runtime_s = float(entry.get("runtime_s", 0.0))
+        stock_j = float(entry.get("stock_energy_j", 0.0))
+        opt_j = float(entry.get("optimized_energy_j", 0.0))
+        saved_j = float(entry.get("saved_energy_j", max(0.0, stock_j - opt_j)))
+        saved_pct = float(entry.get("saved_pct", 0.0))
+
+        stock_w = entry.get("stock_avg_power_w")
+        if stock_w is None and runtime_s > 0:
+            stock_w = stock_j / runtime_s
+        opt_w = entry.get("optimized_avg_power_w")
+        if opt_w is None and runtime_s > 0:
+            opt_w = opt_j / runtime_s
+        saved_w = entry.get("saved_avg_power_w")
+        if saved_w is None and runtime_s > 0:
+            saved_w = saved_j / runtime_s
+
+        meta = entry.get("metadata") or {}
+
+        with self.conn:
+            cur = self.conn.execute(
+                """
+                INSERT INTO savings_ledger (
+                    session_id, source, workload_name, app_name, target_pid, objective,
+                    runtime_s, stock_energy_j, optimized_energy_j, saved_energy_j,
+                    saved_pct, stock_avg_power_w, optimized_avg_power_w,
+                    saved_avg_power_w, timestamp_iso, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(entry.get("session_id", "sess_0")),
+                    str(entry.get("source", "watch")),
+                    entry.get("workload_name"),
+                    entry.get("app_name"),
+                    entry.get("target_pid"),
+                    entry.get("objective"),
+                    round(runtime_s, 2),
+                    round(stock_j, 2),
+                    round(opt_j, 2),
+                    round(saved_j, 2),
+                    round(saved_pct, 1),
+                    round(stock_w, 2) if stock_w is not None else None,
+                    round(opt_w, 2) if opt_w is not None else None,
+                    round(saved_w, 2) if saved_w is not None else None,
+                    now,
+                    json.dumps(meta) if meta else None,
+                ),
+            )
+            return cur.lastrowid
+
+    def get_savings_summary(self) -> dict[str, Any]:
+        """Compute aggregated energy savings statistics from the ledger."""
+        cur = self.conn.execute(
+            """
+            SELECT
+                COUNT(*) as sessions_count,
+                COALESCE(SUM(runtime_s), 0.0) as total_runtime_s,
+                COALESCE(SUM(stock_energy_j), 0.0) as total_stock_energy_j,
+                COALESCE(SUM(optimized_energy_j), 0.0) as total_optimized_energy_j,
+                COALESCE(SUM(saved_energy_j), 0.0) as total_saved_energy_j,
+                COALESCE(AVG(saved_pct), 0.0) as avg_saved_pct
+            FROM savings_ledger
+            """
+        )
+        row = cur.fetchone()
+        sessions = row["sessions_count"] if row else 0
+        runtime_s = row["total_runtime_s"] if row else 0.0
+        stock_j = row["total_stock_energy_j"] if row else 0.0
+        opt_j = row["total_optimized_energy_j"] if row else 0.0
+        saved_j = row["total_saved_energy_j"] if row else 0.0
+        avg_pct = row["avg_saved_pct"] if row else 0.0
+
+        avg_watts_saved = (saved_j / runtime_s) if runtime_s > 0 else 0.0
+        total_saved_wh = saved_j / 3600.0
+        total_saved_kwh = total_saved_wh / 1000.0
+
+        # Equivalents:
+        # Typical laptop battery ~60Wh, nominal total system power ~15W
+        battery_extension_minutes = (total_saved_wh / 15.0) * 60.0
+        # Average grid carbon intensity ~390g CO2 / kWh
+        co2_saved_grams = total_saved_kwh * 390.0
+
+        return {
+            "sessions_count": sessions,
+            "total_runtime_s": round(runtime_s, 2),
+            "total_stock_energy_j": round(stock_j, 1),
+            "total_optimized_energy_j": round(opt_j, 1),
+            "total_saved_energy_j": round(saved_j, 1),
+            "total_saved_energy_wh": round(total_saved_wh, 2),
+            "total_saved_energy_kwh": round(total_saved_kwh, 4),
+            "avg_saved_pct": round(avg_pct, 1),
+            "avg_watts_saved": round(avg_watts_saved, 2),
+            "battery_extension_minutes": round(battery_extension_minutes, 1),
+            "co2_saved_grams": round(co2_saved_grams, 2),
+        }
+
+    def get_savings_ledger(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """Retrieve recent savings entries from the ledger."""
+        cur = self.conn.execute(
+            """
+            SELECT * FROM savings_ledger
+            ORDER BY timestamp_iso DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        )
+        results = []
+        for row in cur.fetchall():
+            d = dict(row)
+            d["metadata"] = json.loads(d["metadata_json"]) if d.get("metadata_json") else {}
+            results.append(d)
+        return results
+
+    def reset_savings_ledger(self) -> int:
+        """Clear all entries in the savings ledger."""
+        with self.conn:
+            cur = self.conn.execute("DELETE FROM savings_ledger")
+            return cur.rowcount
+
+    def export_savings_ledger(self) -> list[dict[str, Any]]:
+        """Return all savings records for audit or download."""
+        cur = self.conn.execute(
+            "SELECT * FROM savings_ledger ORDER BY timestamp_iso DESC, id DESC"
+        )
+        results = []
+        for row in cur.fetchall():
+            d = dict(row)
+            d["metadata"] = json.loads(d["metadata_json"]) if d.get("metadata_json") else {}
+            results.append(d)
+        return results
+
+    def seed_demo_savings_if_empty(self) -> None:
+        """Seed realistic demo savings entries if ledger is empty."""
+        cur = self.conn.execute("SELECT COUNT(*) as cnt FROM savings_ledger")
+        if cur.fetchone()["cnt"] > 0:
+            return
+        demo_entries = [
+            {
+                "session_id": "burst_1",
+                "source": "watch",
+                "workload_name": "gcc_build",
+                "app_name": "Code Builder",
+                "target_pid": 14205,
+                "objective": "efficiency",
+                "runtime_s": 42.5,
+                "stock_energy_j": 1381.2,
+                "optimized_energy_j": 566.3,
+                "saved_energy_j": 814.9,
+                "saved_pct": 59.0,
+                "stock_avg_power_w": 32.5,
+                "optimized_avg_power_w": 13.3,
+                "saved_avg_power_w": 19.2,
+                "timestamp_iso": "2026-09-10T11:15:20Z",
+                "metadata": {"cores": 12, "freq_ghz": 3.8},
+            },
+            {
+                "session_id": "burst_2",
+                "source": "watch",
+                "workload_name": "rust_cargo",
+                "app_name": "Cargo Watch",
+                "target_pid": 18392,
+                "objective": "deadline",
+                "runtime_s": 88.0,
+                "stock_energy_j": 2860.0,
+                "optimized_energy_j": 1716.0,
+                "saved_energy_j": 1144.0,
+                "saved_pct": 40.0,
+                "stock_avg_power_w": 32.5,
+                "optimized_avg_power_w": 19.5,
+                "saved_avg_power_w": 13.0,
+                "timestamp_iso": "2026-09-10T12:04:10Z",
+                "metadata": {"cores": 8, "freq_ghz": 3.8, "budget_s": 95.0},
+            },
+            {
+                "session_id": "burst_3",
+                "source": "validation",
+                "workload_name": "clean_build",
+                "app_name": "Build Harness",
+                "target_pid": 21094,
+                "objective": "efficiency",
+                "runtime_s": 15.2,
+                "stock_energy_j": 494.0,
+                "optimized_energy_j": 202.5,
+                "saved_energy_j": 291.5,
+                "saved_pct": 59.0,
+                "stock_avg_power_w": 32.5,
+                "optimized_avg_power_w": 13.3,
+                "saved_avg_power_w": 19.2,
+                "timestamp_iso": "2026-09-10T13:45:00Z",
+                "metadata": {"cores": 12, "freq_ghz": 3.4},
+            },
+        ]
+        for e in demo_entries:
+            self.record_savings_entry(e, enforce_opt_in=False)
+

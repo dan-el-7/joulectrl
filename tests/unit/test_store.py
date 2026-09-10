@@ -232,3 +232,53 @@ def test_legacy_run_id_primary_key_database_migrates(tmp_path):
     )
     assert len(migrated.get_runs("exp-old")) == 1
     assert len(migrated.get_runs("exp-new")) == 1
+
+
+def test_user_preferences(store):
+    assert store.get_preference("energy_savings_opt_in", False) is False
+    store.set_preference("energy_savings_opt_in", True)
+    assert store.get_preference("energy_savings_opt_in") is True
+    store.set_preference("custom_key", {"threshold": 12.5, "enabled": True})
+    assert store.get_preference("custom_key") == {"threshold": 12.5, "enabled": True}
+
+
+def test_savings_ledger_opt_in_gate(store):
+    # By default, opt-in is False, so record_savings_entry returns None and doesn't write
+    entry = {
+        "session_id": "test_1",
+        "source": "watch",
+        "workload_name": "build",
+        "runtime_s": 10.0,
+        "stock_energy_j": 300.0,
+        "optimized_energy_j": 120.0,
+        "saved_energy_j": 180.0,
+        "saved_pct": 60.0,
+    }
+    row_id = store.record_savings_entry(entry, enforce_opt_in=True)
+    assert row_id is None
+    assert len(store.get_savings_ledger()) == 0
+
+    # Opt-in enabled
+    store.set_preference("energy_savings_opt_in", True)
+    row_id = store.record_savings_entry(entry, enforce_opt_in=True)
+    assert row_id is not None
+
+    ledger = store.get_savings_ledger()
+    assert len(ledger) == 1
+    assert ledger[0]["session_id"] == "test_1"
+    assert ledger[0]["saved_energy_j"] == 180.0
+    assert ledger[0]["saved_avg_power_w"] == 18.0  # 180 J / 10s
+
+    summary = store.get_savings_summary()
+    assert summary["sessions_count"] == 1
+    assert summary["total_runtime_s"] == 10.0
+    assert summary["total_saved_energy_j"] == 180.0
+    assert summary["total_saved_energy_wh"] == 0.05  # 180 / 3600
+    assert summary["avg_watts_saved"] == 18.0
+
+    # Reset ledger
+    deleted = store.reset_savings_ledger()
+    assert deleted == 1
+    assert len(store.get_savings_ledger()) == 0
+    assert store.get_savings_summary()["sessions_count"] == 0
+

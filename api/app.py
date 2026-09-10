@@ -14,6 +14,8 @@ Invariants:
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import os
@@ -1606,6 +1608,7 @@ def start_watch(req: WatchStartRequest) -> dict[str, Any]:
         poll_hz=req.poll_hz,
         onset_s=float(req.onset_consecutive_s),
         idle_grace_s=float(req.idle_grace_s),
+        store=_STORE,
     )
     status = _WATCH_SERVICE.status_dict()
     return {
@@ -1701,6 +1704,7 @@ def arm_watch(req: WatchArmRequest) -> dict[str, Any]:
         recurrence_mode=req.recurrence_mode,
         time_budget_s=req.time_budget_s,
         target_freq_khz=req.target_freq_khz,
+        store=_STORE,
     )
     return {
         "ok": True,
@@ -1813,6 +1817,7 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
             recurrence_mode=req.recurrence_mode,
             time_budget_s=req.time_budget_s,
             target_freq_khz=req.target_freq_khz,
+            store=_STORE,
         )
         ctrl_state = _WATCH_SERVICE.control_state
 
@@ -2207,6 +2212,125 @@ def launch_terminal_endpoint(req: Optional[LaunchTerminalRequest] = None) -> dic
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to spawn terminal {term_bin}: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Energy Savings & Carbon Reduction Dashboard (Opt-In, Zero-Overhead)
+# ---------------------------------------------------------------------------
+
+class SavingsOptInRequest(BaseModel):
+    enabled: bool
+    seed_demo_if_empty: Optional[bool] = True
+
+
+@app.get("/api/savings/dashboard")
+def get_savings_dashboard() -> dict[str, Any]:
+    """Retrieve cumulative energy savings, power reductions, and receipts ledger.
+
+    Zero-Power Invariant:
+    Computes aggregates on-demand via indexed SQL. Runs 0 background threads,
+    0 timers, and 0 idle polling loops to prevent CPU wakeups and preserve
+    deep C-states.
+    """
+    opted_in = bool(_STORE.get_preference("energy_savings_opt_in", False))
+    summary = _STORE.get_savings_summary()
+    ledger = _STORE.get_savings_ledger(limit=100)
+    return {
+        "ok": True,
+        "opted_in": opted_in,
+        "summary": summary,
+        "ledger": ledger,
+        "zero_power_architecture": {
+            "idle_polling_overhead_w": 0.0,
+            "event_driven": True,
+            "ledger_storage": "local_sqlite",
+            "description": (
+                "Joulectrl logs savings strictly on workload completion (event-driven). "
+                "No background power meter queries or timer wakeups run when idle, "
+                "ensuring 100% C-state sleep residency."
+            ),
+        },
+    }
+
+
+@app.post("/api/savings/opt-in")
+def update_savings_opt_in(req: SavingsOptInRequest) -> dict[str, Any]:
+    """Opt-in or opt-out of energy savings receipt logging."""
+    _STORE.set_preference("energy_savings_opt_in", req.enabled)
+    if req.enabled and req.seed_demo_if_empty:
+        _STORE.seed_demo_savings_if_empty()
+    summary = _STORE.get_savings_summary()
+    return {
+        "ok": True,
+        "opted_in": req.enabled,
+        "summary": summary,
+        "message": "Energy savings tracking enabled." if req.enabled else "Energy savings tracking disabled.",
+    }
+
+
+@app.post("/api/savings/reset")
+def reset_savings_ledger() -> dict[str, Any]:
+    """Clear all historical receipts in the savings ledger."""
+    deleted = _STORE.reset_savings_ledger()
+    return {
+        "ok": True,
+        "deleted": deleted,
+        "summary": _STORE.get_savings_summary(),
+        "message": f"Ledger cleared ({deleted} entries removed).",
+    }
+
+
+@app.get("/api/savings/export")
+def export_savings_ledger(format: str = Query("json", pattern="^(json|csv)$")) -> Any:
+    """Export savings receipts as JSON or CSV."""
+    records = _STORE.export_savings_ledger()
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "id",
+            "session_id",
+            "source",
+            "workload_name",
+            "app_name",
+            "target_pid",
+            "objective",
+            "runtime_s",
+            "stock_energy_j",
+            "optimized_energy_j",
+            "saved_energy_j",
+            "saved_pct",
+            "stock_avg_power_w",
+            "optimized_avg_power_w",
+            "saved_avg_power_w",
+            "timestamp_iso",
+        ])
+        for r in records:
+            writer.writerow([
+                r.get("id"),
+                r.get("session_id"),
+                r.get("source"),
+                r.get("workload_name"),
+                r.get("app_name"),
+                r.get("target_pid"),
+                r.get("objective"),
+                r.get("runtime_s"),
+                r.get("stock_energy_j"),
+                r.get("optimized_energy_j"),
+                r.get("saved_energy_j"),
+                r.get("saved_pct"),
+                r.get("stock_avg_power_w"),
+                r.get("optimized_avg_power_w"),
+                r.get("saved_avg_power_w"),
+                r.get("timestamp_iso"),
+            ])
+        csv_text = output.getvalue()
+        return Response(
+            content=csv_text,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=joulectrl_savings_ledger.csv"},
+        )
+    return JSONResponse(content={"ok": True, "count": len(records), "records": records})
 
 
 # ---------------------------------------------------------------------------

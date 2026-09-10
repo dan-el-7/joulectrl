@@ -981,4 +981,58 @@ def test_installed_applications_endpoint(client):
         assert "icon" in data["apps"][0]
 
 
+def test_savings_dashboard_endpoints(client):
+    # Initial status - opt-in may be false or default
+    res = client.get("/api/savings/dashboard")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+    assert "opted_in" in data
+    assert "summary" in data
+    assert "ledger" in data
+    assert "zero_power_architecture" in data
+    assert data["zero_power_architecture"]["idle_polling_overhead_w"] == 0.0
+
+    # Opt in with demo seed
+    res_opt = client.post("/api/savings/opt-in", json={"enabled": True, "seed_demo_if_empty": True})
+    assert res_opt.status_code == 200
+    assert res_opt.json()["opted_in"] is True
+
+    # Check dashboard now has data
+    res_dash = client.get("/api/savings/dashboard")
+    dash = res_dash.json()
+    assert dash["opted_in"] is True
+    assert dash["summary"]["sessions_count"] >= 1
+    assert dash["summary"]["total_saved_energy_j"] > 0
+    assert dash["summary"]["avg_watts_saved"] > 0
+
+    # Export JSON
+    res_exp_json = client.get("/api/savings/export?format=json")
+    assert res_exp_json.status_code == 200
+    assert res_exp_json.json()["ok"] is True
+    assert len(res_exp_json.json()["records"]) >= 1
+
+    # Export CSV
+    res_exp_csv = client.get("/api/savings/export?format=csv")
+    assert res_exp_csv.status_code == 200
+    assert "text/csv" in res_exp_csv.headers["content-type"]
+    assert "session_id,source" in res_exp_csv.text
+
+    # Reset ledger
+    res_reset = client.post("/api/savings/reset")
+    assert res_reset.status_code == 200
+    assert res_reset.json()["ok"] is True
+
+    # Verify ledger is now empty
+    res_dash_empty = client.get("/api/savings/dashboard")
+    assert len(res_dash_empty.json()["ledger"]) == 0
+    assert res_dash_empty.json()["summary"]["sessions_count"] == 0
+
+    # Opt out
+    res_opt_out = client.post("/api/savings/opt-in", json={"enabled": False})
+    assert res_opt_out.status_code == 200
+    assert res_opt_out.json()["opted_in"] is False
+
+
+
 

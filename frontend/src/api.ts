@@ -1,4 +1,13 @@
-import { CapabilitiesResponse, Experiment, Selection, WatchStatus, WorkloadInfo } from './types';
+import {
+  CapabilitiesResponse,
+  Experiment,
+  SavingsDashboardResponse,
+  SavingsLedgerEntry,
+  SavingsSummary,
+  Selection,
+  WatchStatus,
+  WorkloadInfo,
+} from './types';
 
 const API_BASE = '/api';
 
@@ -486,4 +495,34 @@ export async function measureCommand(params: MeasureCommandParams): Promise<any>
   }
   return res.json();
 }
+
+export async function fetchSavingsDashboard(): Promise<SavingsDashboardResponse> {
+  const res = await fetch(`${API_BASE}/savings/dashboard`);
+  if (!res.ok) throw new Error(`Failed to fetch savings dashboard: ${res.statusText}`);
+  return res.json();
+}
+
+export async function setSavingsOptIn(
+  enabled: boolean,
+  seed_demo_if_empty: boolean = true
+): Promise<{ ok: boolean; opted_in: boolean; summary: SavingsSummary }> {
+  const res = await fetch(`${API_BASE}/savings/opt-in`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled, seed_demo_if_empty }),
+  });
+  if (!res.ok) throw new Error(`Failed to update savings opt-in: ${res.statusText}`);
+  return res.json();
+}
+
+export async function resetSavingsLedger(): Promise<{ ok: boolean; deleted: number; summary: SavingsSummary }> {
+  const res = await fetch(`${API_BASE}/savings/reset`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Failed to reset savings ledger: ${res.statusText}`);
+  return res.json();
+}
+
+export function getSavingsExportUrl(format: 'json' | 'csv' = 'json'): string {
+  return `${API_BASE}/savings/export?format=${format}`;
+}
+
 

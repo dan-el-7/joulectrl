@@ -231,3 +231,51 @@ export interface WatchStatus {
   active_sessions_count?: number;
   savings_history?: WatchSavingsReceipt[];
 }
+
+export interface SavingsSummary {
+  sessions_count: number;
+  total_runtime_s: number;
+  total_stock_energy_j: number;
+  total_optimized_energy_j: number;
+  total_saved_energy_j: number;
+  total_saved_energy_wh: number;
+  total_saved_energy_kwh: number;
+  avg_saved_pct: number;
+  avg_watts_saved: number;
+  battery_extension_minutes: number;
+  co2_saved_grams: number;
+}
+
+export interface SavingsLedgerEntry {
+  id: number;
+  session_id: string;
+  source: string;
+  workload_name?: string | null;
+  app_name?: string | null;
+  target_pid?: number | null;
+  objective?: string | null;
+  runtime_s: number;
+  stock_energy_j: number;
+  optimized_energy_j: number;
+  saved_energy_j: number;
+  saved_pct: number;
+  stock_avg_power_w?: number | null;
+  optimized_avg_power_w?: number | null;
+  saved_avg_power_w?: number | null;
+  timestamp_iso: string;
+  metadata?: Record<string, any>;
+}
+
+export interface SavingsDashboardResponse {
+  ok: boolean;
+  opted_in: boolean;
+  summary: SavingsSummary;
+  ledger: SavingsLedgerEntry[];
+  zero_power_architecture: {
+    idle_polling_overhead_w: number;
+    event_driven: boolean;
+    ledger_storage: string;
+    description: string;
+  };
+}
+

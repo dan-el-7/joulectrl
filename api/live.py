@@ -225,7 +225,9 @@ class WatchService:
         recurrence_mode: str = "repeated",
         time_budget_s: Optional[float] = None,
         target_freq_khz: Optional[int] = None,
+        store: Optional[Any] = None,
     ) -> None:
+        self.store = store
         self.backend, self.source_info = (
             (backend, {"source": "injected", "synthetic": bool(getattr(backend, "_profile_segments", None))})
             if backend is not None
@@ -429,6 +431,30 @@ class WatchService:
             "objective": self.optimization_objective,
         }
         self.savings_history.append(receipt)
+
+        if self.store is not None:
+            try:
+                self.store.record_savings_entry({
+                    "session_id": f"burst_{self.active_sessions_count}",
+                    "source": "watch",
+                    "workload_name": self.target_command or "watched_burst",
+                    "app_name": self.target_process_name or "Target App",
+                    "target_pid": self.target_pid,
+                    "objective": self.optimization_objective,
+                    "runtime_s": runtime_s,
+                    "stock_energy_j": est_stock_j,
+                    "optimized_energy_j": actual_j if actual_j is not None else (est_stock_j - saved_j),
+                    "saved_energy_j": saved_j,
+                    "saved_pct": saved_pct,
+                    "timestamp_iso": _iso_now(),
+                    "metadata": {
+                        "focus_mode": self.focus_mode,
+                        "time_budget_s": self.time_budget_s,
+                        "target_freq_khz": self.target_freq_khz,
+                    },
+                }, enforce_opt_in=True)
+            except Exception:
+                pass
 
         self._restore_controls()
 

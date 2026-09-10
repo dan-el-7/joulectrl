@@ -21,13 +21,14 @@ import { DemoView } from './components/DemoView';
 import { WatchPanel } from './components/WatchPanel';
 import { TaskManagerView } from './components/TaskManagerView';
 import { SettingsView } from './components/SettingsView';
+import { SavingsDashboard } from './components/SavingsDashboard';
 import { FocusMode } from './components/FocusSwitch';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
 const AppContent: React.FC = () => {
   const { theme, themeColors, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'demo' | 'watch' | 'tasks' | 'settings'>('explorer');
+  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'demo' | 'watch' | 'tasks' | 'dashboard' | 'settings'>('explorer');
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [workloads, setWorkloads] = useState<WorkloadInfo[]>([]);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
@@ -442,6 +443,8 @@ const AppContent: React.FC = () => {
             }}
           />
         )}
+
+        {activeTab === 'dashboard' && <SavingsDashboard />}
 
         {activeTab === 'settings' && (
           <SettingsView
