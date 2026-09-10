@@ -11,10 +11,11 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
 from helper.client import HelperClient
 
-KERNEL = Path("workloads/kernel/fixed_compute").resolve()
+KERNEL = (REPO_ROOT / "workloads/kernel/fixed_compute").resolve()
 PARAMS = ["--chunks", "16384", "--iters", "200000"]
 CLASSES = {
     "fast": [0, 2, 4, 6, 8, 10, 12, 14],       # Zen 5 (even)
