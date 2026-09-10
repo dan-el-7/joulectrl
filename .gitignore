@@ -17,4 +17,5 @@ fixed_compute
 workloads/build_target/
 .DS_Store
 ~*
+scratch/
 
