@@ -181,6 +181,18 @@ export interface Experiment {
   restoration_status: string;
 }
 
+export interface WatchSavingsReceipt {
+  session_id: number;
+  timestamp: string;
+  runtime_s: number;
+  actual_energy_j: number | null;
+  estimated_stock_j: number | null;
+  saved_energy_j: number | null;
+  saved_pct: number;
+  target_pid?: number | null;
+  target_process_name?: string | null;
+}
+
 export interface WatchStatus {
   active: boolean;
   state: string;
@@ -196,4 +208,12 @@ export interface WatchStatus {
   baseline_spread_w: number | null;
   active_segment_elapsed_s: number | null;
   completed_segments_count: number;
+  active_control?: boolean;
+  control_state?: string;
+  target_pid?: number | null;
+  target_process_name?: string | null;
+  target_command?: string | null;
+  total_saved_energy_j?: number;
+  active_sessions_count?: number;
+  savings_history?: WatchSavingsReceipt[];
 }

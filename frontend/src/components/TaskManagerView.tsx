@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchUserProcesses, setProcessPriority, UserProcess } from '../api';
+import { fetchUserProcesses, setProcessPriority, UserProcess, armWatch } from '../api';
 import { fonts, fontFeatures, radii } from '../design';
 import { useTheme } from '../ThemeContext';
 import { FocusSwitch, FocusMode } from './FocusSwitch';
@@ -167,6 +167,18 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
         String(p.pid).includes(q),
     );
   }, [processes, searchQuery]);
+
+  const handleArmWatcher = async (proc: UserProcess) => {
+    try {
+      setIsActing(true);
+      await armWatch({ pid: proc.pid, process_name: proc.name, focus_mode: 'on' });
+      setActionFeedback(`⚡ Watcher armed for ${proc.name} (PID ${proc.pid}) at Stock Boost! Clamping engages on sustained power spike.`);
+    } catch (e: any) {
+      setActionFeedback(`❌ Failed to arm watcher: ${e.message}`);
+    } finally {
+      setIsActing(false);
+    }
+  };
 
   const { fastProcs, normalProcs, ecoProcs } = useMemo(() => {
     const fast: UserProcess[] = [];
@@ -770,6 +782,23 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                             }}
                           >
                             ↺ Normal
+                          </button>
+                          <button
+                            disabled={isActing}
+                            onClick={() => handleArmWatcher(p)}
+                            title="Arm Power Watcher: runs at Stock Boost now, clamps to 2.0 GHz sweet-spot on sustained power spike."
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: radii.sm,
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              color: '#f59e0b',
+                              cursor: isActing ? 'wait' : 'pointer',
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}
+                          >
+                            🎯 Watcher
                           </button>
                           {onTargetProcess && (
                             <button

@@ -79,3 +79,108 @@ def test_watch_bursty_geekbench_absorbs_pauses_and_trims_tail():
     assert closed.end_ts == 40.0
     assert closed.runtime_s == 35.0
 
+
+def test_watch_callbacks_on_active_and_idle():
+    active_events = []
+    idle_events = []
+
+    def handle_active(ts: float, power_w: float):
+        active_events.append((ts, power_w))
+
+    def handle_idle(segment):
+        idle_events.append(segment)
+
+    detector = WatchDetector(
+        baseline_window_s=2,
+        onset_s=2,
+        idle_grace_s=3,
+        initial_baseline_w=10.0,
+        on_active=handle_active,
+        on_idle=handle_idle,
+    )
+
+    assert detector.state == "idle"
+    assert detector.baseline_w == 10.0
+
+    # Feed idle samples
+    detector.observe(10.0, 1000000, 0.0)
+    detector.observe(10.5, 2000000, 1.0)
+    assert len(active_events) == 0
+
+    # Start spike: 40W at t=2.0
+    detector.observe(40.0, 3000000, 2.0)
+    assert len(active_events) == 0  # onset_s is 2, need sustained spike
+
+    # Sustained spike at t=4.0
+    detector.observe(42.0, 4000000, 4.0)
+    assert len(active_events) == 1
+    assert active_events[0] == (4.0, 42.0)
+    assert detector.state == "active"
+
+    # Sustained spike continues
+    detector.observe(41.0, 5000000, 5.0)
+    assert len(active_events) == 1  # Not triggered again while active
+
+    # Return to idle: 10W at t=6.0, t=7.0, t=8.0, t=9.0 (grace is 3s)
+    detector.observe(10.0, 6000000, 6.0)
+    detector.observe(10.0, 7000000, 7.0)
+    detector.observe(10.0, 8000000, 8.0)
+    assert len(idle_events) == 0
+    seg = detector.observe(10.0, 9000000, 9.0)
+
+    assert seg is not None
+    assert len(idle_events) == 1
+    assert idle_events[0].start_ts == 2.0
+    assert idle_events[0].end_ts == 5.0
+
+
+def test_watch_service_active_control_workflow():
+    from unittest.mock import MagicMock
+    from api.live import WatchService
+
+    mock_helper = MagicMock()
+    mock_helper.begin_session.return_value = {"ok": True}
+    mock_helper.apply_configuration.return_value = {"ok": True}
+    mock_helper.restore.return_value = {"ok": True}
+    mock_helper.end_session.return_value = {"ok": True}
+
+    service = WatchService(
+        onset_s=2.0,
+        idle_grace_s=3.0,
+        initial_baseline_w=10.0,
+        active_control=True,
+        target_pid=99999,
+        target_process_name="test_heavy_app",
+    )
+    service._helper = mock_helper
+
+    assert service.control_state == "stock_idle"
+    assert service.active_control is True
+
+    # Simulate active spike
+    service.detector.observe(45.0, 1000000, 0.0)
+    service.detector.observe(45.0, 2000000, 2.0)
+
+    assert service.control_state == "optimized_active"
+    mock_helper.begin_session.assert_called_once()
+    mock_helper.apply_configuration.assert_called_with({"boost": False})
+
+    # Simulate idle return
+    service.detector.observe(10.0, 3000000, 3.0)
+    service.detector.observe(10.0, 4000000, 4.0)
+    service.detector.observe(10.0, 5000000, 5.0)
+    service.detector.observe(10.0, 6000000, 6.0)
+
+    assert service.control_state == "stock_idle"
+    mock_helper.restore.assert_called_once()
+    mock_helper.end_session.assert_called_once()
+    assert service.active_sessions_count == 1
+    assert service.total_saved_energy_j > 0
+    assert len(service.savings_history) == 1
+    st = service.status_dict()
+    assert st["active_control"] is True
+    assert st["control_state"] == "stock_idle"
+    assert st["target_pid"] == 99999
+
+
+

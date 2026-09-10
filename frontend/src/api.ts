@@ -178,6 +178,49 @@ export async function stopWatch(): Promise<any> {
   return res.json();
 }
 
+export async function armWatch(params: {
+  pid?: number;
+  process_name?: string;
+  focus_mode?: string;
+  onset_s?: number;
+  idle_grace_s?: number;
+  baseline_w?: number;
+  poll_hz?: number;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/watch/arm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Failed to arm watch: ${res.statusText}`);
+  return res.json();
+}
+
+export async function launchAndArm(params: {
+  command: string;
+  cwd?: string;
+  focus_mode?: string;
+  onset_s?: number;
+  idle_grace_s?: number;
+  baseline_w?: number;
+  poll_hz?: number;
+  launch_in_terminal?: boolean;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/watch/launch-and-arm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Failed to launch and arm app: ${res.statusText}`);
+  return res.json();
+}
+
+export async function disarmWatch(): Promise<any> {
+  const res = await fetch(`${API_BASE}/watch/disarm`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Failed to disarm watch: ${res.statusText}`);
+  return res.json();
+}
+
 export interface DetectedApp {
   key: string;
   name: string;

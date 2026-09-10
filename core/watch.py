@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from statistics import median
-from typing import Optional
+from typing import Callable, Optional
 
 from core.models import Configuration, RunRecord
 
@@ -77,17 +77,29 @@ class WatchDetector:
         idle_grace_s: float = 10.0,
         poll_interval_s: float = 1.0,
         energy_range_uj: Optional[int] = None,
+        initial_baseline_w: Optional[float] = None,
+        on_active: Optional[Callable[[float, float], None]] = None,
+        on_idle: Optional[Callable[[WatchSegment], None]] = None,
     ) -> None:
         self.baseline_window_s = baseline_window_s
         self.onset_s = onset_s
         self.idle_grace_s = idle_grace_s
         self.poll_interval_s = poll_interval_s
         self.energy_range_uj = energy_range_uj
+        self.on_active = on_active
+        self.on_idle = on_idle
         self._baseline_started: Optional[float] = None
         self._baseline_values: list[float] = []
-        self.baseline_w: Optional[float] = None
-        self.spread_w: float = 0.0
-        self.state = "calibrating"
+
+        if initial_baseline_w is not None and initial_baseline_w > 0:
+            self.baseline_w = float(initial_baseline_w)
+            self.spread_w = 1.0
+            self.state = "idle"
+        else:
+            self.baseline_w = None
+            self.spread_w = 0.0
+            self.state = "calibrating"
+
         self._candidate_start: Optional[float] = None
         self._candidate_energy: Optional[int] = None
         self._candidate_active_samples: int = 0
@@ -133,6 +145,11 @@ class WatchDetector:
                     self._last_above_ts = timestamp
                     self._last_above_energy = energy_uj
                     self._idle_since = None
+                    if self.on_active is not None:
+                        try:
+                            self.on_active(timestamp, power_w)
+                        except Exception:
+                            pass
                 return None
             else:
                 # Brief dip during onset: do not discard candidate start immediately
@@ -151,6 +168,11 @@ class WatchDetector:
             if timestamp - self._idle_since >= self.idle_grace_s:
                 segment = self._close_segment()
                 self._segments.append(segment)
+                if self.on_idle is not None:
+                    try:
+                        self.on_idle(segment)
+                    except Exception:
+                        pass
                 return segment
         else:
             # Active spike: update last above-band timestamp & energy; absorb preceding dip

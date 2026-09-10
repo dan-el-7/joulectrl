@@ -245,6 +245,27 @@ class WatchStartRequest(BaseModel):
     idle_grace_s: int = 10
 
 
+class WatchArmRequest(BaseModel):
+    pid: Optional[int] = None
+    process_name: Optional[str] = None
+    focus_mode: str = "on"
+    onset_s: float = 2.0
+    idle_grace_s: float = 4.0
+    baseline_w: Optional[float] = None
+    poll_hz: float = 1.0
+
+
+class WatchLaunchAndArmRequest(BaseModel):
+    command: str
+    cwd: Optional[str] = None
+    focus_mode: str = "on"
+    onset_s: float = 2.0
+    idle_grace_s: float = 4.0
+    baseline_w: Optional[float] = None
+    poll_hz: float = 1.0
+    launch_in_terminal: bool = False
+
+
 # ---------------------------------------------------------------------------
 # API Routes (per docs/API.md)
 # ---------------------------------------------------------------------------
@@ -1558,7 +1579,7 @@ def start_watch(req: WatchStartRequest) -> dict[str, Any]:
 
 @app.post("/api/watch/stop")
 def stop_watch() -> dict[str, Any]:
-    """Stop passive watcher, return observed activity segments with suggested budgets."""
+    """Stop passive watcher or disarm active watcher, return observed activity segments with suggested budgets."""
     global _WATCH_SERVICE
     if _WATCH_SERVICE is None:
         return {"status": "stopped", "segments": [], "message": "No watcher running."}
@@ -1566,7 +1587,7 @@ def stop_watch() -> dict[str, Any]:
     segments = [
         _WATCH_SERVICE.segment_frame(seg) for seg in _WATCH_SERVICE.detector.segments
     ]
-    _WATCH_SERVICE.detector.state = "stopped"
+    _WATCH_SERVICE.disarm()
     return {
         "status": "stopped",
         "segments": segments,
@@ -1588,8 +1609,184 @@ def get_watch_status() -> dict[str, Any]:
             "baseline_spread_w": None,
             "active_segment_elapsed_s": None,
             "completed_segments_count": 0,
+            "active_control": False,
+            "control_state": "idle",
+            "target_pid": None,
+            "target_process_name": None,
+            "target_command": None,
+            "total_saved_energy_j": 0.0,
+            "active_sessions_count": 0,
+            "savings_history": [],
         }
     return _WATCH_SERVICE.status_dict()
+
+
+@app.post("/api/watch/arm")
+def arm_watch(req: WatchArmRequest) -> dict[str, Any]:
+    """Arm the Watcher for a specific running PID or app.
+    Keeps hardware at Stock Boost (100% responsiveness) until a sustained power spike occurs.
+    """
+    global _WATCH_SERVICE
+    import os
+    from pathlib import Path
+
+    proc_name = req.process_name
+    if req.pid is not None:
+        try:
+            os.kill(req.pid, 0)
+        except OSError:
+            raise HTTPException(status_code=404, detail=f"Process PID {req.pid} not found")
+        if not proc_name:
+            try:
+                comm_path = Path(f"/proc/{req.pid}/comm")
+                if comm_path.exists():
+                    proc_name = comm_path.read_text().strip()
+            except Exception:
+                pass
+
+    # Stop any previous watcher session safely
+    if _WATCH_SERVICE is not None and _WATCH_SERVICE.detector.state != "stopped":
+        _WATCH_SERVICE.disarm()
+
+    _WATCH_SERVICE = WatchService(
+        poll_hz=req.poll_hz,
+        onset_s=float(req.onset_s),
+        idle_grace_s=float(req.idle_grace_s),
+        initial_baseline_w=req.baseline_w,
+        active_control=True,
+        target_pid=req.pid,
+        target_process_name=proc_name,
+        focus_mode=req.focus_mode,
+    )
+    return {
+        "ok": True,
+        "status": "armed",
+        "control_state": _WATCH_SERVICE.control_state,
+        "target_pid": req.pid,
+        "target_process_name": proc_name,
+        "message": f"Watcher armed for PID {req.pid or 'system'} at Stock Boost. Monitoring for sustained power spike.",
+    }
+
+
+@app.post("/api/watch/launch-and-arm")
+def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
+    """Launch an application or command at Stock Boost, and arm the watcher for sustained power spikes.
+    App starts with 0 throttle and 100% snappiness. Sweet-spot clamping engages only when heavy work begins.
+    """
+    global _WATCH_SERVICE
+    import subprocess
+    import os
+    import shutil
+    import shlex
+
+    cmd_str = req.command.strip()
+    if not cmd_str:
+        raise HTTPException(status_code=400, detail="Command cannot be empty")
+
+    cwd_path = os.path.abspath(req.cwd) if req.cwd else os.getcwd()
+    if not os.path.isdir(cwd_path):
+        cwd_path = os.getcwd()
+
+    env = os.environ.copy()
+
+    # Launch process
+    if req.launch_in_terminal:
+        terminal_candidates = [
+            "ptyxis", "gnome-terminal", "kgx", "x-terminal-emulator",
+            "konsole", "xfce4-terminal", "kitty", "alacritty", "foot", "xterm"
+        ]
+        term_bin = None
+        for cand in terminal_candidates:
+            if shutil.which(cand):
+                term_bin = cand
+                break
+
+        if not term_bin:
+            raise HTTPException(status_code=500, detail="No supported desktop terminal emulator found")
+
+        bash_script = (
+            f"cd {shlex.quote(cwd_path)} && "
+            f"echo -e '\\033[1;36m============================================================\\033[0m' && "
+            f"echo -e '\\033[1;32m      joulectrl — App Launched with Power-Spike Watcher     \\033[0m' && "
+            f"echo -e '\\033[1;36m============================================================\\033[0m\\n' && "
+            f"{cmd_str}; "
+            f"echo; echo -e '\\033[1;33m[Process finished] Press Enter to close this window...\\033[0m'; read dummy"
+        )
+
+        if term_bin == "ptyxis":
+            spawn_cmd = ["ptyxis", "--new-window", "-T", f"joulectrl: {cmd_str[:25]}", "--", "bash", "-c", bash_script]
+        elif term_bin == "gnome-terminal":
+            spawn_cmd = ["gnome-terminal", f"--title=joulectrl: {cmd_str[:25]}", "--", "bash", "-c", bash_script]
+        elif term_bin in ("kgx", "xfce4-terminal"):
+            spawn_cmd = [term_bin, "-T", f"joulectrl: {cmd_str[:25]}", "-e", f"bash -c {shlex.quote(bash_script)}"]
+        elif term_bin == "konsole":
+            spawn_cmd = ["konsole", "-p", f"tabtitle=joulectrl: {cmd_str[:25]}", "-e", "bash", "-c", bash_script]
+        elif term_bin in ("kitty", "alacritty", "foot"):
+            spawn_cmd = [term_bin, "-T", f"joulectrl: {cmd_str[:25]}", "bash", "-c", bash_script]
+        else:
+            spawn_cmd = [term_bin, "-title", f"joulectrl: {cmd_str[:25]}", "-e", f"bash -c {shlex.quote(bash_script)}"]
+
+        proc = subprocess.Popen(
+            spawn_cmd,
+            cwd=cwd_path,
+            env=env,
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        proc = subprocess.Popen(
+            ["bash", "-c", cmd_str],
+            cwd=cwd_path,
+            env=env,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    pid = proc.pid
+    comm = cmd_str.split()[0] if cmd_str else "app"
+
+    # Stop any previous watcher
+    if _WATCH_SERVICE is not None and _WATCH_SERVICE.detector.state != "stopped":
+        _WATCH_SERVICE.disarm()
+
+    _WATCH_SERVICE = WatchService(
+        poll_hz=req.poll_hz,
+        onset_s=float(req.onset_s),
+        idle_grace_s=float(req.idle_grace_s),
+        initial_baseline_w=req.baseline_w,
+        active_control=True,
+        target_pid=pid,
+        target_process_name=comm,
+        target_command=cmd_str,
+        focus_mode=req.focus_mode,
+    )
+
+    return {
+        "ok": True,
+        "status": "launched_and_armed",
+        "pid": pid,
+        "command": cmd_str,
+        "control_state": _WATCH_SERVICE.control_state,
+        "message": f"Launched '{comm}' (PID {pid}) at Stock Boost. Watcher armed for heavy load.",
+    }
+
+
+@app.post("/api/watch/disarm")
+def disarm_watch() -> dict[str, Any]:
+    """Disarm active watcher and restore all stock clocks and normal scheduling immediately."""
+    global _WATCH_SERVICE
+    if _WATCH_SERVICE is None:
+        return {"ok": True, "status": "disarmed", "message": "No watcher was running."}
+
+    _WATCH_SERVICE.disarm()
+    return {
+        "ok": True,
+        "status": "disarmed",
+        "message": "Watcher disarmed. Stock hardware clocks and normal scheduling restored.",
+    }
 
 
 @app.get("/api/watch/events")

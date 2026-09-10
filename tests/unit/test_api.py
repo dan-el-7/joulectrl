@@ -225,6 +225,51 @@ def test_watch_status_idle_when_never_started():
         app_module._WATCH_SERVICE = prev
 
 
+def test_watch_arm_and_launch_endpoints(client):
+    import os
+
+    # 1. Arm on a running process (our own PID)
+    res_arm = client.post("/api/watch/arm", json={
+        "pid": os.getpid(),
+        "process_name": "pytest",
+        "focus_mode": "on",
+        "baseline_w": 10.0,
+    })
+    assert res_arm.status_code == 200
+    arm_data = res_arm.json()
+    assert arm_data["ok"] is True
+    assert arm_data["status"] == "armed"
+    assert arm_data["control_state"] == "stock_idle"
+
+    # Status check
+    st = client.get("/api/watch/status").json()
+    assert st["active"] is True
+    assert st["active_control"] is True
+    assert st["control_state"] == "stock_idle"
+    assert st["target_pid"] == os.getpid()
+
+    # 2. Launch & Arm with a command
+    res_launch = client.post("/api/watch/launch-and-arm", json={
+        "command": "sleep 1",
+        "focus_mode": "on",
+        "baseline_w": 10.0,
+    })
+    assert res_launch.status_code == 200
+    launch_data = res_launch.json()
+    assert launch_data["ok"] is True
+    assert launch_data["status"] == "launched_and_armed"
+    assert launch_data["pid"] is not None
+
+    # 3. Disarm
+    res_disarm = client.post("/api/watch/disarm")
+    assert res_disarm.status_code == 200
+    assert res_disarm.json()["ok"] is True
+
+    st2 = client.get("/api/watch/status").json()
+    assert st2["control_state"] == "stopped"
+
+
+
 def test_select_publishes_selection_updated_on_bus(client):
     """POST /select must publish selection_updated on B's EventBus (AFFECTS(c))."""
     from core.events import default_bus
