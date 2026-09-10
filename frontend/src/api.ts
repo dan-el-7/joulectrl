@@ -196,6 +196,20 @@ export async function armWatch(params: {
   return res.json();
 }
 
+export interface InstalledApp {
+  name: string;
+  exec: string;
+  icon?: string;
+  desktop_file?: string;
+}
+
+export async function fetchInstalledApps(): Promise<InstalledApp[]> {
+  const res = await fetch(`${API_BASE}/system/installed-apps`);
+  if (!res.ok) throw new Error(`Failed to fetch installed apps: ${res.statusText}`);
+  const data = await res.json();
+  return data.apps || [];
+}
+
 export async function launchAndArm(params: {
   command: string;
   cwd?: string;
@@ -205,6 +219,8 @@ export async function launchAndArm(params: {
   baseline_w?: number;
   poll_hz?: number;
   launch_in_terminal?: boolean;
+  pin_lane?: string;
+  arm_watcher?: boolean;
 }): Promise<any> {
   const res = await fetch(`${API_BASE}/watch/launch-and-arm`, {
     method: 'POST',

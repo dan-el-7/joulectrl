@@ -264,6 +264,8 @@ class WatchLaunchAndArmRequest(BaseModel):
     baseline_w: Optional[float] = None
     poll_hz: float = 1.0
     launch_in_terminal: bool = False
+    pin_lane: Optional[str] = None  # 'fast', 'eco', 'normal', or None
+    arm_watcher: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -1077,6 +1079,18 @@ def get_user_processes(limit: int = 100) -> dict[str, Any]:
     }
 
 
+@app.get("/api/system/installed-apps")
+def get_installed_apps() -> dict[str, Any]:
+    """List installed GUI desktop applications from Linux .desktop files."""
+    from api.system import get_installed_applications
+    apps = get_installed_applications()
+    return {
+        "ok": True,
+        "apps": apps,
+        "total": len(apps),
+    }
+
+
 @app.post("/api/system/process-priority")
 def update_process_priority(req: ProcessPriorityRequest) -> dict[str, Any]:
     """Set process priority and core affinity.
@@ -1748,29 +1762,46 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
     pid = proc.pid
     comm = cmd_str.split()[0] if cmd_str else "app"
 
+    # Optional immediate pinning if requested
+    if req.pin_lane == "fast":
+        try:
+            from api.system import set_process_priority
+            set_process_priority(pid, "prioritize_fast")
+        except Exception:
+            pass
+    elif req.pin_lane == "eco":
+        try:
+            from api.system import set_process_priority
+            set_process_priority(pid, "deprioritize_eco")
+        except Exception:
+            pass
+
     # Stop any previous watcher
     if _WATCH_SERVICE is not None and _WATCH_SERVICE.detector.state != "stopped":
         _WATCH_SERVICE.disarm()
 
-    _WATCH_SERVICE = WatchService(
-        poll_hz=req.poll_hz,
-        onset_s=float(req.onset_s),
-        idle_grace_s=float(req.idle_grace_s),
-        initial_baseline_w=req.baseline_w,
-        active_control=True,
-        target_pid=pid,
-        target_process_name=comm,
-        target_command=cmd_str,
-        focus_mode=req.focus_mode,
-    )
+    ctrl_state = "unmonitored"
+    if req.arm_watcher:
+        _WATCH_SERVICE = WatchService(
+            poll_hz=req.poll_hz,
+            onset_s=float(req.onset_s),
+            idle_grace_s=float(req.idle_grace_s),
+            initial_baseline_w=req.baseline_w,
+            active_control=True,
+            target_pid=pid,
+            target_process_name=comm,
+            target_command=cmd_str,
+            focus_mode=req.focus_mode,
+        )
+        ctrl_state = _WATCH_SERVICE.control_state
 
     return {
         "ok": True,
-        "status": "launched_and_armed",
+        "status": "launched_and_armed" if req.arm_watcher else "launched",
         "pid": pid,
         "command": cmd_str,
-        "control_state": _WATCH_SERVICE.control_state,
-        "message": f"Launched '{comm}' (PID {pid}) at Stock Boost. Watcher armed for heavy load.",
+        "control_state": ctrl_state,
+        "message": f"Launched '{comm}' (PID {pid}) at Stock Boost." + (" Watcher armed for heavy load." if req.arm_watcher else ""),
     }
 
 

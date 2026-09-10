@@ -10,6 +10,9 @@ import {
   setProcessPriority,
   fetchUserProcesses,
   UserProcess,
+  fetchInstalledApps,
+  InstalledApp,
+  launchAndArm,
 } from '../api';
 import { FocusSwitch, FocusMode } from './FocusSwitch';
 
@@ -133,9 +136,21 @@ export const SetupView: React.FC<SetupViewProps> = ({
   targetedProcess,
   onSelectTargetProcess,
 }) => {
-  const [workloadMode, setWorkloadMode] = React.useState<'benchmark' | 'process'>(() => {
+  const [workloadMode, setWorkloadMode] = React.useState<'benchmark' | 'launch' | 'process'>(() => {
     return targetedProcess ? 'process' : 'benchmark';
   });
+  const [launchCommand, setLaunchCommand] = React.useState<string>('make -C scratch/zstd clean && make -C scratch/zstd -j8');
+  const [launchTab, setLaunchTab] = React.useState<'command' | 'apps'>('command');
+  const [installedApps, setInstalledApps] = React.useState<InstalledApp[]>([]);
+  const [loadingApps, setLoadingApps] = React.useState<boolean>(false);
+  const [searchApp, setSearchApp] = React.useState<string>('');
+  const [launchInTerminal, setLaunchInTerminal] = React.useState<boolean>(true);
+  const [launchWatchMode, setLaunchWatchMode] = React.useState<boolean>(true);
+  const [launchLane, setLaunchLane] = React.useState<'fast' | 'eco' | 'all'>('fast');
+  const [launchFeedback, setLaunchFeedback] = React.useState<string | null>(null);
+  const [isLaunchingApp, setIsLaunchingApp] = React.useState<boolean>(false);
+  const [launchedPid, setLaunchedPid] = React.useState<number | null>(null);
+
   const [activeProcessList, setActiveProcessList] = React.useState<UserProcess[]>([]);
   const [loadingProcs, setLoadingProcs] = React.useState<boolean>(false);
   const [procSearch, setProcSearch] = React.useState<string>('');
@@ -151,6 +166,45 @@ export const SetupView: React.FC<SetupViewProps> = ({
   const [targetCoreLane, setTargetCoreLane] = React.useState<'fast' | 'eco' | 'normal'>('fast');
   const [processFeedback, setProcessFeedback] = React.useState<string | null>(null);
   const [isApplyingPriority, setIsApplyingPriority] = React.useState<boolean>(false);
+
+  const loadInstalledApps = React.useCallback(async () => {
+    try {
+      setLoadingApps(true);
+      const apps = await fetchInstalledApps();
+      setInstalledApps(apps);
+    } catch (e) {
+      console.warn('Failed to load installed apps in setup:', e);
+    } finally {
+      setLoadingApps(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (workloadMode === 'launch' && installedApps.length === 0) {
+      loadInstalledApps();
+    }
+  }, [workloadMode, installedApps.length, loadInstalledApps]);
+
+  const handleExecuteLaunch = async () => {
+    if (!launchCommand.trim()) return;
+    try {
+      setIsLaunchingApp(true);
+      setLaunchFeedback(null);
+      const res = await launchAndArm({
+        command: launchCommand.trim(),
+        launch_in_terminal: launchInTerminal,
+        pin_lane: launchLane === 'all' ? undefined : launchLane,
+        arm_watcher: launchWatchMode,
+        baseline_w: 10.0,
+      });
+      setLaunchedPid(res.pid);
+      setLaunchFeedback(`🚀 Launched PID ${res.pid} at Stock Boost! ${launchWatchMode ? 'Watcher armed to clamp sweet-spot during heavy compute.' : ''}`);
+    } catch (e: any) {
+      setLaunchFeedback(`❌ Failed to launch: ${e.message}`);
+    } finally {
+      setIsLaunchingApp(false);
+    }
+  };
 
   React.useEffect(() => {
     if (targetedProcess) {
@@ -281,6 +335,10 @@ export const SetupView: React.FC<SetupViewProps> = ({
   };
 
   const handleStartWithCheck = () => {
+    if (workloadMode === 'launch') {
+      handleExecuteLaunch();
+      return;
+    }
     if (workloadMode === 'process' && targetProcess) {
       handleApplyProcessPriority();
       return;
@@ -328,6 +386,32 @@ export const SetupView: React.FC<SetupViewProps> = ({
             }}
           >
             <span>📦</span> Benchmark Workload
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setWorkloadMode('launch');
+              if (onSelectTargetProcess) onSelectTargetProcess(null);
+            }}
+            style={{
+              flex: 1,
+              padding: '0.5rem',
+              borderRadius: '0.375rem',
+              border: 'none',
+              background: workloadMode === 'launch' ? colors.surface : 'transparent',
+              color: workloadMode === 'launch' ? colors.textPrimary : colors.textTertiary,
+              fontWeight: workloadMode === 'launch' ? 600 : 400,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              boxShadow: workloadMode === 'launch' ? colors.cardShadow : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🚀</span> Launch App / Command
           </button>
           <button
             type="button"
@@ -385,6 +469,303 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   </div>
                 );
               })}
+            </div>
+          </div>
+        ) : workloadMode === 'launch' ? (
+          /* Launch Application or Command Section */
+          <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, borderRadius: '0.5rem', padding: '1.25rem', border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.92rem', fontWeight: 700, color: colors.textPrimary }}>
+                  🚀 Launch Any App or Command
+                </label>
+                <div style={{ fontSize: '0.78rem', color: colors.textTertiary, marginTop: '0.2rem', lineHeight: 1.4 }}>
+                  Launch installed applications or CLI commands with dynamic sweet-spot optimization. Starts at 100% Stock Boost with zero UI latency.
+                </div>
+              </div>
+
+              {/* Sub-tab: CLI Command vs Installed Apps */}
+              <div style={{ display: 'flex', background: colors.surface, borderRadius: '0.375rem', padding: 2, border: `1px solid ${colors.border}` }}>
+                <button
+                  type="button"
+                  onClick={() => setLaunchTab('command')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '0.25rem',
+                    border: 'none',
+                    background: launchTab === 'command' ? colors.accent : 'transparent',
+                    color: launchTab === 'command' ? '#fff' : colors.textTertiary,
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⚡ Command / Script
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLaunchTab('apps');
+                    if (installedApps.length === 0) loadInstalledApps();
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '0.25rem',
+                    border: 'none',
+                    background: launchTab === 'apps' ? colors.accent : 'transparent',
+                    color: launchTab === 'apps' ? '#fff' : colors.textTertiary,
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🖥️ Installed Apps ({installedApps.length || '…'})
+                </button>
+              </div>
+            </div>
+
+            {/* Launch Feedback Banner */}
+            {launchFeedback && (
+              <div
+                style={{
+                  padding: '0.7rem 0.9rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: launchFeedback.includes('❌') ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
+                  border: `1px solid ${launchFeedback.includes('❌') ? colors.red : colors.emerald}`,
+                  fontSize: '0.82rem',
+                  color: colors.textPrimary,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span>{launchFeedback}</span>
+                {onOpenWatchTab && (
+                  <button
+                    type="button"
+                    onClick={onOpenWatchTab}
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: '0.25rem',
+                      background: colors.emerald,
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    View in Watcher →
+                  </button>
+                )}
+              </div>
+            )}
+
+            {launchTab === 'command' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {/* Preset Chips */}
+                <div>
+                  <div style={{ fontSize: '0.74rem', color: colors.textTertiary, fontWeight: 600, marginBottom: '0.35rem' }}>
+                    Quick Presets (1-Click Fill):
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {[
+                      { label: '⚡ Real GCC 10s+ Compile', cmd: 'make -C scratch/zstd clean && make -C scratch/zstd -j8' },
+                      { label: '🎬 Blender Render', cmd: 'blender -b -f 1' },
+                      { label: '🦀 Cargo Build', cmd: 'cargo build --release' },
+                      { label: '🐍 Python Benchmark', cmd: 'python3 scratch/compile_demo.py' },
+                      { label: '🌐 Brave Browser', cmd: 'brave' },
+                      { label: '💻 VS Code', cmd: 'code' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setLaunchCommand(preset.cmd)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.74rem',
+                          border: `1px solid ${launchCommand === preset.cmd ? colors.accent : colors.border}`,
+                          background: launchCommand === preset.cmd ? 'rgba(113,112,255,0.2)' : colors.surface,
+                          color: launchCommand === preset.cmd ? colors.accentHover : colors.textSecondary,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Command Input */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: colors.textSecondary, marginBottom: '0.3rem' }}>
+                    Command to run:
+                  </label>
+                  <input
+                    type="text"
+                    value={launchCommand}
+                    onChange={(e) => setLaunchCommand(e.target.value)}
+                    placeholder="e.g. make -j8 or blender or cargo build --release"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '0.6rem 0.8rem',
+                      borderRadius: '0.375rem',
+                      border: `1px solid ${colors.inputBorder}`,
+                      background: colors.inputBg,
+                      color: colors.textPrimary,
+                      fontFamily: 'monospace',
+                      fontSize: '0.85rem',
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Installed Apps List */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <input
+                  type="text"
+                  placeholder="Search installed desktop apps (e.g. brave, code, blender)..."
+                  value={searchApp}
+                  onChange={(e) => setSearchApp(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: `1px solid ${colors.inputBorder}`,
+                    background: colors.inputBg,
+                    color: colors.textPrimary,
+                    fontSize: '0.82rem',
+                  }}
+                />
+
+                <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                  {loadingApps ? (
+                    <div style={{ gridColumn: '1 / -1', padding: '1rem', textAlign: 'center', color: colors.textTertiary, fontSize: '0.8rem' }}>
+                      Discovering installed applications...
+                    </div>
+                  ) : installedApps
+                    .filter((a) => !searchApp || a.name.toLowerCase().includes(searchApp.toLowerCase()) || a.exec.toLowerCase().includes(searchApp.toLowerCase()))
+                    .slice(0, 30)
+                    .map((app) => {
+                      const isSelected = launchCommand === app.exec;
+                      return (
+                        <div
+                          key={app.name}
+                          onClick={() => setLaunchCommand(app.exec)}
+                          style={{
+                            padding: '0.45rem 0.65rem',
+                            borderRadius: '0.375rem',
+                            border: `1px solid ${isSelected ? colors.accent : colors.border}`,
+                            background: isSelected ? 'rgba(113,112,255,0.18)' : colors.surface,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                          }}
+                        >
+                          <span style={{ fontSize: '1.2rem' }}>📦</span>
+                          <div style={{ overflow: 'hidden' }}>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? colors.accentHover : colors.textPrimary, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                              {app.name}
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: colors.textTertiary, fontFamily: 'monospace', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                              {app.exec.slice(0, 30)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Launch Settings: Watcher + Terminal + Core Lane */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', borderTop: `1px solid ${colors.border}`, paddingTop: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: 600, color: colors.emerald, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={launchWatchMode}
+                    onChange={(e) => setLaunchWatchMode(e.target.checked)}
+                  />
+                  <span>⚡ Arm Power-Spike Watcher (Stock Boost → 2.0 GHz Sweet Spot)</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: colors.textSecondary, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={launchInTerminal}
+                    onChange={(e) => setLaunchInTerminal(e.target.checked)}
+                  />
+                  <span>Open in native desktop terminal window</span>
+                </label>
+              </div>
+
+              {/* Core Lane Priority */}
+              <div>
+                <div style={{ fontSize: '0.74rem', color: colors.textTertiary, marginBottom: '0.3rem' }}>
+                  Hardware Affinity Lane:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                  {[
+                    { id: 'fast', label: '⚡ Fast Zen 5 Cores', desc: 'Cores 0,2,4,6,8,10,12,14' },
+                    { id: 'eco', label: '🌿 Eco Zen 5c Cores', desc: 'Cores 1,3,5,7,9,11,13,15' },
+                    { id: 'all', label: '⚪ All 16 Cores', desc: 'OS default scheduling' },
+                  ].map((lane) => {
+                    const isSel = launchLane === lane.id;
+                    return (
+                      <button
+                        key={lane.id}
+                        type="button"
+                        onClick={() => setLaunchLane(lane.id as any)}
+                        style={{
+                          padding: '0.4rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          border: `1px solid ${isSel ? colors.accent : colors.border}`,
+                          background: isSel ? 'rgba(113,112,255,0.15)' : colors.surface,
+                          color: isSel ? colors.textPrimary : colors.textSecondary,
+                          fontSize: '0.74rem',
+                          fontWeight: isSel ? 600 : 400,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div>{lane.label}</div>
+                        <div style={{ fontSize: '0.65rem', color: colors.textTertiary }}>{lane.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Direct Launch Button inside the card for immediate 1-click execution */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+              <button
+                type="button"
+                disabled={isLaunchingApp || !launchCommand.trim()}
+                onClick={handleExecuteLaunch}
+                style={{
+                  padding: '0.6rem 1.4rem',
+                  borderRadius: '0.375rem',
+                  backgroundColor: colors.emerald,
+                  color: '#fff',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: isLaunchingApp || !launchCommand.trim() ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <span>🚀</span>
+                <span>{isLaunchingApp ? 'Launching...' : 'Launch App / Command Now'}</span>
+              </button>
             </div>
           </div>
         ) : (
@@ -1442,35 +1823,42 @@ export const SetupView: React.FC<SetupViewProps> = ({
         {/* Action Button */}
         <button
           onClick={handleStartWithCheck}
-          disabled={isStarting}
+          disabled={isStarting || isLaunchingApp || (workloadMode === 'launch' && !launchCommand.trim())}
           style={{
             width: '100%',
             padding: '0.75rem',
             borderRadius: '0.5rem',
-            backgroundColor: colors.accentBg,
-            color: colors.textPrimary,
+            backgroundColor: workloadMode === 'launch' ? colors.emerald : colors.accentBg,
+            color: '#fff',
             fontSize: '0.95rem',
-            fontWeight: 600,
+            fontWeight: 700,
             border: 'none',
-            cursor: isStarting ? 'wait' : 'pointer',
-            boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.3)',
+            cursor: (isStarting || isLaunchingApp || (workloadMode === 'launch' && !launchCommand.trim())) ? 'not-allowed' : 'pointer',
+            boxShadow: workloadMode === 'launch' ? '0 4px 12px rgba(16, 185, 129, 0.35)' : '0 4px 6px -1px rgba(37, 99, 235, 0.3)',
+            transition: 'background-color 0.15s ease',
           }}
         >
-          {isStarting
-            ? 'Optimizing Workload...'
-            : workloadMode === 'process'
-              ? targetProcess
-                ? `Shield PID ${targetProcess.pid} (${targetProcess.name}) on ${targetCoreLane === 'fast' ? 'Fast Cores' : targetCoreLane === 'eco' ? 'Eco Cores' : 'All Cores'}`
-                : 'Select a Running Process to Shield'
-              : calibrationBudgetS && calibrationBudgetS > 0
-                ? `Run ${calibrationBudgetS}s Scan & Optimize Workload`
-                : calibrationBudgetS === null
-                  ? 'Run Full Scan & Optimize Workload'
-                  : objective === 'deadline'
-                    ? 'Optimize Workload for Deadline (Instant)'
-                    : objective === 'preference'
-                      ? 'Optimize for Preference Target (Instant)'
-                      : 'Explore Pareto Candidates (Instant)'}
+          {isStarting || isLaunchingApp
+            ? (isLaunchingApp ? 'Launching App / Command...' : 'Optimizing Workload...')
+            : workloadMode === 'launch'
+              ? !launchCommand.trim()
+                ? 'Enter a Command or Select an App Above to Launch'
+                : launchWatchMode
+                  ? '🚀 Launch App & Arm Power-Spike Watcher'
+                  : `🚀 Launch App on ${launchLane === 'fast' ? 'Fast Cores' : launchLane === 'eco' ? 'Eco Cores' : 'All Cores'}`
+              : workloadMode === 'process'
+                ? targetProcess
+                  ? `Shield PID ${targetProcess.pid} (${targetProcess.name}) on ${targetCoreLane === 'fast' ? 'Fast Cores' : targetCoreLane === 'eco' ? 'Eco Cores' : 'All Cores'}`
+                  : 'Select a Running Process to Shield'
+                : calibrationBudgetS && calibrationBudgetS > 0
+                  ? `Run ${calibrationBudgetS}s Scan & Optimize Workload`
+                  : calibrationBudgetS === null
+                    ? 'Run Full Scan & Optimize Workload'
+                    : objective === 'deadline'
+                      ? 'Optimize Workload for Deadline (Instant)'
+                      : objective === 'preference'
+                        ? 'Optimize for Preference Target (Instant)'
+                        : 'Explore Pareto Candidates (Instant)'}
         </button>
       </div>
 

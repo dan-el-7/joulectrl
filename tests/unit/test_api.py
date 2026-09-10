@@ -952,3 +952,17 @@ def test_dynamic_calibration_tiers_and_status(client):
     assert data["frequency_limits_khz"]["min"] > 0
     assert data["frequency_limits_khz"]["max"] >= data["frequency_limits_khz"]["min"]
 
+
+def test_installed_applications_endpoint(client):
+    res = client.get("/api/system/installed-apps")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+    assert isinstance(data["apps"], list)
+    if data["apps"]:
+        assert "name" in data["apps"][0]
+        assert "exec" in data["apps"][0]
+        assert "icon" in data["apps"][0]
+
+
+

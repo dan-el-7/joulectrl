@@ -501,3 +501,53 @@ def apply_policy_to_pattern(pattern: str, policy: str) -> dict[str, Any]:
         "applied_pids": applied,
     }
 
+
+def get_installed_applications() -> list[dict[str, Any]]:
+    """Discover installed GUI applications from standard Linux .desktop files."""
+    import glob
+    import os
+    import re
+
+    apps: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    dirs = [
+        "/usr/share/applications",
+        os.path.expanduser("~/.local/share/applications"),
+    ]
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for f in sorted(glob.glob(os.path.join(d, "*.desktop"))):
+            try:
+                name, exec_cmd, icon, nodisplay, is_app = "", "", "", False, False
+                with open(f, "r", errors="ignore") as fp:
+                    for line in fp:
+                        s = line.strip()
+                        if s == "[Desktop Entry]":
+                            is_app = True
+                        elif is_app and s.startswith("["):
+                            break
+                        if s.startswith("Name=") and not name:
+                            name = s.split("=", 1)[1].strip()
+                        elif s.startswith("Exec=") and not exec_cmd:
+                            raw = s.split("=", 1)[1].strip()
+                            exec_cmd = re.sub(r"%[a-zA-Z]", "", raw).strip()
+                        elif s.startswith("Icon=") and not icon:
+                            icon = s.split("=", 1)[1].strip()
+                        elif s.startswith("NoDisplay=true"):
+                            nodisplay = True
+                if is_app and name and exec_cmd and not nodisplay:
+                    base_exec = exec_cmd.split()[0]
+                    if base_exec not in seen and not base_exec.startswith("/usr/libexec"):
+                        seen.add(base_exec)
+                        apps.append({
+                            "name": name,
+                            "exec": exec_cmd,
+                            "icon": icon,
+                            "desktop_file": os.path.basename(f),
+                        })
+            except Exception:
+                pass
+    return sorted(apps, key=lambda x: x["name"].lower())
+
+
