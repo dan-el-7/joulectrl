@@ -712,14 +712,14 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             elif len(cpus) == topo_info.get("physical_cores", 8) and cfg.worker_count == topo_info.get("physical_cores", 8):
                 cls = "all_physical"
             else:
-                cls = "all"
+                cls = "all_logical"
             key = (cls, cpus, cfg.worker_count, cfg.freq_cap_khz, cfg.boost, cfg.id, r.workload_name)
             by_key.setdefault(key, []).append(r)
 
         classes_map: dict[str, dict[str, Any]] = {
             "fast": {"label": "fast", "c1": None, "points": []},
             "efficient": {"label": "efficient", "c1": None, "points": []},
-            "all": {"label": "all", "c1": None, "points": []},
+            "all_logical": {"label": "all_logical", "c1": None, "points": []},
             "all_physical": {"label": "all_physical", "c1": None, "points": []},
         }
 
@@ -805,7 +805,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             classes_map[cls]["points"].append(point)
 
         out_classes = []
-        for cls_key in ["fast", "efficient", "all", "all_physical"]:
+        for cls_key in ["fast", "efficient", "all_logical", "all_physical"]:
             entry = classes_map.get(cls_key)
             if entry and entry["points"]:
                 # Sort points within each class by (workers, watts) ascending
@@ -857,7 +857,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
         if row.get("workers") == 8 or row.get("layout") == "all8":
             row["class"] = "all_physical"
         else:
-            row["class"] = "all"
+            row["class"] = "all_logical"
         c2_rows.append(row)
 
     def med(rows: list[dict[str, Any]], key: str) -> Optional[float]:
@@ -916,7 +916,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             }
         )
 
-    out = sorted(classes.values(), key=lambda e: {"fast": 0, "efficient": 1, "all": 2, "all_physical": 3}.get(e["label"], 4))
+    out = sorted(classes.values(), key=lambda e: {"fast": 0, "efficient": 1, "all_logical": 2, "all_physical": 3}.get(e["label"], 4))
     for entry in out:
         entry["points"].sort(key=lambda p: (p["workers"], p["watts"]))
         hw = cap_classes.get(entry["label"]) or {}

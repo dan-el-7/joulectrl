@@ -76,7 +76,7 @@ const classColor = (label: string) =>
 
 /** Data-driven class display name: "fast · ≤5.09 GHz" — never hardcoded core names. */
 const classDisplayName = (c: ClassSummary) => {
-  if (c.label === 'all') return 'all cores · 16 threads (SMT)';
+  if (c.label === 'all' || c.label === 'all_logical') return 'all cores · 16 threads (SMT)';
   if (c.label === 'all_physical') return 'all physical · 8 cores';
   return c.hw_max_freq_khz ? `${c.label} · ≤${(c.hw_max_freq_khz / 1e6).toFixed(2)} GHz` : c.label;
 };
@@ -94,6 +94,7 @@ const SERIES_PALETTE: Record<string, string> = {
   'fast': colors.series.fast,
   'efficient': colors.series.efficient,
   'all': '#60a5fa',
+  'all_logical': '#60a5fa',
   'all_physical': '#38bdf8',
 };
 
