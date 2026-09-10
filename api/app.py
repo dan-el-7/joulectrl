@@ -527,12 +527,13 @@ def select_configuration(id: str, req: SelectRequest) -> dict[str, Any]:
             if not baseline_id:
                 baseline_id = sel_model.get("baseline_config_id", "")
 
-    if not baseline_id and configs:
+    base_summary = next((c for c in configs if c.config_id == baseline_id), None)
+    if not base_summary or (base_summary.configuration and not base_summary.configuration.boost and any(c.configuration and c.configuration.boost for c in configs)):
         for c in configs:
-            if c.is_baseline or "stock" in c.config_id:
+            if c.is_baseline or (c.configuration and c.configuration.boost) or "stock" in c.config_id:
                 baseline_id = c.config_id
                 break
-        if not baseline_id:
+        if not baseline_id and configs:
             baseline_id = configs[0].config_id
 
     if not configs:

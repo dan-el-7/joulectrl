@@ -40,12 +40,24 @@ def extract_explanation_facts(
     # Selected configuration details
     if selection.selected_configuration is not None:
         cfg = selection.selected_configuration
+        cfg_id = (cfg.id if cfg.id and cfg.id != "config" else None) or selection.selected_config_id or "selected"
         facts["selected_config"] = {
-            "id": cfg.id,
+            "id": cfg_id,
             "layout": cfg.layout,
             "worker_count": cfg.worker_count,
             "freq_cap_khz": cfg.freq_cap_khz,
             "boost": cfg.boost,
+            "median_energy_j": selection.selected_median_energy_j,
+            "median_runtime_s": selection.selected_median_runtime_s,
+            "guarded_runtime_s": selection.selected_guarded_runtime_s,
+        }
+    elif selection.selected_config_id:
+        facts["selected_config"] = {
+            "id": selection.selected_config_id,
+            "layout": "unknown",
+            "worker_count": 0,
+            "freq_cap_khz": None,
+            "boost": None,
             "median_energy_j": selection.selected_median_energy_j,
             "median_runtime_s": selection.selected_median_runtime_s,
             "guarded_runtime_s": selection.selected_guarded_runtime_s,
@@ -55,7 +67,7 @@ def extract_explanation_facts(
 
     # Baseline configuration details
     facts["baseline_config"] = {
-        "id": selection.baseline_config_id,
+        "id": selection.baseline_config_id or "baseline",
         "median_energy_j": selection.baseline_median_energy_j,
         "median_runtime_s": selection.baseline_median_runtime_s,
     }

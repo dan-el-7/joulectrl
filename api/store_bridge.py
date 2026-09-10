@@ -276,7 +276,18 @@ def apply_live_profile(
     profile = overlay.setdefault("profile", {})
     profile["configurations"] = configurations
     profile["runs"] = runs
-    profile["baseline_config_id"] = next(iter(configurations), None)
+
+    base_id = sel_dict.get("baseline_config_id") if sel_dict else None
+    if not base_id or base_id not in configurations:
+        for cid, cdata in configurations.items():
+            cfg_obj = cdata.get("configuration") or {}
+            if cdata.get("is_baseline") or cfg_obj.get("boost") or "stock" in cid:
+                base_id = cid
+                break
+    if not base_id and configurations:
+        base_id = next(iter(configurations), None)
+    profile["baseline_config_id"] = base_id
+
     overlay["selection"] = selection_to_api(sel_dict) if sel_dict else None
     overlay["_selection_model"] = sel_dict
     overlay["state"] = state

@@ -242,35 +242,44 @@ class LiveEngine:
                     cand_cfg_id = r.config_id
                     break
 
+        if cand_cfg and cand_cfg_id and cand_cfg.id == "config":
+            cand_cfg.id = cand_cfg_id
+
         if not cand_cfg:
             logger.warning("No candidate config found for validation of %s", exp_id)
             self._emit(exp_id, "experiment_state", {"state": "failed", "message": "No candidate configuration found for validation"})
             return
 
-        # 3. Resolve baseline configuration
+        # 3. Resolve baseline configuration (must represent stock unconstrained execution: boost=True)
         base_cfg_id = prof.get("baseline_config_id") or sel.get("baseline_config_id")
         base_cfg: Optional[Configuration] = None
         if base_cfg_id and base_cfg_id in configs:
             base_raw = configs[base_cfg_id].get("configuration") or {}
             base_cfg = Configuration.from_dict(base_raw)
-        else:
+            base_cfg.id = base_cfg_id
+
+        # Guarantee baseline is a stock boost configuration (never a base clock or capped profile)
+        if not base_cfg or not base_cfg.boost:
             for cid, cinfo in configs.items():
-                if cinfo.get("is_baseline") or "stock" in cid or "baseline" in cid:
-                    base_cfg = Configuration.from_dict(cinfo.get("configuration") or {})
+                c_obj = cinfo.get("configuration") or {}
+                if cinfo.get("is_baseline") or c_obj.get("boost") or "stock" in cid:
+                    base_cfg = Configuration.from_dict(c_obj)
+                    base_cfg.id = cid
                     break
 
-        if not base_cfg and sel.get("candidates"):
+        if (not base_cfg or not base_cfg.boost) and sel.get("candidates"):
             for cand in sel["candidates"]:
-                if cand.get("is_baseline") or "stock" in cand.get("config_id", "") or cand.get("config_id") == base_cfg_id:
+                if cand.get("is_baseline") or "stock" in cand.get("config_id", "") or (cand.get("configuration") or {}).get("boost"):
                     base_raw = cand.get("configuration") or {}
                     if base_raw:
                         base_cfg = Configuration.from_dict(base_raw)
+                        base_cfg.id = cand.get("config_id") or "cfg_stock_baseline"
                         break
 
-        if not base_cfg and self.store:
+        if (not base_cfg or not base_cfg.boost) and self.store:
             runs = self.store.get_runs(exp_id)
             for r in runs:
-                if r.is_baseline or "stock" in (r.configuration.id if r.configuration else ""):
+                if (r.is_baseline or "stock" in (r.configuration.id if r.configuration else "")) and (r.configuration and r.configuration.boost):
                     base_cfg = r.configuration
                     break
 
@@ -879,12 +888,17 @@ class LiveEngine:
             ent["sources"].add(source)
 
         if cal and workload_id == "fixed_compute":
+            target_chunks = 65536
             for row in cal.get("rows", []):
                 cap = (row.get("requested_control") or {}).get("cap_khz") or row.get("freq_cap_khz")
                 workers = row.get("workers", len(row["cpus"]))
+                row_chunks = row.get("chunks")
+                scale = (target_chunks / row_chunks) if (row_chunks and row_chunks > 0) else 1.0
+                rt = row["runtime_s"] * scale
+                ej = (row.get("package_energy_j") * scale) if row.get("package_energy_j") is not None else None
                 add((tuple(row["cpus"]), 1 if row["boost"] else 0, cap, workers),
                     row["cpus"], 1 if row["boost"] else 0, workers, cap,
-                    row["runtime_s"], row.get("package_energy_j"), "calibration")
+                    rt, ej, "calibration")
 
         # Discard calibration for any key that was freshly measured in this run
         fresh_keys = {
@@ -926,16 +940,15 @@ class LiveEngine:
         from core.models import Selection, ConfigSummary
 
         summaries = []
-        for i, r in enumerate(rows):
-            cap_str = f"_cap{r['freq_cap_khz']//1000}m" if r.get("freq_cap_khz") else ""
-            ctrl_str = "stock" if r["boost"] else f"base{cap_str}"
+        for r in rows:
+            cid = make_config_id(r["workers"], bool(r["boost"]), r.get("freq_cap_khz"), r["cpus"])
             cfg = Configuration(
-                id=f"cfg_{i}_{r['workers']}w_{ctrl_str}",
+                id=cid,
                 layout="A", worker_count=r["workers"], cpu_affinity=r["cpus"],
                 freq_cap_khz=r.get("freq_cap_khz"), boost=bool(r["boost"]),
             )
             summaries.append(ConfigSummary(
-                config_id=cfg.id, configuration=cfg,
+                config_id=cid, configuration=cfg,
                 runtime_samples=[r["median_runtime_s"]],
                 energy_samples=[r["median_energy_j"]] if r["median_energy_j"] is not None else [],
                 median_runtime_s=r["median_runtime_s"], min_runtime_s=r["median_runtime_s"],
@@ -946,7 +959,12 @@ class LiveEngine:
                 profile_is_usable=r["median_energy_j"] is not None,
                 total_runs=r["n"], is_baseline=False,
             ))
-        baseline = min(summaries, key=lambda s: s.median_runtime_s)  # fastest = stock baseline
+        stock_summaries = [s for s in summaries if s.configuration and s.configuration.boost]
+        if stock_summaries:
+            baseline = min(stock_summaries, key=lambda s: s.median_runtime_s)
+        else:
+            baseline = min(summaries, key=lambda s: s.median_runtime_s)
+        baseline.is_baseline = True
         if objective == "preference":
             return select_preference(
                 summaries,
@@ -973,11 +991,12 @@ class LiveEngine:
                 })
             configs = {}
             for row in rows:
-                cap_str = f"_cap{row['freq_cap_khz']//1000}m" if row.get("freq_cap_khz") else ""
-                cid = f"cfg_{row['workers']}w_{'stock' if row['boost'] else 'base'}{cap_str}_{','.join(map(str, row['cpus'][:2]))}"
+                cid = make_config_id(row["workers"], bool(row["boost"]), row.get("freq_cap_khz"), row["cpus"])
+                is_base = (cid == getattr(selection, "baseline_config_id", None))
                 configs[cid] = {
                     "config_id": cid,
                     "configuration": {
+                        "id": cid,
                         "layout": "B", "worker_count": row["workers"],
                         "cpu_affinity": row["cpus"], "freq_cap_khz": row.get("freq_cap_khz"),
                         "boost": bool(row["boost"]),
@@ -995,7 +1014,7 @@ class LiveEngine:
                     if row["median_energy_j"] else None,
                     "profile_is_usable": row["median_energy_j"] is not None,
                     "total_runs": row["n"],
-                    "is_baseline": False,
+                    "is_baseline": is_base,
                     "sources": row["sources"],
                 }
             self.sb.apply_live_profile(self._overlay_for(exp_id), exp_id, runs_api, configs, selection,
@@ -1033,9 +1052,21 @@ class LiveEngine:
         return self._overlays.setdefault(exp_id, {})
 
 
+def make_config_id(workers: int, boost: bool, cap_khz: Optional[int], cpus: list[int]) -> str:
+    """Generate consistent deterministic configuration identifier across engine, selection, and store."""
+    cap_str = f"_cap{cap_khz // 1000}m" if (cap_khz and not boost) else ""
+    ctrl_str = "stock" if boost else f"base{cap_str}"
+    cpu_suffix = f"_{','.join(map(str, cpus[:2]))}" if cpus else ""
+    return f"cfg_{workers}w_{ctrl_str}{cpu_suffix}"
+
+
 def _cfg_to_api(cfg: Configuration) -> dict[str, Any]:
     return {
-        "layout": cfg.layout, "worker_count": cfg.worker_count,
-        "cpu_affinity": cfg.cpu_affinity, "freq_cap_khz": cfg.freq_cap_khz,
+        "id": cfg.id,
+        "config_id": cfg.id,
+        "layout": cfg.layout,
+        "worker_count": cfg.worker_count,
+        "cpu_affinity": cfg.cpu_affinity,
+        "freq_cap_khz": cfg.freq_cap_khz,
         "boost": cfg.boost,
     }

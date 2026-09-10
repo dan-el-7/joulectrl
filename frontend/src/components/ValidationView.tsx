@@ -464,15 +464,21 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             <div
               style={{
                 fontSize: '0.9rem',
-                color: c.emerald,
+                color: validation.verified_savings_pct >= 0 ? c.emerald : (isLight ? '#b91c1c' : '#f87171'),
                 fontWeight: 700,
-                background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.12)',
+                background: validation.verified_savings_pct >= 0
+                  ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.12)')
+                  : (isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)'),
                 padding: '0.4rem 0.8rem',
                 borderRadius: radii.md,
-                border: `1px solid ${isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.3)'}`,
+                border: `1px solid ${validation.verified_savings_pct >= 0
+                  ? (isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.3)')
+                  : (isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.3)')}`,
               }}
             >
-              Observed Energy Savings: {validation.verified_savings_pct.toFixed(1)}%
+              {validation.verified_savings_pct >= 0
+                ? `Observed Energy Savings: ${validation.verified_savings_pct.toFixed(1)}%`
+                : `Observed Energy Delta: ${validation.verified_savings_pct.toFixed(1)}% (Regression)`}
             </div>
           )}
         </div>
@@ -550,7 +556,9 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                       <td
                         style={{
                           padding: '0.65rem 0.5rem',
-                          color: eSavings != null && eSavings > 0 ? c.emerald : c.textTertiary,
+                          color: eSavings != null && eSavings > 0
+                            ? c.emerald
+                            : (eSavings != null && eSavings < 0 ? (isLight ? '#dc2626' : '#f87171') : c.textTertiary),
                           fontWeight: 700,
                           fontFamily: fonts.mono,
                         }}
@@ -678,13 +686,18 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                       paddingTop: '0.4rem',
                       borderTop: `1px solid ${c.borderSubtle}`,
                       display: 'flex',
-                      justifyContent: 'space-between',
+                      flexDirection: 'column',
+                      gap: '0.2rem',
                       fontSize: '0.72rem',
                       color: c.textTertiary,
                     }}
                   >
-                    <span>Workers: <strong>{cand.workers}</strong></span>
-                    <span>Mask: <code style={{ color: c.textSecondary }}>{cand.cpu_mask}</code></span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Workers: <strong>{cand.workers}</strong></span>
+                    </div>
+                    <div style={{ wordBreak: 'break-all' }}>
+                      Mask: <code style={{ color: c.textSecondary }}>{cand.cpu_mask}</code>
+                    </div>
                   </div>
                 </div>
               );
