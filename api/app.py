@@ -1678,6 +1678,179 @@ def get_system_clock_check_endpoint(
 
 
 # ---------------------------------------------------------------------------
+# Application & Compilation Measurement Endpoint
+# ---------------------------------------------------------------------------
+
+class MeasureCommandRequest(BaseModel):
+    command: Optional[str] = Field(
+        None,
+        description="CLI command or compilation command to execute. If omitted, runs default GCC compile demo."
+    )
+    compare_stock: bool = Field(
+        False,
+        description="If True, runs Stock Boost vs Energy-Optimized configurations side-by-side."
+    )
+    mode: str = Field(
+        "auto",
+        description="Demo mode when command is omitted: 'auto', 'kernel', or 'zstd'."
+    )
+    workers: Optional[int] = Field(
+        None,
+        description="Number of worker threads/processes allocated. Defaults to CPU count."
+    )
+    cpu_affinity: Optional[list[int]] = Field(
+        None,
+        description="Explicit CPU IDs for taskset affinity. Defaults to all available workers."
+    )
+    boost: Optional[bool] = Field(
+        None,
+        description="Explicit boost setting for single run (True for ON, False for OFF)."
+    )
+    freq_cap_khz: Optional[int] = Field(
+        None,
+        description="Target CPU frequency cap clamp in kHz."
+    )
+    timeout_s: float = Field(
+        120.0,
+        description="Execution timeout in seconds."
+    )
+
+
+@app.post("/api/measure")
+def measure_command_endpoint(req: Optional[MeasureCommandRequest] = None) -> dict[str, Any]:
+    """Measure the energy, runtime, and average wattage of an application, compile command, or demo."""
+    from workloads.custom_command import CustomCommandWorkload, get_gcc_compile_demo_workload
+    from cli.main import resolve_energy_backend
+    from helper.client import HelperClient
+    from core.models import Configuration
+    from core.runner import WorkloadRunner
+
+    req = req or MeasureCommandRequest()
+
+    if req.command and req.command.strip():
+        workload = CustomCommandWorkload(req.command.strip())
+    else:
+        workload = get_gcc_compile_demo_workload(mode=req.mode)
+
+    ncpu = os.cpu_count() or 4
+    workers = req.workers if (req.workers is not None and req.workers > 0) else ncpu
+    cpus = req.cpu_affinity if req.cpu_affinity is not None else list(range(workers))
+
+    backend = resolve_energy_backend()
+    sock_path = "/run/joulectrl-helper.sock"
+    helper = HelperClient(socket_path=sock_path) if os.path.exists(sock_path) else None
+
+    runner = WorkloadRunner(backend, working_dir=".")
+
+    if req.compare_stock:
+        cfg_stock = Configuration(
+            id="stock_baseline",
+            layout="stock",
+            worker_count=workers,
+            cpu_affinity=cpus,
+            boost=True,
+        )
+        cfg_opt = Configuration(
+            id="energy_optimized",
+            layout="optimized",
+            worker_count=workers,
+            cpu_affinity=cpus,
+            boost=False,
+            freq_cap_khz=req.freq_cap_khz or 2000000,
+        )
+
+        if helper:
+            try:
+                helper.begin_session()
+                helper.apply_configuration({"boost": True})
+            except Exception:
+                pass
+        rec_stock = runner.run(workload, "api_measure_stock", cfg_stock, 1, timeout_s=req.timeout_s)
+
+        if helper:
+            try:
+                helper.apply_configuration({"boost": False})
+            except Exception:
+                pass
+        rec_opt = runner.run(workload, "api_measure_opt", cfg_opt, 1, timeout_s=req.timeout_s)
+
+        if helper:
+            try:
+                helper.restore()
+                helper.end_session()
+            except Exception:
+                pass
+
+        t_stock = rec_stock.runtime_s
+        t_opt = rec_opt.runtime_s
+        t_delta_pct = ((t_opt - t_stock) / t_stock * 100.0) if t_stock > 0 else 0.0
+
+        e_stock = rec_stock.package_energy_j
+        e_opt = rec_opt.package_energy_j
+        e_saved_pct = ((1.0 - e_opt / e_stock) * 100.0) if (e_stock and e_opt and e_stock > 0) else None
+
+        p_stock = rec_stock.avg_power_w
+        p_opt = rec_opt.avg_power_w
+        p_saved_pct = ((1.0 - p_opt / p_stock) * 100.0) if (p_stock and p_opt and p_stock > 0) else None
+
+        return {
+            "status": "success" if (rec_stock.status == "success" and rec_opt.status == "success") else "failed",
+            "command": " ".join(workload.command(workers)),
+            "stock": rec_stock.to_dict(),
+            "optimized": rec_opt.to_dict(),
+            "comparison": {
+                "runtime_stock_s": t_stock,
+                "runtime_opt_s": t_opt,
+                "runtime_delta_pct": round(t_delta_pct, 2),
+                "energy_stock_j": e_stock,
+                "energy_opt_j": e_opt,
+                "energy_saved_pct": round(e_saved_pct, 2) if e_saved_pct is not None else None,
+                "avg_power_stock_w": p_stock,
+                "avg_power_opt_w": p_opt,
+                "power_saved_pct": round(p_saved_pct, 2) if p_saved_pct is not None else None,
+            }
+        }
+
+    # Single run
+    applied_session = False
+    if helper and (req.boost is not None or req.freq_cap_khz is not None):
+        try:
+            helper.begin_session()
+            applied_session = True
+            ctrl: dict[str, Any] = {}
+            if req.boost is not None:
+                ctrl["boost"] = req.boost
+            if req.freq_cap_khz is not None:
+                ctrl["policy_freq_caps_khz"] = {"policy0": req.freq_cap_khz}
+            helper.apply_configuration(ctrl)
+        except Exception:
+            pass
+
+    cfg = Configuration(
+        id="api_measure_run",
+        layout="custom",
+        worker_count=workers,
+        cpu_affinity=cpus,
+        boost=req.boost if req.boost is not None else True,
+        freq_cap_khz=req.freq_cap_khz,
+    )
+    rec = runner.run(workload, "api_measure", cfg, 1, timeout_s=req.timeout_s)
+
+    if applied_session and helper:
+        try:
+            helper.restore()
+            helper.end_session()
+        except Exception:
+            pass
+
+    return {
+        "status": rec.status,
+        "command": " ".join(workload.command(workers)),
+        "run": rec.to_dict(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Single-Origin Frontend Serving (Vite build in frontend/dist)
 # ---------------------------------------------------------------------------
 

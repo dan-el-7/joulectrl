@@ -6,11 +6,14 @@ from typing import Any, Callable, Type
 from workloads.base import Workload
 from workloads.clean_build import CleanBuildWorkload
 from workloads.fixed_compute import FixedComputeWorkload, PRESETS
+from workloads.custom_command import CustomCommandWorkload, get_gcc_compile_demo_workload
 
 
 _REGISTRY: dict[str, Callable[..., Workload]] = {
     "clean_build": CleanBuildWorkload,
     "fixed_compute": FixedComputeWorkload,
+    "custom_command": CustomCommandWorkload,
+    "compile_demo": get_gcc_compile_demo_workload,
 }
 
 
@@ -70,6 +73,34 @@ def list_workloads() -> list[dict[str, Any]]:
                 "preset": "standard",
                 "chunks": 4096,
                 "iters": 100000,
+            },
+        },
+        {
+            "id": "compile_demo",
+            "name": "GCC C Compilation Demo",
+            "category": "compilation",
+            "description": "Real GCC C compilation measuring active package energy and average wattage.",
+            "characteristics": {
+                "memory_intensity": "medium",
+                "io_intensity": "medium",
+                "scaling_type": "process-parallel",
+            },
+            "parameters": {
+                "mode": "auto",
+            },
+        },
+        {
+            "id": "custom_command",
+            "name": "Custom Command Execution",
+            "category": "cli",
+            "description": "Measures energy, runtime, and average wattage for any user-supplied command or application.",
+            "characteristics": {
+                "memory_intensity": "variable",
+                "io_intensity": "variable",
+                "scaling_type": "configurable",
+            },
+            "parameters": {
+                "command": "",
             },
         },
     ]
