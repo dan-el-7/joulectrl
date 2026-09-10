@@ -161,3 +161,24 @@ def test_api_measure_compare(api_client):
     assert "runtime_opt_s" in comp
     assert "energy_stock_j" in comp
     assert "avg_power_stock_w" in comp
+
+
+def test_api_launch_terminal_mocked(api_client, monkeypatch):
+    import subprocess
+    from unittest.mock import MagicMock
+
+    fake_proc = MagicMock()
+    fake_proc.pid = 99999
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+
+    res = api_client.post("/api/demo/launch-terminal", json={
+        "mode": "kernel",
+        "compare": True,
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+    assert "terminal" in data
+    assert data["pid"] == 99999
+    assert "command" in data
+

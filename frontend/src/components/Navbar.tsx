@@ -4,8 +4,8 @@ import { getThemeColors, fonts, fontFeatures, type, radii, ThemeMode } from '../
 import { FocusSwitch, FocusMode } from './FocusSwitch';
 
 interface NavbarProps {
-  activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings';
-  onSelectTab: (tab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings') => void;
+  activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'demo' | 'watch' | 'tasks' | 'settings';
+  onSelectTab: (tab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'demo' | 'watch' | 'tasks' | 'settings') => void;
   restorationStatus: string;
   onEmergencyRestore: () => void;
   isRestoring: boolean;
@@ -27,6 +27,7 @@ const TABS = [
   { id: 'explorer', label: 'Profile' },
   { id: 'calibration', label: 'Calibration' },
   { id: 'validation', label: 'Validation' },
+  { id: 'demo', label: 'Demo' },
   { id: 'watch', label: 'Watch' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'settings', label: 'Settings' },

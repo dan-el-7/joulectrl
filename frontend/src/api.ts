@@ -364,3 +364,57 @@ export async function stopCalibration(): Promise<{ ok: boolean; message: string;
   if (!res.ok) throw new Error(`Failed to stop calibration: ${res.statusText}`);
   return res.json();
 }
+
+export interface LaunchTerminalParams {
+  command?: string;
+  mode?: 'auto' | 'kernel' | 'zstd';
+  compare?: boolean;
+  workers?: number;
+  cap_khz?: number;
+}
+
+export interface LaunchTerminalResponse {
+  ok: boolean;
+  terminal: string;
+  pid: number;
+  command: string;
+  message: string;
+}
+
+export async function launchDemoTerminal(params: LaunchTerminalParams): Promise<LaunchTerminalResponse> {
+  const res = await fetch(`${API_BASE}/demo/launch-terminal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to launch terminal');
+  }
+  return res.json();
+}
+
+export interface MeasureCommandParams {
+  command?: string;
+  compare_stock?: boolean;
+  mode?: 'auto' | 'kernel' | 'zstd';
+  workers?: number;
+  cpu_affinity?: number[];
+  boost?: boolean;
+  freq_cap_khz?: number;
+  timeout_s?: number;
+}
+
+export async function measureCommand(params: MeasureCommandParams): Promise<any> {
+  const res = await fetch(`${API_BASE}/measure`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Failed to run measurement');
+  }
+  return res.json();
+}
+

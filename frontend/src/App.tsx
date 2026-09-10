@@ -17,6 +17,7 @@ import { ExplorerView } from './components/ExplorerView';
 import { Navbar } from './components/Navbar';
 import { SetupView } from './components/SetupView';
 import { ValidationView } from './components/ValidationView';
+import { DemoView } from './components/DemoView';
 import { WatchPanel } from './components/WatchPanel';
 import { TaskManagerView } from './components/TaskManagerView';
 import { SettingsView } from './components/SettingsView';
@@ -26,7 +27,7 @@ import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
 const AppContent: React.FC = () => {
   const { theme, themeColors, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings'>('explorer');
+  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'demo' | 'watch' | 'tasks' | 'settings'>('explorer');
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [workloads, setWorkloads] = useState<WorkloadInfo[]>([]);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
@@ -418,6 +419,8 @@ const AppContent: React.FC = () => {
             onNavigateExplorer={() => setActiveTab('explorer')}
           />
         )}
+
+        {activeTab === 'demo' && <DemoView />}
 
         {activeTab === 'watch' && (
           <WatchPanel onApplySuggestedBudget={handleApplySuggestedBudget} />

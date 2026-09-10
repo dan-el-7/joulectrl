@@ -1850,6 +1850,114 @@ def measure_command_endpoint(req: Optional[MeasureCommandRequest] = None) -> dic
     }
 
 
+class LaunchTerminalRequest(BaseModel):
+    command: Optional[str] = Field(None, description="Custom command to run. If empty, runs GCC compile demo.")
+    mode: str = Field("auto", description="GCC demo mode: 'auto', 'kernel', or 'zstd'.")
+    compare: bool = Field(True, description="Run side-by-side comparison (Stock Boost vs Energy-Optimized).")
+    workers: Optional[int] = Field(None, description="Worker count.")
+    cap_khz: Optional[int] = Field(None, description="Frequency cap clamp in kHz.")
+
+
+@app.post("/api/demo/launch-terminal")
+def launch_terminal_endpoint(req: Optional[LaunchTerminalRequest] = None) -> dict[str, Any]:
+    """Launch the demo inside an external desktop terminal window (e.g. ptyxis, gnome-terminal)."""
+    import shlex
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    req = req or LaunchTerminalRequest()
+    repo_root = Path(__file__).resolve().parent.parent
+    py_bin = repo_root / ".venv" / "bin" / "python"
+    if not py_bin.exists():
+        py_bin = Path(sys.executable)
+
+    # Build cli command line
+    if req.command and req.command.strip():
+        cli_args = [str(py_bin), "-m", "cli.main", "measure", req.command.strip()]
+    else:
+        cli_args = [str(py_bin), "-m", "cli.main", "compile-demo"]
+        if req.mode == "kernel":
+            cli_args.append("--quick")
+        elif req.mode == "zstd":
+            cli_args.append("--full")
+
+    if req.compare:
+        cli_args.append("--compare")
+    if req.workers:
+        cli_args.extend(["--workers", str(req.workers)])
+    if req.cap_khz:
+        cli_args.extend(["--cap-khz", str(req.cap_khz)])
+
+    full_cli_str = " ".join(shlex.quote(a) for a in cli_args)
+
+    # Find installed terminal emulator
+    terminal_candidates = [
+        "ptyxis",
+        "gnome-terminal",
+        "kgx",
+        "x-terminal-emulator",
+        "konsole",
+        "xfce4-terminal",
+        "kitty",
+        "alacritty",
+        "foot",
+        "xterm",
+    ]
+    term_bin = None
+    for cand in terminal_candidates:
+        if shutil.which(cand):
+            term_bin = cand
+            break
+
+    if not term_bin:
+        raise HTTPException(
+            status_code=500,
+            detail="No supported desktop terminal emulator found (tested ptyxis, gnome-terminal, xterm, etc.)"
+        )
+
+    bash_script = (
+        f"cd {shlex.quote(str(repo_root))} && "
+        f"echo -e '\\033[1;36m============================================================\\033[0m' && "
+        f"echo -e '\\033[1;32m      joulectrl — Real GCC Compilation & Energy Demo       \\033[0m' && "
+        f"echo -e '\\033[1;36m============================================================\\033[0m\\n' && "
+        f"{full_cli_str}; "
+        f"echo; echo -e '\\033[1;33m[Finished] Press Enter to close this window...\\033[0m'; read dummy"
+    )
+
+    if term_bin == "ptyxis":
+        spawn_cmd = ["ptyxis", "--new-window", "-T", "joulectrl GCC Demo", "--", "bash", "-c", bash_script]
+    elif term_bin == "gnome-terminal":
+        spawn_cmd = ["gnome-terminal", "--title=joulectrl GCC Demo", "--", "bash", "-c", bash_script]
+    elif term_bin in ("kgx", "xfce4-terminal"):
+        spawn_cmd = [term_bin, "-T", "joulectrl GCC Demo", "-e", f"bash -c {shlex.quote(bash_script)}"]
+    elif term_bin == "konsole":
+        spawn_cmd = ["konsole", "-p", "tabtitle=joulectrl GCC Demo", "-e", "bash", "-c", bash_script]
+    elif term_bin in ("kitty", "alacritty", "foot"):
+        spawn_cmd = [term_bin, "-T", "joulectrl GCC Demo", "bash", "-c", bash_script]
+    else:
+        spawn_cmd = [term_bin, "-title", "joulectrl GCC Demo", "-e", f"bash -c {shlex.quote(bash_script)}"]
+
+    try:
+        proc = subprocess.Popen(
+            spawn_cmd,
+            cwd=str(repo_root),
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return {
+            "ok": True,
+            "terminal": term_bin,
+            "pid": proc.pid,
+            "command": full_cli_str,
+            "message": f"Launched demo in {term_bin} (PID: {proc.pid})",
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to spawn terminal {term_bin}: {exc}")
+
+
 # ---------------------------------------------------------------------------
 # Single-Origin Frontend Serving (Vite build in frontend/dist)
 # ---------------------------------------------------------------------------
