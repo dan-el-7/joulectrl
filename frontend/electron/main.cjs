@@ -78,12 +78,27 @@ function waitForServer(cb, tries = 0) {
   }
 }
 
+function checkExistingServer(cb) {
+  const req = http.get({ host: '127.0.0.1', port: PORT, path: '/api/capabilities', timeout: 800 }, (res) => {
+    res.resume();
+    cb(res.statusCode < 500);
+  });
+  req.on('error', () => cb(false));
+  req.on('timeout', () => { req.destroy(); cb(false); });
+}
+
+function freePortIfBlocked(cb) {
+  if (isWindows) { cb(); return; }
+  const p = spawn('fuser', ['-k', `${PORT}/tcp`], { stdio: 'ignore' });
+  p.on('close', () => cb());
+  p.on('error', () => cb());
+}
+
 // Disable hardware acceleration to eliminate Linux Chromium GPU compositor crashes
 // during 100% CPU multi-threaded compute workloads. Software rasterization for 2D UI
 // uses negligible CPU and never drops window surfaces.
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('disable-http-cache');
 
 async function createWindow() {
@@ -150,15 +165,25 @@ app.on('child-process-gone', (event, details) => {
 });
 
 app.whenReady().then(() => {
-  startServer();
-  waitForServer((ok) => {
-    if (!ok) {
-      console.error('API server did not come up');
-      app.quit();
-      return;
+  checkExistingServer((running) => {
+    if (running) {
+      console.log(`[desktop] Existing API server already running on port ${PORT}, reusing.`);
+      createWindow();
+      win.on('closed', () => { win = null; });
+    } else {
+      freePortIfBlocked(() => {
+        startServer();
+        waitForServer((ok) => {
+          if (!ok) {
+            console.error('API server did not come up');
+            app.quit();
+            return;
+          }
+          createWindow();
+          win.on('closed', () => { win = null; });
+        });
+      });
     }
-    createWindow();
-    win.on('closed', () => { win = null; });
   });
 });
 
