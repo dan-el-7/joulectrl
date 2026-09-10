@@ -8,6 +8,10 @@ from typing import Callable, Optional
 
 from core.models import Configuration, RunRecord
 
+# Same plausibility ceiling as energy.base.EnergyAccumulator: a segment delta
+# implying more than this sustained over the segment means counter reset/multi-wrap.
+PLAUSIBLE_MAX_W = 200.0
+
 
 @dataclass
 class WatchSegment:
@@ -35,6 +39,9 @@ class WatchSegment:
             delta = self.end_energy_uj - self.start_energy_uj
             if delta < 0:
                 return None
+        # Counter reset / multi-wrap guard: never report an implausible delta as Joules.
+        if delta > PLAUSIBLE_MAX_W * max(self.runtime_s, 1e-9) * 1e6:
+            return None
         return delta / 1_000_000.0
 
     def to_run_record(self, experiment_id: str, workload_name: str, config: Optional[Configuration] = None) -> RunRecord:
@@ -159,6 +166,10 @@ class WatchDetector:
                         self._candidate_start = None
                         self._candidate_energy = None
                         self._candidate_active_samples = 0
+                else:
+                    # No pending spike: slowly re-learn idle baseline so ambient
+                    # drift (browser video, background load) is tracked, not fought.
+                    self._adapt_baseline(power_w)
                 return None
 
         # Active: a short in-band dip is absorbed until the grace period elapses (Geekbench bursty phases).
@@ -180,6 +191,17 @@ class WatchDetector:
             self._last_above_ts = timestamp
             self._last_above_energy = energy_uj
         return None
+
+    def _adapt_baseline(self, power_w: float) -> None:
+        """Rolling-window idle re-estimation: absorb ambient drift (e.g. browser
+        video raising idle power 8W→18W) while no spike candidate is pending.
+        Baseline is frozen during candidates/active segments so a workload's
+        ramp-up can never be absorbed into the threshold."""
+        self._baseline_values.append(power_w)
+        cap = max(8, int(self.baseline_window_s / max(self.poll_interval_s, 0.1)))
+        if len(self._baseline_values) > cap:
+            self._baseline_values = self._baseline_values[-cap:]
+        self._set_baseline()
 
     def _set_baseline(self) -> None:
         self.baseline_w = median(self._baseline_values)

@@ -299,3 +299,46 @@ def test_validation_uses_invariant_fixed_chunks_across_workers():
 
 
 
+
+
+class TestThermalCooldown:
+    def test_cooldown_waits_until_below_threshold(self, monkeypatch):
+        from core.validation import ValidationRunner
+        temps = iter([60.0, 55.0, 48.0])
+        monkeypatch.setattr(ValidationRunner, "_cpu_temp_c", staticmethod(lambda: next(temps)))
+        monkeypatch.setattr("time.sleep", lambda s: None)
+        vr = ValidationRunner.__new__(ValidationRunner)
+        vr.cooldown_temp_c = 50.0
+        vr.cooldown_max_wait_s = 20.0
+
+        class R: metadata = {}
+        vr._thermal_cooldown(R())
+        assert R.metadata == {}  # cooled before deadline, no timeout flag
+
+    def test_cooldown_times_out_gracefully(self, monkeypatch):
+        from core.validation import ValidationRunner
+        monkeypatch.setattr(ValidationRunner, "_cpu_temp_c", staticmethod(lambda: 90.0))
+        fake = iter([0.0, 0.0, 100.0])
+        monkeypatch.setattr("time.monotonic", lambda: next(fake))
+        monkeypatch.setattr("time.sleep", lambda s: None)
+        vr = ValidationRunner.__new__(ValidationRunner)
+        vr.cooldown_temp_c = 50.0
+        vr.cooldown_max_wait_s = 20.0
+
+        class R: metadata = {}
+        vr._thermal_cooldown(R())
+        assert R.metadata == {"cooldown_timeout": True}
+
+    def test_no_sensor_skips_immediately(self, monkeypatch):
+        import time as _t
+        from core.validation import ValidationRunner
+        monkeypatch.setattr(ValidationRunner, "_cpu_temp_c", staticmethod(lambda: None))
+        called = []
+        monkeypatch.setattr("time.sleep", lambda s: called.append(s))
+        vr = ValidationRunner.__new__(ValidationRunner)
+        vr.cooldown_temp_c = 50.0
+        vr.cooldown_max_wait_s = 20.0
+
+        class R: metadata = {}
+        vr._thermal_cooldown(R())
+        assert called == [] and R.metadata == {}

@@ -7,8 +7,10 @@ Narrow op set (frozen contract, AGENTS.md §5):
 Rules honored:
 - No shell, no arbitrary paths, no arbitrary sysfs writes — only the exact paths
   the capability report verified, with values validated against policy bounds.
-- Peer-credential auth: only clients from this machine's user dan-el (uid 1000)...
-  actually: any local user is accepted but every op is logged with uid/pid.
+- Peer-credential auth: SO_PEERCRED is resolved on every connection and the
+  kernel-provided uid/pid are authoritative (client-supplied uid/pid args are
+  ignored). Access is restricted to ALLOWED_UIDS (default: invoking user 1000
+  and root); other local users are refused before any op runs.
 - Snapshot-restore: apply_configuration persists a recovery snapshot BEFORE writing;
   restore puts it back; heartbeat-loss watchdog auto-restores.
 - read_energy: powercap package-0 counter (root-only on this machine).
@@ -22,13 +24,18 @@ from __future__ import annotations
 import json
 import os
 import socket
-import subprocess
+import struct
 import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 SOCKET_PATH = "/run/joulectrl-helper.sock"
+# Kernel-verified peer credentials gate every connection (SO_PEERCRED).
+# Only these uids may talk to the daemon; root is always allowed. The invoking
+# user is taken from PKEXEC_UID (set by pkexec) when present.
+_pkexec_uid = os.environ.get("PKEXEC_UID", "")
+ALLOWED_UIDS = {0, int(_pkexec_uid) if _pkexec_uid.isdigit() else 1000}
 RECOVERY_FILE = Path("/run/joulectrl-helper-recovery.json")  # tmpfs: cleared on reboot
 HEARTBEAT_TIMEOUT_S = 30.0
 OP_SET = ["begin_session", "read_energy", "apply_configuration",
@@ -152,25 +159,28 @@ def _write_str(path: str, value: str) -> bool:
         return False
 
 
-def op_begin_session(args: Dict[str, Any]) -> Dict[str, Any]:
+def op_begin_session(args: Dict[str, Any], peer: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     with _lock:
         if _session["active"]:
             return {"ok": False, "error": "session_already_active",
                     "held_by_uid": _session["uid"], "held_by_pid": _session["pid"]}
-        _session.update(active=True, uid=args.get("uid"), pid=args.get("pid"),
+        # Kernel-verified credentials are authoritative; args uid/pid are ignored.
+        # (peer=None only in direct unit-test invocation; the socket path always supplies it.)
+        creds = peer or {"uid": args.get("uid"), "pid": args.get("pid")}
+        _session.update(active=True, uid=creds["uid"], pid=creds["pid"],
                         began_at=time.time(), last_heartbeat=time.time())
         return {"ok": True, "session": {k: _session[k] for k in
                 ("active", "uid", "pid", "began_at")}}
 
 
-def op_read_energy(args: Dict[str, Any]) -> Dict[str, Any]:
+def op_read_energy(args: Dict[str, Any], peer: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     uj = _read_int(ENERGY_PATH)
     if uj is None:
         return {"ok": False, "error": "energy_unavailable"}
     return {"ok": True, "uj": uj, "t": time.time()}
 
 
-def op_apply_configuration(args: Dict[str, Any]) -> Dict[str, Any]:
+def op_apply_configuration(args: Dict[str, Any], peer: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     with _lock:
         if not _session["active"]:
             return {"ok": False, "error": "no_session"}
@@ -202,6 +212,9 @@ def op_apply_configuration(args: Dict[str, Any]) -> Dict[str, Any]:
             applied["boost"] = _read_int(f"{BASE}/boost")
         caps = requested.get("policy_freq_caps_khz") or {}
         clamp_caps = bool(requested.get("clamp_out_of_range", False))
+        # Validate ALL requests before writing any (no partial application):
+        # policy names must exist, caps resolved against post-boost hw bounds.
+        resolved_caps = []
         for pname, khz in caps.items():
             pd = Path(BASE) / str(pname)
             if not pd.exists():
@@ -217,23 +230,28 @@ def op_apply_configuration(args: Dict[str, Any]) -> Dict[str, Any]:
                         target_khz = hw_min
                 else:
                     return {"ok": False, "error": f"cap_out_of_range:{pname}:{khz}"}
-            _write_int(f"{pd}/scaling_max_freq", target_khz)
-            applied[f"{pname}/scaling_max_freq"] = _read_int_retry(
-                f"{pd}/scaling_max_freq", target_khz)
-        # optional per-policy governor switch (validated against available list)
+            resolved_caps.append((pname, pd, target_khz))
         governors = requested.get("policy_governors") or {}
+        resolved_governors = []
         for pname, gov in governors.items():
             pd = Path(BASE) / str(pname)
             if not pd.exists():
                 return {"ok": False, "error": f"unknown_policy:{pname}"}
             if gov not in _allowed_governors(pd):
                 return {"ok": False, "error": f"governor_not_allowed:{pname}:{gov}"}
+            resolved_governors.append((pname, pd, gov))
+        # Validation passed — now write everything.
+        for pname, pd, target_khz in resolved_caps:
+            _write_int(f"{pd}/scaling_max_freq", target_khz)
+            applied[f"{pname}/scaling_max_freq"] = _read_int_retry(
+                f"{pd}/scaling_max_freq", target_khz)
+        for pname, pd, gov in resolved_governors:
             _write_str(f"{pd}/scaling_governor", gov)
             applied[f"{pname}/scaling_governor"] = _read_str(f"{pd}/scaling_governor")
         return {"ok": True, "applied": applied}
 
 
-def op_heartbeat(args: Dict[str, Any]) -> Dict[str, Any]:
+def op_heartbeat(args: Dict[str, Any], peer: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     with _lock:
         if not _session["active"]:
             return {"ok": False, "error": "no_session"}
@@ -241,7 +259,7 @@ def op_heartbeat(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": True, "t": _session["last_heartbeat"]}
 
 
-def op_restore(args: Dict[str, Any]) -> Dict[str, Any]:
+def op_restore(args: Dict[str, Any], peer: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     with _lock:
         global _orig_state
         if not _orig_state:
@@ -259,7 +277,7 @@ def op_restore(args: Dict[str, Any]) -> Dict[str, Any]:
                                if expected[k] != readback_cmp.get(k)] if not restored_ok else []}
 
 
-def op_end_session(args: Dict[str, Any]) -> Dict[str, All] | Dict[str, Any]:
+def op_end_session(args: Dict[str, Any], peer: Optional[Dict[str, Any]] = None) -> Dict[str, All] | Dict[str, Any]:
     with _lock:
         was_active = _session["active"]
         _session.update(active=False, uid=None, pid=None)
@@ -297,9 +315,25 @@ OPS = {"begin_session": op_begin_session, "read_energy": op_read_energy,
        "restore": op_restore, "end_session": op_end_session}
 
 
+def _peer_credentials(conn: socket.socket) -> Optional[Dict[str, int]]:
+    """Resolve SO_PEERCRED — the kernel's authoritative uid/pid for this connection."""
+    try:
+        creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+        pid, uid, gid = struct.unpack("3i", creds)
+        return {"pid": pid, "uid": uid, "gid": gid}
+    except OSError:
+        return None
+
+
 def handle_conn(conn: socket.socket) -> None:
+    peer = _peer_credentials(conn)
+    if peer is None or peer["uid"] not in ALLOWED_UIDS:
+        # Refuse before reading anything: untrusted local users get no protocol access.
+        print(f"[helper] refused connection peer={peer}", flush=True)
+        return
     with conn:
         f = conn.makefile("rw")
+        op = None
         for line in f:
             line = line.strip()
             if not line:
@@ -310,7 +344,7 @@ def handle_conn(conn: socket.socket) -> None:
                 if op not in OPS:
                     resp = {"ok": False, "error": f"unknown_op:{op}"}
                 else:
-                    resp = OPS[op](req.get("args", {}))
+                    resp = OPS[op](req.get("args", {}), peer)
             except json.JSONDecodeError as e:
                 resp = {"ok": False, "error": f"bad_json:{e}"}
             f.write(json.dumps(resp) + "\n")
@@ -327,7 +361,16 @@ def main() -> None:
     threading.Thread(target=watchdog, daemon=True).start()
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(SOCKET_PATH)
-    os.chmod(SOCKET_PATH, 0o666)  # local-only; every op logs uid/pid (peer-cred hardening in Gate 2)
+    # Owner-group the socket to the first allowed non-root uid so that user can
+    # connect; SO_PEERCRED gate in handle_conn refuses everyone else.
+    try:
+        import pwd
+        for uid in sorted(ALLOWED_UIDS - {0}):
+            os.chown(SOCKET_PATH, uid, pwd.getpwuid(uid).pw_gid)
+            break
+    except (KeyError, ImportError, OSError):
+        pass
+    os.chmod(SOCKET_PATH, 0o660)
     print(f"[helper] listening on {SOCKET_PATH}", flush=True)
     srv.listen(4)
     while True:

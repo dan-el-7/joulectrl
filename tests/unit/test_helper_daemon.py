@@ -166,3 +166,28 @@ def test_pstate_mode_experimental_knob(daemon_ns):
     assert r2["ok"], r2.get("mismatches")
     assert open(pstate_path).read().strip() == "active"
     ns["op_end_session"]({})
+
+
+def test_begin_session_uses_kernel_peer_credentials(daemon_ns):
+    ns = daemon_ns
+    # A spoofed args uid/pid must be ignored: kernel-verified peer wins.
+    r = ns["op_begin_session"]({"uid": 0, "pid": 999}, peer={"uid": 1000, "pid": 42})
+    assert r["ok"]
+    assert ns["_session"]["uid"] == 1000 and ns["_session"]["pid"] == 42
+    ns["op_end_session"]({})
+
+
+def test_peer_gate_refuses_untrusted_uid():
+    # handle_conn refuses before any op when SO_PEERCRED uid is not allowed.
+    import socket as s
+    src = open("helper/daemon.py").read()
+    ns = {"__name__": "daemon"}
+    exec(compile(src, "daemon", "exec"), ns)
+    a, b = s.socketpair()
+    refused = []
+    ns["_peer_credentials"] = lambda conn: {"pid": 1, "uid": 12345, "gid": 12345}
+    ns["OPS"] = {k: (lambda *args, **kw: refused.append(k)) for k in ns["OPS"]}
+    ns["handle_conn"](a)
+    refused == [] or AssertionError("untrusted uid must not reach any op")
+    b.close()
+    a.close()

@@ -1,7 +1,7 @@
 """Scripted power-profile tests for passive watch detection."""
 
 from energy.synthetic import SyntheticEnergyBackend
-from core.watch import WatchDetector
+from core.watch import WatchDetector, WatchSegment
 
 
 def test_watch_backdates_onset_and_end_and_absorbs_dip():
@@ -259,3 +259,36 @@ def test_watch_service_deadline_objective():
 
 
 
+
+
+class TestAdaptiveBaselineAndResetGuard:
+    def _detector(self):
+        return WatchDetector(initial_baseline_w=8.0, onset_s=2.0, idle_grace_s=6.0,
+                             poll_interval_s=1.0, energy_range_uj=65_532_610_987)
+
+    def test_baseline_adapts_to_idle_drift(self):
+        d = self._detector()
+        t = 0.0
+        i = 0
+        # Gradual drift 8W -> 18W in +2W steps, each inside the band vs the
+        # rolling median, so samples keep adapting the baseline (never spiking).
+        for w in (10.0, 12.0, 14.0, 16.0, 18.0):
+            for _ in range(8):
+                d.observe(w, None, t + i)
+                i += 1
+        # Threshold must now sit above 18W-ish band so 20W is NOT a spike,
+        # while a genuine 35W spike still triggers onset.
+        assert d.state == "idle"
+        fired = []
+        d.on_active = lambda ts, w: fired.append(ts)
+        for i in range(40, 50):
+            d.observe(35.0, None, t + i)
+        assert fired, "spike must still be detected after baseline drift adaptation"
+
+    def test_segment_energy_reset_returns_none(self):
+        d = self._detector()
+        # Close a segment whose counter delta implies >200W — must yield None.
+        seg = WatchSegment(start_ts=0.0, end_ts=10.0, start_energy_uj=1000,
+                           end_energy_uj=10_000_000_000, energy_range_uj=65_532_610_987,
+                           baseline_w=8.0, spread_w=1.0, poll_interval_s=1.0)
+        assert seg.energy_j is None

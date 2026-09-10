@@ -84,11 +84,27 @@ class TestGccCompileDemo(unittest.TestCase):
         self.assertIn("fixed_compute.c", " ".join(cmd))
 
     def test_get_gcc_compile_demo_zstd(self):
+        zstd_root = Path(__file__).resolve().parents[2] / "workloads" / "build_target" / "zstd"
+        if not zstd_root.exists():
+            self.skipTest(
+                "workloads/build_target/zstd not present (fresh clone); "
+                "run scripts/setup to vendor the zstd build target"
+            )
         wl = get_gcc_compile_demo_workload(mode="zstd")
         self.assertEqual(wl.name, "gcc_compile_demo")
         cmd = wl.command(6)
         self.assertEqual(cmd[0], "make")
         self.assertIn("-j6", cmd)
+
+    def test_get_gcc_compile_demo_falls_back_without_zstd_tree(self):
+        # Documented fallback: without the zstd build target, mode="zstd"
+        # degrades to the single-file gcc kernel compile.
+        zstd_root = Path(__file__).resolve().parents[2] / "workloads" / "build_target" / "zstd"
+        if zstd_root.exists():
+            self.skipTest("zstd tree present on this machine; fallback not active")
+        wl = get_gcc_compile_demo_workload(mode="zstd")
+        self.assertEqual(wl.name, "gcc_compile_demo")
+        self.assertEqual(wl.command(6)[0], "gcc")
 
 
 class TestCliMeasureCommands(unittest.TestCase):

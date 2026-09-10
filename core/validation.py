@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import random
 import uuid
 from dataclasses import dataclass, field
@@ -167,6 +168,8 @@ class ValidationRunner:
         store: Optional[Store] = None,
         apply_configuration: Optional[Callable[[Configuration], None]] = None,
         restore_configuration: Optional[Callable[[], None]] = None,
+        cooldown_temp_c: float = 50.0,
+        cooldown_max_wait_s: float = 20.0,
     ) -> None:
         if repetitions < 1:
             raise ValueError("repetitions must be positive")
@@ -182,12 +185,53 @@ class ValidationRunner:
         self.store = store
         self.apply_configuration = apply_configuration
         self.restore_configuration = restore_configuration
+        self.cooldown_temp_c = cooldown_temp_c
+        self.cooldown_max_wait_s = cooldown_max_wait_s
+
+    @staticmethod
+    def _cpu_temp_c() -> Optional[float]:
+        """Best-effort CPU temperature from hwmon (k10temp/zenpower on AMD);
+        None when unavailable → cooldown gate is skipped, never blocks."""
+        import glob
+        for pattern in ("/sys/class/hwmon/hwmon*/name",):
+            for name_path in glob.glob(pattern):
+                try:
+                    name = open(name_path).read().strip()
+                    if name not in ("k10temp", "zenpower", "coretemp"):
+                        continue
+                    base = name_path.rsplit("/", 1)[0]
+                    for inp in sorted(glob.glob(f"{base}/temp*_input")):
+                        try:
+                            return int(open(inp).read().strip()) / 1000.0
+                        except (OSError, ValueError):
+                            continue
+                except OSError:
+                    continue
+        return None
+
+    def _thermal_cooldown(self, report: ValidationReport) -> None:
+        """Between pairs: wait for the package to cool below the threshold so a
+        hot boost baseline run doesn't bias the candidate measured right after
+        it. Skips immediately when no temperature sensor is readable or the
+        package is already cool; never waits longer than cooldown_max_wait_s."""
+        if self.cooldown_temp_c <= 0 or self.cooldown_max_wait_s <= 0:
+            return
+        deadline = time.monotonic() + self.cooldown_max_wait_s
+        while time.monotonic() < deadline:
+            temp = self._cpu_temp_c()
+            if temp is None or temp <= self.cooldown_temp_c:
+                return
+            time.sleep(1.0)
+        report_metadata = getattr(report, "metadata", None)
+        if isinstance(report_metadata, dict):
+            report_metadata["cooldown_timeout"] = True
 
     def run(self, deadline_s: Optional[float] = None, timeout_s: Optional[float] = None) -> ValidationReport:
         jobs = [(candidate, repetition) for candidate in self.candidates for repetition in range(1, self.repetitions + 1)]
         random.Random(self.seed).shuffle(jobs)
         report = ValidationReport(deadline_s=deadline_s)
         for pair_index, (candidate, repetition) in enumerate(jobs, 1):
+            self._thermal_cooldown(report)
             baseline_run = self._run_one(self.baseline, repetition, report, timeout_s)
             selected_run = self._run_one(candidate, repetition, report, timeout_s)
             pair = ValidationPair(

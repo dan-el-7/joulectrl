@@ -30,10 +30,6 @@ class EnergyBackend(Protocol):
         """Advertised counter wrap range in microjoules, if known."""
 
 
-class EnergyReading(NamedTupleMeta := object):
-    pass
-
-
 from dataclasses import dataclass
 
 

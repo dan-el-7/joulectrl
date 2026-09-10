@@ -850,8 +850,19 @@ class LiveEngine:
             rec = runner.run(wl, exp_id, cfg, repetition=repetition, phase=phase)
             e2 = helper.read_energy()
             if e1.get("ok") and e2.get("ok"):
-                rec.package_energy_j = round(((e2["uj"] - e1["uj"]) % WRAP_UJ) / 1e6, 4)
-                rec.energy_available = True
+                # Wrap-safe modulo + plausibility ceiling (mirrors EnergyAccumulator):
+                # a delta implying >200W sustained over the bracket means counter
+                # reset/multi-wrap — report unavailable instead of a bogus number.
+                d_uj = (e2["uj"] - e1["uj"]) % WRAP_UJ
+                bracket_s = max(rec.runtime_s or 0.0, 1e-9) + 1.0  # +settle/launch overhead
+                if d_uj <= 200.0 * bracket_s * 1e6:
+                    rec.package_energy_j = round(d_uj / 1e6, 4)
+                    rec.energy_available = True
+                else:
+                    rec.package_energy_j = None
+                    rec.energy_available = False
+                    rec.metadata = {**(rec.metadata or {}), "energy_error":
+                                    f"helper bracket delta {d_uj} uJ implausible over {bracket_s:.1f}s — reset or multi-wrap"}
             return rec
         finally:
             self._active_runners.pop(exp_id, None)
