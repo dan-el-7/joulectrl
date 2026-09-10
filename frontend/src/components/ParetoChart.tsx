@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ConfigSummary } from '../types';
 import { colors } from '../design';
 
@@ -12,11 +12,11 @@ interface ParetoChartProps {
   onSelectConfig?: (configId: string) => void;
 }
 
-const LAYOUT_COLORS: Record<string, { bg: string; border: string; name: string }> = {
-  A: { bg: colors.emerald, border: colors.emerald, name: 'Layout A: fast-class cores' },
-  B: { bg: colors.accent, border: colors.accentBg, name: 'Layout B: all physical cores' },
-  C: { bg: colors.amber, border: colors.amber, name: 'Layout C: all logical CPUs' },
-  D: { bg: colors.accentHover, border: colors.accent, name: 'Layout D: efficient-class cores' },
+const LAYOUT_COLORS: Record<string, { bg: string; border: string; name: string; short: string }> = {
+  A: { bg: colors.emerald, border: colors.emerald, name: 'Layout A: fast-class cores', short: 'Fast Cores' },
+  B: { bg: colors.accent, border: colors.accentBg, name: 'Layout B: all physical cores', short: 'Physical Cores' },
+  C: { bg: colors.amber, border: colors.amber, name: 'Layout C: all logical CPUs', short: 'All Logical CPUs' },
+  D: { bg: colors.accentHover, border: colors.accent, name: 'Layout D: efficient-class cores', short: 'Dense Zen 5c' },
 };
 
 function formatDuration(sec: number): string {
@@ -42,6 +42,8 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
   onSelectConfig,
 }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [viewFilter, setViewFilter] = useState<'frontier' | 'all'>('frontier');
+  const [selectedLayout, setSelectedLayout] = useState<string>('ALL');
 
   const configsList = Object.values(configurations);
   if (configsList.length === 0) {
@@ -66,6 +68,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
     guardedRuntime: number;
     energy: number;
     isFeasible: boolean;
+    isDominated: boolean;
   }> = {};
 
   configsList.forEach((cfg) => {
@@ -86,14 +89,81 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
       guardedRuntime,
       energy,
       isFeasible,
+      isDominated: false,
     };
   });
 
   const scaledList = Object.values(scaledMap);
 
-  // Calculate bounds with padding
-  const runtimes = scaledList.map((s) => s.runtime);
-  const energies = scaledList.map((s) => s.energy);
+  // Identify non-dominated points among all candidate configurations
+  const nonDominatedMap = useMemo(() => {
+    const set = new Set<string>();
+    scaledList.forEach((ptA) => {
+      let dominated = false;
+      for (const ptB of scaledList) {
+        if (ptA.cfg.config_id === ptB.cfg.config_id) continue;
+        if (
+          ptB.runtime <= ptA.runtime &&
+          ptB.energy <= ptA.energy &&
+          (ptB.runtime < ptA.runtime || ptB.energy < ptA.energy)
+        ) {
+          dominated = true;
+          break;
+        }
+      }
+      if (!dominated) {
+        set.add(ptA.cfg.config_id);
+      }
+    });
+    return set;
+  }, [scaledList]);
+
+  // Merge backend frontierConfigIds with local Pareto discovery
+  const allFrontierIds = useMemo(() => {
+    const set = new Set<string>([...frontierConfigIds, ...Array.from(nonDominatedMap)]);
+    if (baselineConfigId) set.add(baselineConfigId);
+    if (selectedConfigId) set.add(selectedConfigId);
+    return set;
+  }, [frontierConfigIds, nonDominatedMap, baselineConfigId, selectedConfigId]);
+
+  // Mark dominated status
+  scaledList.forEach((item) => {
+    item.isDominated = !allFrontierIds.has(item.cfg.config_id);
+  });
+
+  // Filter items based on active layout and view filter
+  const displayedItems = useMemo(() => {
+    return scaledList.filter((item) => {
+      const layout = item.cfg.configuration?.layout || 'A';
+      if (selectedLayout !== 'ALL' && layout !== selectedLayout) {
+        if (item.cfg.config_id !== selectedConfigId && item.cfg.config_id !== baselineConfigId) {
+          return false;
+        }
+      }
+      if (viewFilter === 'frontier') {
+        return allFrontierIds.has(item.cfg.config_id);
+      }
+      return true;
+    });
+  }, [scaledList, selectedLayout, viewFilter, allFrontierIds, selectedConfigId, baselineConfigId]);
+
+  // Build Pareto frontier curve points sorted by runtime
+  // In frontier mode, this curve connects all non-dominated points, guaranteeing a smooth downward slope
+  const frontierPoints = useMemo(() => {
+    const source = selectedLayout === 'ALL'
+      ? scaledList.filter((s) => allFrontierIds.has(s.cfg.config_id))
+      : scaledList.filter((s) => {
+          const l = s.cfg.configuration?.layout || 'A';
+          return (l === selectedLayout || s.cfg.config_id === selectedConfigId || s.cfg.config_id === baselineConfigId) && allFrontierIds.has(s.cfg.config_id);
+        });
+
+    return source.sort((a, b) => a.runtime - b.runtime);
+  }, [scaledList, allFrontierIds, selectedLayout, selectedConfigId, baselineConfigId]);
+
+  // Calculate bounds with padding based on displayed points
+  const activeForBounds = displayedItems.length > 0 ? displayedItems : scaledList;
+  const runtimes = activeForBounds.map((s) => s.runtime);
+  const energies = activeForBounds.map((s) => s.energy);
   const spanX = Math.max(...runtimes, deadlineS ?? 0) - Math.min(...runtimes, deadlineS ?? Infinity) || 1;
   const spanY = Math.max(...energies) - Math.min(...energies) || 1;
   const minX = Math.max(0, (Math.min(...runtimes, deadlineS ?? Infinity) || 0) - spanX * 0.15);
@@ -115,24 +185,24 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
   const scaleX = (val: number) => padLeft + ((val - minX) / (maxX - minX)) * chartW;
   const scaleY = (val: number) => padTop + chartH - ((val - minY) / (maxY - minY)) * chartH;
 
-  // Build Pareto frontier curve points sorted by runtime
-  const frontierPoints = frontierConfigIds
-    .map((id) => scaledMap[id])
-    .filter(Boolean)
-    .sort((a, b) => a.runtime - b.runtime);
-
   const frontierPath =
     frontierPoints.length > 1
       ? frontierPoints
-          .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(pt.runtime)} ${scaleY(pt.energy)}`)
+          .map((pt, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(pt.runtime).toFixed(1)} ${scaleY(pt.energy).toFixed(1)}`)
           .join(' ')
+      : '';
+
+  const frontierAreaPath =
+    frontierPoints.length > 1
+      ? `${frontierPath} L ${scaleX(frontierPoints[frontierPoints.length - 1].runtime).toFixed(1)} ${padTop + chartH} L ${scaleX(frontierPoints[0].runtime).toFixed(1)} ${padTop + chartH} Z`
       : '';
 
   const hoveredItem = hoveredId ? scaledMap[hoveredId] : null;
 
   return (
     <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+      {/* Top Header: Title, Mode Toggle, and Layout Filters */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <h3 style={{ margin: 0, fontSize: '1rem', color: colors.textSecondary, fontWeight: 600 }}>
             Package Energy vs. Runtime (Pareto Frontier)
@@ -153,18 +223,110 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
-          {Object.entries(LAYOUT_COLORS).map(([key, info]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: colors.textTertiary }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: info.bg }} />
-              <span>{info.name}</span>
-            </div>
-          ))}
+
+        {/* View Mode Toggle: Clean Frontier Curve vs All Points */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: colors.surfaceElevated, padding: '2px', borderRadius: '0.375rem', border: `1px solid ${colors.border}` }}>
+          <button
+            type="button"
+            onClick={() => setViewFilter('frontier')}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '0.25rem',
+              fontSize: '0.72rem',
+              fontWeight: viewFilter === 'frontier' ? 600 : 400,
+              border: 'none',
+              background: viewFilter === 'frontier' ? colors.accent : 'transparent',
+              color: viewFilter === 'frontier' ? '#fff' : colors.textTertiary,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title="Focus exclusively on the optimal Pareto tradeoff curve"
+          >
+            <span>✨</span>
+            <span>Frontier Curve</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewFilter('all')}
+            style={{
+              padding: '3px 8px',
+              borderRadius: '0.25rem',
+              fontSize: '0.72rem',
+              fontWeight: viewFilter === 'all' ? 600 : 400,
+              border: 'none',
+              background: viewFilter === 'all' ? colors.accent : 'transparent',
+              color: viewFilter === 'all' ? '#fff' : colors.textTertiary,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title="Display all swept benchmark candidates including dominated points"
+          >
+            <span>📊</span>
+            <span>All Points ({scaledList.length})</span>
+          </button>
         </div>
+      </div>
+
+      {/* Filterable Layout Chips */}
+      <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.72rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.6rem', paddingBottom: '0.4rem', borderBottom: `1px solid ${colors.border}` }}>
+        <span style={{ color: colors.textTertiary, fontSize: '0.7rem', fontWeight: 600, marginRight: '0.2rem' }}>Filter Layout:</span>
+        <button
+          type="button"
+          onClick={() => setSelectedLayout('ALL')}
+          style={{
+            padding: '2px 7px',
+            borderRadius: '0.25rem',
+            border: `1px solid ${selectedLayout === 'ALL' ? colors.accentHover : colors.border}`,
+            background: selectedLayout === 'ALL' ? 'rgba(113,112,255,0.2)' : 'transparent',
+            color: selectedLayout === 'ALL' ? colors.accentHover : colors.textTertiary,
+            fontSize: '0.7rem',
+            cursor: 'pointer',
+            fontWeight: selectedLayout === 'ALL' ? 600 : 400,
+          }}
+        >
+          All Layouts
+        </button>
+        {Object.entries(LAYOUT_COLORS).map(([key, info]) => {
+          const isSel = selectedLayout === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSelectedLayout(isSel ? 'ALL' : key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '2px 7px',
+                borderRadius: '0.25rem',
+                border: `1px solid ${isSel ? info.bg : colors.border}`,
+                background: isSel ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: isSel ? colors.textPrimary : colors.textTertiary,
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                fontWeight: isSel ? 600 : 400,
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: info.bg }} />
+              <span>{info.short}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ position: 'relative' }}>
         <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+          <defs>
+            <linearGradient id="frontierAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={colors.accentHover} stopOpacity="0.14" />
+              <stop offset="100%" stopColor={colors.accentHover} stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
             const y = padTop + chartH * ratio;
@@ -228,21 +390,29 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             </g>
           )}
 
-          {/* Pareto Frontier Curve */}
+          {/* Shaded Area under Frontier Curve */}
+          {frontierAreaPath && (
+            <path
+              d={frontierAreaPath}
+              fill="url(#frontierAreaGrad)"
+            />
+          )}
+
+          {/* Pareto Frontier Optimal Curve */}
           {frontierPath && (
             <path
               d={frontierPath}
               fill="none"
               stroke={colors.accentHover}
-              strokeWidth="2"
+              strokeWidth="2.5"
               strokeDasharray="4 2"
-              opacity="0.75"
+              opacity="0.85"
             />
           )}
 
           {/* Data Points */}
-          {scaledList.map((item) => {
-            const { cfg, runtime, guardedRuntime, energy, isFeasible } = item;
+          {displayedItems.map((item) => {
+            const { cfg, runtime, guardedRuntime, energy, isFeasible, isDominated } = item;
             const cx = scaleX(runtime);
             const cy = scaleY(energy);
             const layoutKey = cfg.configuration?.layout || 'A';
@@ -250,11 +420,18 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             const isSelected = cfg.config_id === selectedConfigId;
             const isBaseline = cfg.config_id === baselineConfigId;
             const isHovered = cfg.config_id === hoveredId;
+            const isFrontier = !isDominated || isBaseline || isSelected;
+
+            // In all mode, gently fade dominated points to bring out the clean frontier
+            const opacity = isHovered || isSelected || isBaseline
+              ? 1.0
+              : (isFrontier ? (isFeasible ? 0.95 : 0.6) : 0.25);
+            const radius = isBaseline ? 7.5 : (isSelected ? 7.5 : (isFrontier ? 6 : 4));
 
             return (
               <g
                 key={cfg.config_id}
-                style={{ cursor: 'pointer', opacity: !isFeasible && !isHovered && !isSelected ? 0.35 : 1.0 }}
+                style={{ cursor: 'pointer', opacity }}
                 onMouseEnter={() => setHoveredId(cfg.config_id)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={() => onSelectConfig && onSelectConfig(cfg.config_id)}
@@ -296,7 +473,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={isBaseline ? 7 : 6}
+                  r={radius}
                   fill={isBaseline ? colors.red : color.bg}
                   stroke={!isFeasible ? colors.red : (isBaseline ? colors.red : color.border)}
                   strokeWidth="1.5"
@@ -351,6 +528,11 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             <div>Layout: {LAYOUT_COLORS[hoveredItem.cfg.configuration?.layout]?.name ?? hoveredItem.cfg.configuration?.layout}</div>
             <div>Workers: {hoveredItem.cfg.configuration?.worker_count} | Boost: {hoveredItem.cfg.configuration?.boost ? 'On' : 'Off'}</div>
             <div>Cap: {hoveredItem.cfg.configuration?.freq_cap_khz ? `${hoveredItem.cfg.configuration.freq_cap_khz / 1e6} GHz` : 'Stock'}</div>
+            {hoveredItem.isDominated && (
+              <div style={{ color: colors.amber, fontSize: '0.68rem', marginTop: '0.2rem' }}>
+                ⚠ Dominated configuration (slower and higher energy than frontier)
+              </div>
+            )}
             <div style={{ marginTop: '0.3rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.3rem' }}>
               <div>
                 <strong>Runtime:</strong> {formatDuration(hoveredItem.runtime)} (guarded: {formatDuration(hoveredItem.guardedRuntime)})
@@ -370,3 +552,4 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
     </div>
   );
 };
+
