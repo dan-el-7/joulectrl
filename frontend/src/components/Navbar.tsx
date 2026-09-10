@@ -1,6 +1,7 @@
 import React from 'react';
 import { fetchSystemThermal, SystemThermalStatus } from '../api';
 import { getThemeColors, fonts, fontFeatures, type, radii, ThemeMode } from '../design';
+import { FocusSwitch, FocusMode } from './FocusSwitch';
 
 interface NavbarProps {
   activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings';
@@ -17,6 +18,8 @@ interface NavbarProps {
   onCancelExperiment?: () => void;
   theme?: ThemeMode;
   onToggleTheme?: () => void;
+  focusMode?: FocusMode;
+  onChangeFocusMode?: (mode: FocusMode) => void;
 }
 
 const TABS = [
@@ -59,6 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onCancelExperiment,
   theme = 'dark',
   onToggleTheme,
+  focusMode = 'off',
+  onChangeFocusMode,
 }) => {
   const c = getThemeColors(theme);
   const restored = restorationStatus === 'restored' || restorationStatus === 'not_required';
@@ -280,6 +285,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               ))}
             </select>
           </div>
+        )}
+
+        {/* Focus Switch: reverse (game/foreground priority) | off | on (pinned task priority) */}
+        {onChangeFocusMode && (
+          <FocusSwitch
+            value={focusMode}
+            onChange={onChangeFocusMode}
+            size="sm"
+          />
         )}
 
         {/* Thermal / Throttling live indicator */}

@@ -9,6 +9,8 @@ import {
   reselectConfiguration,
   restoreSettings,
   cancelExperiment,
+  fetchFocusSwitch,
+  setFocusSwitch,
 } from './api';
 import { CalibrationView } from './components/CalibrationView';
 import { ExplorerView } from './components/ExplorerView';
@@ -18,6 +20,7 @@ import { ValidationView } from './components/ValidationView';
 import { WatchPanel } from './components/WatchPanel';
 import { TaskManagerView } from './components/TaskManagerView';
 import { SettingsView } from './components/SettingsView';
+import { FocusMode } from './components/FocusSwitch';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
@@ -59,6 +62,34 @@ const AppContent: React.FC = () => {
     suggested_budget_s: number;
   } | null>(null);
   const [targetedProcess, setTargetedProcess] = useState<{ pid: number; name: string } | null>(null);
+  const [focusMode, setFocusMode] = useState<FocusMode>(() => {
+    const saved = localStorage.getItem('joulectrl_focus_mode');
+    if (saved === 'reverse' || saved === 'off' || saved === 'on') return saved;
+    return 'off';
+  });
+
+  const handleFocusModeChange = async (mode: FocusMode) => {
+    setFocusMode(mode);
+    localStorage.setItem('joulectrl_focus_mode', mode);
+
+    // Synchronize taskPriority mode with focus switch
+    if (mode === 'on') {
+      handleTaskPriorityChange('top_priority');
+    } else if (mode === 'reverse') {
+      handleTaskPriorityChange('best_effort');
+    } else {
+      handleTaskPriorityChange('eco_deadline');
+    }
+
+    try {
+      await setFocusSwitch({
+        mode,
+        target_pid: targetedProcess?.pid,
+      });
+    } catch (e) {
+      console.warn('Failed to update focus switch:', e);
+    }
+  };
 
   // Status flags
   const [isStarting, setIsStarting] = useState<boolean>(false);
@@ -131,6 +162,14 @@ const AppContent: React.FC = () => {
         setHasCalibration(false);
         setCalibrationBudgetS((prev) => (prev === 0 ? 120 : prev));
       });
+
+    fetchFocusSwitch()
+      .then((res) => {
+        if (res.ok && res.mode) {
+          setFocusMode(res.mode);
+        }
+      })
+      .catch(() => {});
 
     loadExperiments();
   }, [loadExperiments]);
@@ -314,6 +353,8 @@ const AppContent: React.FC = () => {
         onCancelExperiment={handleCancelExperiment}
         theme={theme}
         onToggleTheme={toggleTheme}
+        focusMode={focusMode}
+        onChangeFocusMode={handleFocusModeChange}
       />
 
       <main style={{ flex: 1, padding: '1.5rem', maxWidth: '1300px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
@@ -337,6 +378,8 @@ const AppContent: React.FC = () => {
             onChangeRepetitions={handleRepetitionsChange}
             taskPriority={taskPriority}
             onChangeTaskPriority={handleTaskPriorityChange}
+            focusMode={focusMode}
+            onChangeFocusMode={handleFocusModeChange}
             onStartExperiment={handleStartExperiment}
             isStarting={isStarting}
             baselineRuntimeS={
@@ -381,6 +424,8 @@ const AppContent: React.FC = () => {
 
         {activeTab === 'tasks' && (
           <TaskManagerView
+            focusMode={focusMode}
+            onChangeFocusMode={handleFocusModeChange}
             onTargetProcess={(p) => {
               setTargetedProcess({ pid: p.pid, name: p.name });
               setActiveTab('setup');

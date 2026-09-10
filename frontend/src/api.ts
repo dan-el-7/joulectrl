@@ -277,4 +277,34 @@ export async function setProcessPriority(params: {
   return res.json();
 }
 
+export interface FocusSwitchResponse {
+  ok: boolean;
+  mode: 'reverse' | 'off' | 'on';
+  target_pid?: number | null;
+  target_pattern?: string | null;
+  actions_taken?: string[];
+  message: string;
+}
+
+export async function fetchFocusSwitch(): Promise<FocusSwitchResponse> {
+  const res = await fetch(`${API_BASE}/system/focus-switch`);
+  if (!res.ok) throw new Error(`Failed to fetch focus switch state: ${res.statusText}`);
+  return res.json();
+}
+
+export async function setFocusSwitch(params: {
+  mode: 'reverse' | 'off' | 'on';
+  target_pid?: number | null;
+  target_pattern?: string | null;
+}): Promise<FocusSwitchResponse> {
+  const res = await fetch(`${API_BASE}/system/focus-switch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Failed to set focus switch: ${res.statusText}`);
+  return res.json();
+}
+
+
 

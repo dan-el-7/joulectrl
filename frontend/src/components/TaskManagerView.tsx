@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { fetchUserProcesses, setProcessPriority, UserProcess } from '../api';
 import { fonts, fontFeatures, radii } from '../design';
 import { useTheme } from '../ThemeContext';
+import { FocusSwitch, FocusMode } from './FocusSwitch';
 
 interface ThemePalette {
   canvasBg: string;
@@ -74,9 +75,15 @@ const COMMON_APPS = [
 
 export interface TaskManagerViewProps {
   onTargetProcess?: (p: UserProcess) => void;
+  focusMode?: FocusMode;
+  onChangeFocusMode?: (mode: FocusMode) => void;
 }
 
-export const TaskManagerView: React.FC<TaskManagerViewProps> = ({ onTargetProcess }) => {
+export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
+  onTargetProcess,
+  focusMode = 'off',
+  onChangeFocusMode,
+}) => {
   const [processes, setProcesses] = useState<UserProcess[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -241,8 +248,29 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({ onTargetProces
           </div>
         </div>
 
-        {/* Action Controls: Search, View Mode, Theme Toggle */}
+        {/* Action Controls: Focus Switch, Search, View Mode, Theme Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {onChangeFocusMode && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: t.textTertiary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Focus:
+              </span>
+              <FocusSwitch
+                value={focusMode}
+                onChange={onChangeFocusMode}
+                size="sm"
+              />
+            </div>
+          )}
+
           {/* Search bar */}
           <input
             type="text"

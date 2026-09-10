@@ -607,6 +607,20 @@ class ProcessPriorityRequest(BaseModel):
     policy: str = "deprioritize_eco"  # "deprioritize_eco", "prioritize_fast", "restore_normal"
 
 
+class FocusSwitchRequest(BaseModel):
+    mode: str = "off"  # "reverse" | "off" | "on"
+    target_pid: Optional[int] = None
+    target_pattern: Optional[str] = None
+
+
+_CURRENT_FOCUS_SWITCH: dict[str, Any] = {
+    "mode": "off",
+    "target_pid": None,
+    "target_pattern": None,
+    "updated_at": None,
+}
+
+
 @app.get("/api/calibration")
 def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any]:
     """Measured calibration and benchmark curve data.
@@ -977,6 +991,86 @@ def update_process_priority(req: ProcessPriorityRequest) -> dict[str, Any]:
         return res
 
     raise HTTPException(status_code=400, detail="Either 'pid' or 'pattern' must be provided")
+
+
+@app.get("/api/system/focus-switch")
+def get_focus_switch() -> dict[str, Any]:
+    """Return current Focus Switch mode ('reverse', 'off', 'on') and targets."""
+    return {
+        "ok": True,
+        "mode": _CURRENT_FOCUS_SWITCH["mode"],
+        "target_pid": _CURRENT_FOCUS_SWITCH["target_pid"],
+        "target_pattern": _CURRENT_FOCUS_SWITCH["target_pattern"],
+        "updated_at": _CURRENT_FOCUS_SWITCH["updated_at"],
+    }
+
+
+@app.post("/api/system/focus-switch")
+def set_focus_switch(req: FocusSwitchRequest) -> dict[str, Any]:
+    """Focus Switch:
+    - 'reverse': Target app is deprioritized to Zen 5c eco cores (Nice +15) so foreground
+      apps (like games) get full performance on Zen 5 fast cores without stutter.
+    - 'on': Target app is prioritized on Zen 5 fast cores (Boost ON, Nice 0). Background
+      noise is deprioritized to eco cores to finish the pinned task in time.
+    - 'off': Standard balanced OS scheduling across all 16 cores.
+    """
+    from api.system import apply_policy_to_pattern, set_process_priority, get_system_noise
+    from datetime import datetime, timezone
+
+    mode = req.mode.lower().strip()
+    if mode not in ("reverse", "off", "on"):
+        raise HTTPException(status_code=400, detail=f"Invalid focus mode '{mode}'. Must be 'reverse', 'off', or 'on'.")
+
+    _CURRENT_FOCUS_SWITCH["mode"] = mode
+    _CURRENT_FOCUS_SWITCH["target_pid"] = req.target_pid
+    _CURRENT_FOCUS_SWITCH["target_pattern"] = req.target_pattern
+    _CURRENT_FOCUS_SWITCH["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    actions_taken = []
+    if mode == "reverse":
+        if req.target_pattern:
+            apply_policy_to_pattern(req.target_pattern, "deprioritize_eco")
+            actions_taken.append(f"Deprioritized pattern '{req.target_pattern}' to Zen 5c Eco Cores (Nice +15)")
+        elif req.target_pid is not None:
+            set_process_priority(req.target_pid, "deprioritize_eco")
+            actions_taken.append(f"Deprioritized PID {req.target_pid} to Zen 5c Eco Cores (Nice +15)")
+        message = "Focus Switch: REVERSE. Target app deprioritized to Eco cores. Fast cores fully yielded to foreground apps/gaming."
+
+    elif mode == "on":
+        if req.target_pattern:
+            apply_policy_to_pattern(req.target_pattern, "prioritize_fast")
+            actions_taken.append(f"Pinned pattern '{req.target_pattern}' to Zen 5 Fast Cores")
+        elif req.target_pid is not None:
+            set_process_priority(req.target_pid, "prioritize_fast")
+            actions_taken.append(f"Pinned PID {req.target_pid} to Zen 5 Fast Cores")
+
+        try:
+            noise = get_system_noise()
+            for app_entry in noise.get("detected_apps", []):
+                if req.target_pattern and app_entry["key"] == req.target_pattern:
+                    continue
+                apply_policy_to_pattern(app_entry["key"], "deprioritize_eco")
+            if noise.get("detected_apps"):
+                actions_taken.append(f"Moved {len(noise['detected_apps'])} background apps to Eco Cores")
+        except Exception:
+            pass
+        message = "Focus Switch: ON. Pinned task boosted on Zen 5 Fast Cores. Maximum priority to finish in time."
+
+    else:
+        if req.target_pattern:
+            apply_policy_to_pattern(req.target_pattern, "restore_normal")
+            actions_taken.append(f"Restored pattern '{req.target_pattern}' to normal scheduling")
+        elif req.target_pid is not None:
+            set_process_priority(req.target_pid, "restore_normal")
+            actions_taken.append(f"Restored PID {req.target_pid} to normal scheduling")
+        message = "Focus Switch: OFF. Standard balanced OS scheduling restored."
+
+    return {
+        "ok": True,
+        "mode": mode,
+        "actions_taken": actions_taken,
+        "message": message,
+    }
 
 
 def _fixture_captured_utc(name: str) -> Optional[str]:

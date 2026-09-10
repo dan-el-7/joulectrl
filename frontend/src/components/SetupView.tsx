@@ -11,6 +11,7 @@ import {
   fetchUserProcesses,
   UserProcess,
 } from '../api';
+import { FocusSwitch, FocusMode } from './FocusSwitch';
 
 
 /** Numeric text input synced with a slider — free typing, no artificial caps. */
@@ -95,6 +96,8 @@ interface SetupViewProps {
   onOpenTasksTab?: () => void;
   targetedProcess?: { pid: number; name: string } | null;
   onSelectTargetProcess?: (p: { pid: number; name: string } | null) => void;
+  focusMode?: FocusMode;
+  onChangeFocusMode?: (mode: FocusMode) => void;
 }
 
 export const SetupView: React.FC<SetupViewProps> = ({
@@ -114,6 +117,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onChangeCalibrationBudget,
   taskPriority = 'top_priority',
   onChangeTaskPriority,
+  focusMode = 'off',
+  onChangeFocusMode,
   repetitions = 1,
   onChangeRepetitions,
   onStartExperiment,
@@ -889,6 +894,53 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
         {/* Task Priority & Catch-Up Policy */}
         <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {/* Focus Switch (Reverse / Off / On) */}
+          {onChangeFocusMode && (
+            <div
+              style={{
+                marginBottom: '0.85rem',
+                paddingBottom: '0.85rem',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>Focus Switch</span>
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      color: focusMode === 'reverse' ? '#10b981' : focusMode === 'on' ? '#818cf8' : colors.textTertiary,
+                      padding: '1px 6px',
+                      borderRadius: 4,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                    }}
+                  >
+                    {focusMode === 'reverse' ? 'Gaming / Foreground Shield' : focusMode === 'on' ? 'Task Priority Shield' : 'Balanced Scheduler'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: colors.textTertiary, marginTop: 2, maxWidth: 520, lineHeight: 1.3 }}>
+                  {focusMode === 'reverse'
+                    ? 'Target app is deprioritized over running foreground apps (e.g. gaming). Runs on Zen 5c Eco Cores with Nice +15; time budget relaxes for pure efficiency.'
+                    : focusMode === 'on'
+                      ? 'Target app is boosted on Zen 5 Fast Cores (Boost ON, Nice 0). Sacrifices background apps/noise to finish in time.'
+                      : 'Standard balanced OS scheduling across all 16 cores.'}
+                </div>
+              </div>
+
+              <FocusSwitch
+                value={focusMode}
+                onChange={onChangeFocusMode}
+                size="md"
+              />
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.6rem' }}>
             <div>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

@@ -620,6 +620,49 @@ def test_system_processes_and_priority_endpoints(client):
     assert res_restore.json()["ok"] is True
 
 
+def test_focus_switch_endpoints(client):
+    # GET initial state
+    res = client.get("/api/system/focus-switch")
+    assert res.status_code == 200
+    assert "mode" in res.json()
+
+    import os
+    pid = os.getpid()
+
+    # Set reverse mode
+    res_rev = client.post(
+        "/api/system/focus-switch",
+        json={"mode": "reverse", "target_pid": pid},
+    )
+    assert res_rev.status_code == 200
+    assert res_rev.json()["ok"] is True
+    assert res_rev.json()["mode"] == "reverse"
+    assert "REVERSE" in res_rev.json()["message"]
+
+    # Set on mode
+    res_on = client.post(
+        "/api/system/focus-switch",
+        json={"mode": "on", "target_pid": pid},
+    )
+    assert res_on.status_code == 200
+    assert res_on.json()["ok"] is True
+    assert res_on.json()["mode"] == "on"
+    assert "ON" in res_on.json()["message"]
+
+    # Set off mode
+    res_off = client.post(
+        "/api/system/focus-switch",
+        json={"mode": "off", "target_pid": pid},
+    )
+    assert res_off.status_code == 200
+    assert res_off.json()["ok"] is True
+    assert res_off.json()["mode"] == "off"
+
+    # Verify invalid mode
+    res_inv = client.post("/api/system/focus-switch", json={"mode": "invalid_mode"})
+    assert res_inv.status_code == 400
+
+
 def test_live_engine_cancellation_registry():
     from api.engine import LiveEngine
     import threading
