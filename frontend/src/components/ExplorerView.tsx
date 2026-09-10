@@ -190,6 +190,49 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     return parts.join(' · ');
   };
 
+  // Derived bounds and fine step resolution for the budget slider
+  const configRuntimes = React.useMemo(() => {
+    return allConfigsList
+      .map((c: any) => c.median_runtime_s)
+      .filter((r: any) => r != null && r > 0);
+  }, [allConfigsList]);
+
+  const minConfigRuntime = configRuntimes.length > 0 ? Math.min(...configRuntimes) : 1;
+  const maxConfigRuntime = configRuntimes.length > 0 ? Math.max(...configRuntimes) : 30;
+
+  const { sliderMin, sliderMax, sliderStep } = React.useMemo(() => {
+    if (isExtrapolating && taskDuration) {
+      const sMin = Math.max(1, Math.round(taskDuration * 0.5));
+      const sMax = Math.round(taskDuration * 2.5);
+      const sStep = taskDuration > 1000 ? 10 : (taskDuration > 100 ? 5 : 1);
+      return { sliderMin: sMin, sliderMax: sMax, sliderStep: sStep };
+    }
+
+    // Benchmark mode: tightly bound around measured runtimes instead of static 300s
+    const sMin = Math.max(0.5, Math.floor(minConfigRuntime * 0.8 * 10) / 10);
+    const naturalMax = Math.ceil(maxConfigRuntime * 1.6);
+    const sMax = Math.max(naturalMax, Math.ceil((tempBudget || 0) * 1.15), 15);
+
+    let sStep = 0.5;
+    if (sMax <= 15) sStep = 0.1;
+    else if (sMax <= 40) sStep = 0.2;
+    else if (sMax <= 100) sStep = 0.5;
+    else sStep = 1.0;
+
+    return { sliderMin: sMin, sliderMax: sMax, sliderStep: sStep };
+  }, [isExtrapolating, taskDuration, minConfigRuntime, maxConfigRuntime, tempBudget]);
+
+  const handleNudge = (direction: -1 | 1) => {
+    const delta = direction * sliderStep;
+    const nextVal = Math.max(sliderMin, Math.min(sliderMax, Math.round((tempBudget + delta) / sliderStep) * sliderStep));
+    const cleanVal = parseFloat(nextVal.toFixed(2));
+    setTempBudget(cleanVal);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      onReselect(cleanVal, isExtrapolating ? (taskDuration || 900) : null);
+    }, 120);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Top Banner: Status + Interactive Budget Slider */}
@@ -237,12 +280,38 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               {isExtrapolating && taskDuration ? `${formatDuration(tempBudget)} (${tempBudget}s)` : `${tempBudget}s`}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Fine Nudge Down */}
+            <button
+              type="button"
+              onClick={() => handleNudge(-1)}
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '0.25rem',
+                border: `1px solid ${colors.border}`,
+                background: colors.surfaceElevated,
+                color: colors.textSecondary,
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                userSelect: 'none',
+                lineHeight: 1,
+              }}
+              title={`Decrease budget by ${sliderStep}s`}
+            >
+              −
+            </button>
+
+            {/* Range Slider with fine-tuned bounds */}
             <input
               type="range"
-              min={isExtrapolating && taskDuration ? Math.max(1, Math.round(taskDuration * 0.5)) : 1}
-              max={isExtrapolating && taskDuration ? Math.round(taskDuration * 2.5) : 300}
-              step={isExtrapolating && taskDuration && taskDuration > 100 ? (taskDuration > 1000 ? 10 : 5) : 0.5}
+              min={sliderMin}
+              max={sliderMax}
+              step={sliderStep}
               value={tempBudget}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
@@ -254,8 +323,35 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 }
                 onReselect(tempBudget, isExtrapolating ? (taskDuration || 900) : null);
               }}
-              style={{ width: '160px', accentColor: colors.emerald, cursor: 'pointer' }}
+              style={{ width: '220px', accentColor: colors.emerald, cursor: 'pointer' }}
             />
+
+            {/* Fine Nudge Up */}
+            <button
+              type="button"
+              onClick={() => handleNudge(1)}
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: '0.25rem',
+                border: `1px solid ${colors.border}`,
+                background: colors.surfaceElevated,
+                color: colors.textSecondary,
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                userSelect: 'none',
+                lineHeight: 1,
+              }}
+              title={`Increase budget by ${sliderStep}s`}
+            >
+              +
+            </button>
+
+            {/* Numeric Direct Entry Input */}
             <input
               type="text"
               inputMode="decimal"
@@ -286,9 +382,15 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 }
               }}
               style={{
-                width: 68, padding: '2px 6px', borderRadius: 4,
-                border: `1px solid ${colors.border}`, background: colors.surfaceElevated,
-                color: colors.textPrimary, fontSize: '0.8rem',
+                width: 58,
+                padding: '3px 6px',
+                borderRadius: 4,
+                border: `1px solid ${colors.border}`,
+                background: colors.surfaceElevated,
+                color: colors.textPrimary,
+                fontSize: '0.82rem',
+                textAlign: 'center',
+                fontWeight: 600,
               }}
             />
             <span style={{ fontSize: '0.72rem', color: colors.textTertiary }}>s</span>
