@@ -144,7 +144,7 @@ def test_watch_lifecycle(client):
     body = res.json()
     assert body["status"] == "watching"
     assert "source" in body  # real powercap or synthetic — always labeled
-    assert body["state"] == "calibrating"
+    assert body["state"] in ("calibrating", "idle")
 
     # Status
     res_st = client.get("/api/watch/status")
@@ -535,15 +535,18 @@ def test_bisection_candidate_generation():
     assert len(configs) >= 50, "Should generate a rich multi-resolution ladder"
 
     # Verify order: Round 0 anchors (stock max and min cap) come first
+    from core.topology import discover_freq_limits
+    cap_min, cap_max = discover_freq_limits()
     first_cids = [c[0].id for c in configs[:6]]
     assert "cfg_all_physical_stock" in first_cids
-    assert "cfg_all_physical_cap623m" in first_cids
+    assert f"cfg_all_physical_cap{cap_min//1000}m" in first_cids
     assert "cfg_fast_class_stock" in first_cids
-    assert "cfg_fast_class_cap623m" in first_cids
+    assert f"cfg_fast_class_cap{cap_min//1000}m" in first_cids
 
-    # Verify Round 1 midpoint (50% cap ~1.31 GHz) comes next
+    # Verify Round 1 midpoint (50% cap) comes next
+    mid_cap = round(cap_min + 0.5 * (cap_max - cap_min))
     mid_cids = [c[0].id for c in configs[6:12]]
-    assert any("cap1311m" in cid for cid in mid_cids)
+    assert any(f"cap{mid_cap//1000}m" in cid for cid in mid_cids)
 
     # Verify all configs are unique
     keys = [(tuple(c[0].cpu_affinity or []), c[0].boost, c[0].freq_cap_khz, c[0].worker_count) for c in configs]
@@ -657,7 +660,7 @@ def test_system_processes_and_priority_endpoints(client):
     )
     assert res_prio.status_code == 200
     assert res_prio.json()["ok"] is True
-    assert "Zen 5c" in res_prio.json()["affinity_label"] or "Eco" in res_prio.json()["affinity_label"]
+    assert any(k in res_prio.json()["affinity_label"] for k in ("Zen 5c", "Eco", "Secondary Cores"))
 
     res_restore = client.post(
         "/api/system/process-priority",

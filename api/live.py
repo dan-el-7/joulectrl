@@ -250,6 +250,10 @@ class WatchService:
         self._helper: Optional[Any] = None
         self._session_active: bool = False
 
+        synthetic = self.source_info.get("synthetic", False)
+        if initial_baseline_w is None and not synthetic and self.backend is not None:
+            initial_baseline_w = self._prime_live_baseline()
+
         self.detector = WatchDetector(
             baseline_window_s=baseline_window_s,
             onset_s=onset_s,
@@ -259,7 +263,6 @@ class WatchService:
             on_active=self._on_active,
             on_idle=self._on_idle,
         )
-        synthetic = self.source_info.get("synthetic", False)
         self._time_scale = time_scale if time_scale is not None else (
             WatchService.DEV_TIME_SCALE if synthetic else 1.0
         )
@@ -271,6 +274,29 @@ class WatchService:
         self._seg_counter = 0
         self.last_power_w: Optional[float] = None
         self.started_at = time.time()
+
+    def _prime_live_baseline(self) -> Optional[float]:
+        """Read instantaneous hardware power on initialization to bootstrap rough idle."""
+        try:
+            r1 = self.backend.read_uj()
+            if r1 is None:
+                return None
+            t1 = time.monotonic()
+            time.sleep(0.12)
+            r2 = self.backend.read_uj()
+            t2 = time.monotonic()
+            if r2 is None or t2 <= t1:
+                return None
+            rng = self.backend.max_range_uj() if callable(getattr(self.backend, "max_range_uj", None)) else None
+            duj = self._delta_uj(r1, r2, rng)
+            if duj is not None and duj > 0:
+                dt = t2 - t1
+                watts = (duj / 1e6) / dt
+                if 1.0 <= watts <= 150.0:
+                    return round(watts, 2)
+        except Exception:
+            pass
+        return None
 
     # -- helper & active optimization controls --------------------------
 
@@ -511,9 +537,8 @@ class WatchService:
     def _in_idle_band(self, power_w: Optional[float]) -> bool:
         if power_w is None or self.detector.baseline_w is None:
             return False
-        return abs(power_w - self.detector.baseline_w) <= max(
-            3.0 * self.detector.spread_w, 2.0
-        )
+        idle_ceil = self.detector.idle_band_max_w
+        return idle_ceil is not None and power_w <= idle_ceil
 
     # -- SSE frames -------------------------------------------------------
 
@@ -530,6 +555,7 @@ class WatchService:
             "state": self.detector.state,
             "baseline_median_w": self.detector.baseline_w,
             "baseline_spread_w": self.detector.spread_w,
+            "threshold_w": round(self.detector.threshold_w, 2) if self.detector.threshold_w is not None else None,
             "active_control": self.active_control,
             "control_state": self.control_state,
             "optimization_objective": self.optimization_objective,
@@ -591,6 +617,7 @@ class WatchService:
             "current_power_w": round(self.last_power_w, 2) if self.last_power_w is not None else None,
             "baseline_median_w": self.detector.baseline_w,
             "baseline_spread_w": self.detector.spread_w,
+            "threshold_w": round(self.detector.threshold_w, 2) if self.detector.threshold_w is not None else None,
             "active_segment_elapsed_s": None,
             "completed_segments_count": len(self.detector.segments),
             "active_control": self.active_control,

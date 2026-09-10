@@ -13,8 +13,9 @@ Counter semantics (machine-agnostic — machine quirks live in capability report
 
 from __future__ import annotations
 
+import os
 import time
-from typing import Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -128,6 +129,30 @@ class PowercapBackend:
                 return int(f.read().strip())
         except OSError:
             return None
+
+
+class LinuxRaplBackend(PowercapBackend):
+    """Direct sysfs RAPL powercap backend with availability check."""
+
+    def __init__(
+        self,
+        path: str = "/sys/class/powercap/intel-rapl:0/energy_uj",
+        max_range_uj: Optional[int] = None,
+    ):
+        if not os.path.exists(path):
+            try:
+                from core.discovery import find_package_energy_paths
+                pkgs = find_package_energy_paths()
+                if pkgs:
+                    path = pkgs[0]["path"]
+                    if max_range_uj is None:
+                        max_range_uj = pkgs[0].get("max_energy_range_uj")
+            except Exception:
+                pass
+        super().__init__(path, max_range_uj)
+
+    def available(self) -> bool:
+        return self.read_uj() is not None
 
 
 class HelperEnergyBackend:

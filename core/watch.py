@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import statistics
 from dataclasses import dataclass, field
 from statistics import median
 from typing import Callable, Optional
@@ -119,22 +120,54 @@ class WatchDetector:
     def segments(self) -> list[WatchSegment]:
         return list(self._segments)
 
+    @property
+    def threshold_w(self) -> Optional[float]:
+        """Dynamic spike threshold based on observed rough idle baseline.
+        
+        A sudden compute spike must clearly stand out from the ambient idle:
+        1. At least 3 * spread_w (noise envelope rejection)
+        2. At least 35% above the rough idle baseline (relative power step)
+        3. Minimum 3.5 W absolute floor (prevents false positives on low-power idles)
+        """
+        if self.baseline_w is None:
+            return None
+        delta = max(3.0 * self.spread_w, 0.35 * self.baseline_w, 3.5)
+        return self.baseline_w + delta
+
+    @property
+    def idle_band_max_w(self) -> Optional[float]:
+        """Dynamic power ceiling for declaring return to idle."""
+        if self.baseline_w is None:
+            return None
+        delta = max(2.0 * self.spread_w, 0.20 * self.baseline_w, 2.5)
+        return self.baseline_w + delta
+
     def observe(self, power_w: float, energy_uj: Optional[int], timestamp: float) -> Optional[WatchSegment]:
         """Consume one low-rate sample; return a segment only when it closes."""
         if self._baseline_started is None:
             self._baseline_started = timestamp
         if self.state == "calibrating":
             self._baseline_values.append(power_w)
-            if timestamp - self._baseline_started < self.baseline_window_s:
+            min_samples = 2
+            if len(self._baseline_values) >= min_samples:
+                # If a sudden spike arrives during the first few samples,
+                # immediately treat the prior samples as rough idle!
+                prior_median = statistics.median(self._baseline_values[:-1])
+                if power_w > prior_median + max(0.35 * prior_median, 3.5):
+                    self.baseline_w = float(prior_median)
+                    self.spread_w = 0.5
+                    self.state = "idle"
+                elif timestamp - self._baseline_started >= min(self.baseline_window_s, 2.0):
+                    self._set_baseline()
+
+            if self.state == "calibrating":
                 return None
-            # Process this sample after learning the baseline; it may be the
-            # first above-band sample and must not be lost at the boundary.
-            self._set_baseline()
 
         assert self.baseline_w is not None
-        threshold = self.baseline_w + max(3.0 * self.spread_w, 2.0)
-        is_above_band = power_w > threshold
-        in_idle_band = not is_above_band
+        thresh = self.threshold_w
+        is_above_band = thresh is not None and power_w > thresh
+        idle_ceil = self.idle_band_max_w
+        in_idle_band = idle_ceil is not None and power_w <= idle_ceil
 
         if self.state == "idle":
             if is_above_band:

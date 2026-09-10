@@ -206,6 +206,7 @@ export interface WatchStatus {
   current_power_w: number | null;
   baseline_median_w: number | null;
   baseline_spread_w: number | null;
+  threshold_w?: number | null;
   active_segment_elapsed_s: number | null;
   completed_segments_count: number;
   active_control?: boolean;

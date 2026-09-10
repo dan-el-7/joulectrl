@@ -161,7 +161,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         optimization_objective: watchObjective,
         recurrence_mode: watchRecurrence,
         time_budget_s: watchObjective === 'deadline' ? watchTimeBudgetS : undefined,
-        baseline_w: status?.baseline_median_w ?? 10.0,
+        baseline_w: status?.baseline_median_w ?? undefined,
       });
       const modeDesc =
         watchObjective === 'efficiency'
@@ -192,7 +192,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         optimization_objective: watchObjective,
         recurrence_mode: watchRecurrence,
         time_budget_s: watchObjective === 'deadline' ? watchTimeBudgetS : undefined,
-        baseline_w: status?.baseline_median_w ?? 10.0,
+        baseline_w: status?.baseline_median_w ?? undefined,
       });
       const modeDesc =
         watchObjective === 'efficiency'
@@ -690,12 +690,16 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         </div>
 
         <div style={{ background: colors.surface, padding: '1.25rem', borderRadius: '0.75rem', border: `1px solid ${colors.border}`, boxShadow: colors.cardShadow }}>
-          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Learned Idle Baseline</div>
+          <div style={{ fontSize: '0.75rem', color: colors.textTertiary, textTransform: 'uppercase' }}>Rough Idle Baseline</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 700, color: colors.accentHover, marginTop: '0.3rem' }}>
-            {baseline != null ? `${baseline.toFixed ? baseline.toFixed(1) : baseline} W` : '10.0 W (default)'}
+            {baseline != null ? `${baseline.toFixed ? baseline.toFixed(1) : baseline} W` : (status?.active ? 'Observing rough idle…' : 'Auto-detected on arm')}
           </div>
           <div style={{ fontSize: '0.75rem', color: colors.textTertiary, marginTop: '0.25rem' }}>
-            Spread: ±{status?.baseline_spread_w ?? 1.0} W (spike threshold: {((baseline ?? 10.0) + 3.0).toFixed(1)} W)
+            {status?.threshold_w != null
+              ? `Spike threshold: ${status.threshold_w.toFixed(1)} W (±${(status?.baseline_spread_w ?? 0.5).toFixed(1)} W spread)`
+              : baseline != null
+              ? `Spike threshold: ${(baseline + Math.max(3.0 * (status?.baseline_spread_w ?? 0.5), 0.35 * baseline, 3.5)).toFixed(1)} W`
+              : 'Dynamic auto-threshold on sudden spike'}
           </div>
         </div>
 

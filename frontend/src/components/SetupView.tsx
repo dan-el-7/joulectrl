@@ -201,7 +201,6 @@ export const SetupView: React.FC<SetupViewProps> = ({
         optimization_objective: launchObjective,
         recurrence_mode: launchRecurrence,
         time_budget_s: launchObjective === 'deadline' ? launchTimeBudgetS : undefined,
-        baseline_w: 10.0,
       });
       setLaunchedPid(res.pid);
       const modeDesc =
