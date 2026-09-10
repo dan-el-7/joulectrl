@@ -709,6 +709,8 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
                 cls = "fast"
             elif cpus_set.issubset(eff_cpus):
                 cls = "efficient"
+            elif len(cpus) == topo_info.get("physical_cores", 8) and cfg.worker_count == topo_info.get("physical_cores", 8):
+                cls = "all_physical"
             else:
                 cls = "all"
             key = (cls, cpus, cfg.worker_count, cfg.freq_cap_khz, cfg.boost, cfg.id, r.workload_name)
@@ -718,6 +720,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             "fast": {"label": "fast", "c1": None, "points": []},
             "efficient": {"label": "efficient", "c1": None, "points": []},
             "all": {"label": "all", "c1": None, "points": []},
+            "all_physical": {"label": "all_physical", "c1": None, "points": []},
         }
 
         # Check for C1 single-core reference points
@@ -771,6 +774,8 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
                 series_name = f"Zen 5 ({workers} {'threads' if workers > 4 else 'cores'})"
             elif cls == "efficient":
                 series_name = f"Zen 5c ({workers} cores)"
+            elif cls == "all_physical":
+                series_name = f"All Physical ({workers} cores)"
             else:
                 series_name = f"All Cores ({workers} threads)"
 
@@ -800,12 +805,12 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             classes_map[cls]["points"].append(point)
 
         out_classes = []
-        for cls_key in ["fast", "efficient", "all"]:
-            entry = classes_map[cls_key]
-            if entry["points"]:
+        for cls_key in ["fast", "efficient", "all", "all_physical"]:
+            entry = classes_map.get(cls_key)
+            if entry and entry["points"]:
                 # Sort points within each class by (workers, watts) ascending
                 entry["points"].sort(key=lambda p: (p["workers"], p["watts"]))
-                hw = cap_classes.get(cls_key) or {}
+                hw = cap_classes.get(cls_key) or cap_classes.get("all") or {}
                 entry["hw_max_freq_khz"] = hw.get("hw_max_freq")
                 out_classes.append(entry)
 
@@ -849,7 +854,10 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
 
     for row in allcores_rows:
         row = dict(row)
-        row["class"] = "all"
+        if row.get("workers") == 8 or row.get("layout") == "all8":
+            row["class"] = "all_physical"
+        else:
+            row["class"] = "all"
         c2_rows.append(row)
 
     def med(rows: list[dict[str, Any]], key: str) -> Optional[float]:
@@ -908,7 +916,7 @@ def get_calibration(experiment_id: Optional[str] = Query(None)) -> dict[str, Any
             }
         )
 
-    out = sorted(classes.values(), key=lambda e: {"fast": 0, "efficient": 1, "all": 2}.get(e["label"], 3))
+    out = sorted(classes.values(), key=lambda e: {"fast": 0, "efficient": 1, "all": 2, "all_physical": 3}.get(e["label"], 4))
     for entry in out:
         entry["points"].sort(key=lambda p: (p["workers"], p["watts"]))
         hw = cap_classes.get(entry["label"]) or {}

@@ -70,25 +70,31 @@ const classColor = (label: string) =>
     ? colors.series.fast
     : label === 'efficient'
       ? colors.series.efficient
-      : '#38bdf8';
+      : label === 'all_physical'
+        ? '#38bdf8'
+        : '#60a5fa';
 
 /** Data-driven class display name: "fast · ≤5.09 GHz" — never hardcoded core names. */
 const classDisplayName = (c: ClassSummary) => {
-  if (c.label === 'all') return 'all cores (mixed classes)';
+  if (c.label === 'all') return 'all cores · 16 threads (SMT)';
+  if (c.label === 'all_physical') return 'all physical · 8 cores';
   return c.hw_max_freq_khz ? `${c.label} · ≤${(c.hw_max_freq_khz / 1e6).toFixed(2)} GHz` : c.label;
 };
 
 const SERIES_PALETTE: Record<string, string> = {
+  'Zen 5 (1 cores)': '#818cf8',
   'Zen 5 (4 cores)': '#a78bfa',
   'Zen 5 (8 threads)': '#c084fc',
+  'Zen 5c (1 cores)': '#6ee7b7',
   'Zen 5c (4 cores)': '#34d399',
   'Zen 5c (8 threads)': '#10b981',
-  'All Cores (8 cores)': '#38bdf8',
+  'All Physical (8 cores)': '#38bdf8',
   'All Cores (8 threads)': '#38bdf8',
   'All Cores (16 threads)': '#60a5fa',
   'fast': colors.series.fast,
   'efficient': colors.series.efficient,
-  'all': '#38bdf8',
+  'all': '#60a5fa',
+  'all_physical': '#38bdf8',
 };
 
 /* ------------------------------------------------------------------ */
@@ -167,19 +173,35 @@ function ScatterChart({
     return acc;
   }, [points, seriesKey]);
 
-  // Compute Pareto Optimal Frontier across all visible points
-  const paretoPoints = useMemo(() => {
-    const sorted = [...points].sort((a, b) => a.x - b.x);
-    const frontier: Point[] = [];
-    let maxY = -Infinity;
-    for (const p of sorted) {
-      if (p.y > maxY) {
-        frontier.push(p);
-        maxY = p.y;
+  // Compute Pareto Optimal Frontier per sub-series (same worker count / topology)
+  // Never connect points across different thread counts (e.g. 8w vs 16w)
+  const paretoFrontiers = useMemo(() => {
+    const acc: Record<string, Point[]> = {};
+    for (const p of points) {
+      const k = p.subSeries || seriesKey(p);
+      (acc[k] ||= []).push(p);
+    }
+    const list: { key: string; points: Point[]; color: string }[] = [];
+    for (const [k, pts] of Object.entries(acc)) {
+      const sorted = [...pts].sort((a, b) => a.x - b.x);
+      const frontier: Point[] = [];
+      let maxY = -Infinity;
+      for (const p of sorted) {
+        if (p.y > maxY) {
+          frontier.push(p);
+          maxY = p.y;
+        }
+      }
+      if (frontier.length >= 2) {
+        list.push({
+          key: k,
+          points: frontier,
+          color: SERIES_PALETTE[k] || '#22d3ee',
+        });
       }
     }
-    return frontier;
-  }, [points]);
+    return list;
+  }, [points, seriesKey]);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
@@ -218,20 +240,21 @@ function ScatterChart({
         {yLabel}{yUnit ? ` (${yUnit})` : ''}
       </text>
 
-      {/* Pareto frontier curve (if enabled and >= 2 points) */}
-      {showPareto && paretoPoints.length >= 2 && (
-        <g>
-          <path
-            d={paretoPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.x)} ${sy(p.y)}`).join(' ')}
-            fill="none"
-            stroke="#22d3ee"
-            strokeWidth={2}
-            strokeDasharray="5 3"
-            opacity={0.8}
-            pointerEvents="none"
-          />
-        </g>
-      )}
+      {/* Pareto frontier curves per series (never crossing thread counts) */}
+      {showPareto &&
+        paretoFrontiers.map((f) => (
+          <g key={`pareto-${f.key}`}>
+            <path
+              d={f.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.x)} ${sy(p.y)}`).join(' ')}
+              fill="none"
+              stroke="#22d3ee"
+              strokeWidth={2}
+              strokeDasharray="5 3"
+              opacity={0.85}
+              pointerEvents="none"
+            />
+          </g>
+        ))}
 
       {/* Per-series curves: sorted by wattage ascending, monotonic curves that never zig-zag */}
       {connectSeries &&
@@ -441,7 +464,7 @@ export const CalibrationView: React.FC = () => {
         <>
           <div style={{ ...sectionLabel, marginTop: 4 }}>Single-Core References (C1)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-            {visibleClasses.map((c) => {
+            {visibleClasses.filter((c) => c.c1?.runtime_s).map((c) => {
               const col = classColor(c.label);
               const tp = c.c1?.runtime_s ? 1000 / c.c1.runtime_s : undefined;
               return (
