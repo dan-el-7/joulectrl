@@ -281,8 +281,35 @@ def get_thermal_status() -> dict[str, Any]:
     }
 
 
-FAST_CORE_IDS = {0, 2, 4, 6, 8, 10, 12, 14}
-ECO_CORE_IDS = {1, 3, 5, 7, 9, 11, 13, 15}
+def get_system_core_classes() -> tuple[set[int], set[int], int, str, str]:
+    """Dynamically query core classes and total logical CPUs from topology.
+
+    Returns:
+        (fast_core_ids, eco_core_ids, ncpu, fast_label, eco_label)
+    """
+    try:
+        from core.topology import read_topology, read_core_class_map
+        topo = read_topology()
+        cmap = read_core_class_map(topo)
+        if cmap.n_classes > 1:
+            sorted_cls = sorted(cmap.classes.items(), key=lambda x: cmap.hw_max_freq.get(x[0], 0), reverse=True)
+            fast_key, fast_cpus = sorted_cls[0]
+            eff_key, eff_cpus = sorted_cls[1]
+            fast_freq = cmap.hw_max_freq.get(fast_key)
+            eff_freq = cmap.hw_max_freq.get(eff_key)
+            fast_label = f"Fast Cores (≤{fast_freq/1e6:.2f} GHz)" if fast_freq else "Fast Cores"
+            eco_label = f"Eco Cores (≤{eff_freq/1e6:.2f} GHz)" if eff_freq else "Eco Cores"
+            return set(fast_cpus), set(eff_cpus), topo.ncpu, fast_label, eco_label
+        else:
+            all_cpus = set(range(topo.ncpu))
+            half = max(1, topo.ncpu // 2)
+            return set(range(half)), set(range(half, topo.ncpu)), topo.ncpu, "Primary Cores", "Secondary Cores"
+    except Exception:
+        return {0, 2, 4, 6, 8, 10, 12, 14}, {1, 3, 5, 7, 9, 11, 13, 15}, 16, "Fast Cores", "Eco Cores"
+
+
+# Backward-compatible sets
+FAST_CORE_IDS, ECO_CORE_IDS = get_system_core_classes()[:2]
 
 
 def _parse_cpu_list(cpus_str: str) -> set[int]:
@@ -319,13 +346,14 @@ def _get_process_affinity(pid: int) -> tuple[str, str]:
         if ":" in out:
             affinity_str = out.split(":", 1)[1].strip()
             cpus = _parse_cpu_list(affinity_str)
+            fast_ids, eco_ids, ncpu, fast_lbl, eco_lbl = get_system_core_classes()
             if not cpus:
                 return affinity_str, "Unknown"
-            if cpus.issubset(ECO_CORE_IDS):
-                return affinity_str, "Zen 5c (Eco)"
-            if cpus.issubset(FAST_CORE_IDS):
-                return affinity_str, "Zen 5 (Fast)"
-            if len(cpus) >= 16:
+            if cpus.issubset(eco_ids):
+                return affinity_str, eco_lbl
+            if cpus.issubset(fast_ids):
+                return affinity_str, fast_lbl
+            if len(cpus) >= ncpu:
                 return affinity_str, "All Cores"
             return affinity_str, f"Cores {affinity_str}"
         return "Unknown", "Unknown"
@@ -402,17 +430,19 @@ def set_process_priority(
     if pid <= 2:
         return {"ok": False, "error": "Cannot modify system init/kernel process", "pid": pid}
 
+    fast_ids, eco_ids, ncpu, fast_lbl, eco_lbl = get_system_core_classes()
+
     if policy == "deprioritize_eco":
-        cpus = "1,3,5,7,9,11,13,15"
+        cpus = ",".join(str(c) for c in sorted(eco_ids))
         nice_val = 15
     elif policy == "prioritize_fast":
-        cpus = "0,2,4,6,8,10,12,14"
+        cpus = ",".join(str(c) for c in sorted(fast_ids))
         nice_val = 0
     elif policy == "restore_normal":
-        cpus = "0-15"
+        cpus = f"0-{ncpu - 1}"
         nice_val = 0
     elif policy == "custom":
-        cpus = custom_cpus or "0-15"
+        cpus = custom_cpus or f"0-{ncpu - 1}"
         nice_val = custom_nice if custom_nice is not None else 0
     else:
         return {"ok": False, "error": f"Unknown policy: {policy}", "pid": pid}

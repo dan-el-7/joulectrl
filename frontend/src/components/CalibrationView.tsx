@@ -465,6 +465,23 @@ export const CalibrationView: React.FC = () => {
     return m;
   }, [classes]);
 
+  const discoveredClasses = calibrationStatus?.classes;
+  const classesBadgeText = useMemo(() => {
+    if (discoveredClasses && discoveredClasses.length > 0) {
+      const parts = discoveredClasses.map((c) => `${c.display || c.class}`);
+      return `${discoveredClasses.length} Core Classes (${parts.join(' · ')})`;
+    }
+    if (data?.classes && data.classes.length > 0) {
+      return `${data.classes.length} Core Classes (${data.classes.map((c) => c.label).join(' · ')})`;
+    }
+    return 'Discovered Core Classes';
+  }, [discoveredClasses, data?.classes]);
+
+  const ecoLabel = useMemo(() => {
+    const ecoClass = discoveredClasses?.find((c) => c.class === 'efficient' || c.class.includes('eco'));
+    return ecoClass ? ecoClass.display.split('(')[0].trim() : 'Eco Cores';
+  }, [discoveredClasses]);
+
   const scopeOptions: { key: ScopeFilter; label: string; disabled?: boolean }[] = [
     { key: 'all', label: 'All scopes' },
     { key: 'single', label: 'Single-core' },
@@ -554,7 +571,7 @@ export const CalibrationView: React.FC = () => {
         setActionFeedback('✓ Preference applied: Max Performance (Boost ON, Fast cores shielded)');
       } else if (preset === 'powersave') {
         await setFocusSwitch({ mode: 'reverse' });
-        setActionFeedback('✓ Preference applied: Maximum Power-Saving (Pinned to Zen 5c Eco cores, Nice +15)');
+        setActionFeedback(`✓ Preference applied: Maximum Power-Saving (Pinned to ${ecoLabel}, Nice +15)`);
       } else {
         await setFocusSwitch({ mode: 'off' });
         setActionFeedback('✓ Preference applied: Balanced Sweet Spot (All cores, Pareto-optimal scheduling)');
@@ -675,11 +692,11 @@ export const CalibrationView: React.FC = () => {
                   color: '#a5b4fc',
                 }}
               >
-                3 Core Classes (All 16w · Zen 5 Fast 8w · Zen 5c Eco 8w)
+                {classesBadgeText}
               </span>
             </div>
             <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4, maxWidth: 680 }}>
-              Profiles continuous hardware frequencies across the 3 multithreaded core classes to map real empirical throughput vs package power curves for Pareto optimization.
+              Profiles continuous hardware frequencies across discovered multithreaded core classes to map real empirical throughput vs package power curves for Pareto optimization.
             </div>
           </div>
 
@@ -898,7 +915,7 @@ export const CalibrationView: React.FC = () => {
                 cursor: 'pointer',
               }}
             >
-              🍃 Max Power-Saving (Zen 5c Eco)
+              🍃 Max Power-Saving ({ecoLabel})
             </button>
           </div>
         </div>

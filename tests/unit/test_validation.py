@@ -220,11 +220,12 @@ def test_live_engine_validation_resolution_with_candidate_summaries(tmp_path):
 
     engine = LiveEngine(bus, store_bridge, overlays=overlays, store=store)
 
-    mock_run = MagicMock()
-    mock_run.side_effect = [
-        RunRecord(run_id="r1", experiment_id="exp_summaries_val", config_id="cfg_base", workload_name="dummy", repetition=1, runtime_s=2.0, package_energy_j=100.0, status="success"),
-        RunRecord(run_id="r2", experiment_id="exp_summaries_val", config_id="cfg_resolved", workload_name="dummy", repetition=1, runtime_s=2.2, package_energy_j=70.0, status="success"),
-    ]
+    def fake_run(wl, exp_id, cfg, repetition=1, phase="validation"):
+        if cfg.id == "cfg_base":
+            return RunRecord(run_id="r1", experiment_id=exp_id, config_id="cfg_base", workload_name="dummy", repetition=repetition, runtime_s=2.0, package_energy_j=100.0, status="success")
+        return RunRecord(run_id="r2", experiment_id=exp_id, config_id="cfg_resolved", workload_name="dummy", repetition=repetition, runtime_s=2.2, package_energy_j=70.0, status="success")
+
+    mock_run = MagicMock(side_effect=fake_run)
 
     with patch.object(engine, "_helper") as mock_h:
         mock_helper = MagicMock()

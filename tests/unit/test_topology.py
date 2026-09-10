@@ -75,7 +75,46 @@ def test_real_topology_matches_fixture():
         pytest.skip("boot_id unreadable")
     if fx.get("boot_id") and not fx["boot_id"].startswith(this_boot[:8]):
         pytest.skip(f"fixture is from another machine (boot_id mismatch)")
-    from core.topology import read_topology
     topo = read_topology()
     assert topo.ncpu == fx["ncpu"]
     assert {str(k): v for k, v in topo.cores.items()} == fx["smt_groups"]
+
+
+def test_discover_freq_limits_with_fake_topo():
+    from core.topology import discover_freq_limits
+    topo = _fake_topo()
+    cap_min, cap_max = discover_freq_limits(topo)
+    assert cap_min == 623377
+    assert cap_max >= cap_min
+    assert cap_max > 0
+
+
+def test_discover_hardware_classes_with_fake_topo():
+    from core.topology import discover_hardware_classes
+    topo = _fake_topo()
+    classes = discover_hardware_classes(topo)
+    assert len(classes) == 3
+    cls_names = [c["class"] for c in classes]
+    assert "all_logical" in cls_names
+    assert "fast" in cls_names
+    assert "efficient" in cls_names
+    for c in classes:
+        assert c["chunks"] == 65536, "All configurations must use invariant constant work"
+        assert c["workers"] == len(c["cpus"])
+
+
+def test_discover_hardware_classes_uniform():
+    from core.topology import discover_hardware_classes
+    policies = [PolicyInfo(f"policy{c}", [c], "acpi-cpufreq", "schedutil",
+                           None, None, 400000, 2400000) for c in range(4)]
+    cores = {0: [0, 1], 1: [2, 3]}
+    core_of = {0: 0, 1: 0, 2: 1, 3: 1}
+    topo = Topology(ncpu=4, cores=cores, sockets={0: [0, 1, 2, 3]},
+                    core_of_cpu=core_of, policies=policies)
+    classes = discover_hardware_classes(topo)
+    cls_names = [c["class"] for c in classes]
+    assert "all_logical" in cls_names
+    assert "all_physical" in cls_names
+    for c in classes:
+        assert c["chunks"] == 65536
+

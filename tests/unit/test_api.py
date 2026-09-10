@@ -66,6 +66,7 @@ def test_create_experiment(client):
     assert "id" in created
     assert created["workload_id"] == "clean_build"
     assert created["runtime_budget_s"] == 40.0
+    client.post(f"/api/experiments/{created['id']}/cancel")
 
 
 def test_select_deadline(client):
@@ -514,6 +515,7 @@ def test_create_experiment_with_repetitions(client):
     assert res.status_code == 201
     created = res.json()
     assert "id" in created
+    client.post(f"/api/experiments/{created['id']}/cancel")
 
 
 def test_engine_profile_rows_repetition_aggregation():
@@ -874,3 +876,34 @@ def test_calibration_start_and_stop(client, monkeypatch):
     status_res2 = client.get("/api/calibration/status")
     assert status_res2.status_code == 200
     assert status_res2.json()["is_running"] is False
+
+
+def test_dynamic_calibration_tiers_and_status(client):
+    from api.calibration_runner import get_tier_config
+
+    # Test adaptive caps calculation
+    cfg_quick = get_tier_config("quick", cap_min=500000, cap_max=2500000)
+    assert len(cfg_quick["caps"]) == 3
+    assert cfg_quick["caps"][0] == 2500000
+    assert cfg_quick["caps"][-1] < 2500000
+
+    cfg_std = get_tier_config("standard", cap_min=500000, cap_max=2500000)
+    assert len(cfg_std["caps"]) == 6
+    assert cfg_std["caps"][0] == 2500000
+    assert cfg_std["caps"][-1] == 500000
+
+    cfg_exh = get_tier_config("exhaustive", cap_min=500000, cap_max=2500000)
+    assert len(cfg_exh["caps"]) == 10
+    assert cfg_exh["caps"][0] == 2500000
+    assert cfg_exh["caps"][-1] == 500000
+
+    # Test status endpoint returns dynamic classes and frequency limits
+    status_res = client.get("/api/calibration/status")
+    assert status_res.status_code == 200
+    data = status_res.json()
+    assert "classes" in data
+    assert len(data["classes"]) >= 1
+    assert "frequency_limits_khz" in data
+    assert data["frequency_limits_khz"]["min"] > 0
+    assert data["frequency_limits_khz"]["max"] >= data["frequency_limits_khz"]["min"]
+

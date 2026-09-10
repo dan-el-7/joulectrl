@@ -308,6 +308,14 @@ export async function setFocusSwitch(params: {
 
 export type CalibrationTier = 'quick' | 'standard' | 'exhaustive';
 
+export interface DiscoveredClassInfo {
+  class: string;
+  display: string;
+  cpus: number[];
+  workers: number;
+  chunks?: number;
+}
+
 export interface CalibrationStatusResponse {
   is_running: boolean;
   session_id?: string | null;
@@ -322,6 +330,8 @@ export interface CalibrationStatusResponse {
   latest_point?: any;
   points_count: number;
   error?: string | null;
+  classes?: DiscoveredClassInfo[];
+  frequency_limits_khz?: { min: number; max: number };
 }
 
 export async function fetchCalibrationStatus(): Promise<CalibrationStatusResponse> {

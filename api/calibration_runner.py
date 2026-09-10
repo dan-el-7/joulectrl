@@ -29,56 +29,58 @@ from typing import Any, Optional
 
 from core.events import default_bus
 from core.models import CalibrationRecord
+from core.topology import discover_freq_limits, discover_hardware_classes
 
 logger = logging.getLogger("joulectrl.calibration")
 
 KERNEL_PATH = Path("workloads/kernel/fixed_compute").resolve()
 WRAP = 65_532_610_987
 
-CLASSES_DEF = [
-    {
-        "class": "all_logical",
-        "display": "All Cores (16 threads)",
-        "cpus": list(range(16)),
-        "workers": 16,
-        "chunks": 131072,
-    },
-    {
-        "class": "fast",
-        "display": "Zen 5 Fast Cores (8 threads)",
-        "cpus": [0, 2, 4, 6, 8, 10, 12, 14],
-        "workers": 8,
-        "chunks": 65536,
-    },
-    {
-        "class": "efficient",
-        "display": "Zen 5c Eco Cores (8 threads)",
-        "cpus": [1, 3, 5, 7, 9, 11, 13, 15],
-        "workers": 8,
-        "chunks": 65536,
-    },
-]
 
-TIER_CONFIGS = {
-    "quick": {
-        "name": "Quick Tier (~20m)",
-        "reps": 1,
-        "caps": [2000000, 1400000, 800000],  # 1 stock + 3 caps = 4 freqs/class
-        "est_run_s": 6.5,
-    },
-    "standard": {
-        "name": "Standard Tier (~1h)",
-        "reps": 2,
-        "caps": [2000000, 1720000, 1450000, 1170000, 900000, 623377],  # 1 stock + 6 caps = 7 freqs/class
-        "est_run_s": 7.0,
-    },
-    "exhaustive": {
-        "name": "Exhaustive Tier (3x per freq)",
-        "reps": 3,
-        "caps": [2000000, 1847041, 1694083, 1541125, 1388167, 1235209, 1082251, 929293, 776335, 623377],
-        "est_run_s": 7.5,
-    },
-}
+def get_tier_config(tier: str, cap_min: Optional[int] = None, cap_max: Optional[int] = None) -> dict[str, Any]:
+    """Dynamically generate tier configuration with linearly interpolated caps based on hardware limits."""
+    if cap_min is None or cap_max is None:
+        c_min, c_max = discover_freq_limits()
+        cap_min = cap_min or c_min
+        cap_max = cap_max or c_max
+
+    if cap_min >= cap_max:
+        cap_min = round(cap_max * 0.3)
+
+    if tier == "standard":
+        # 6 linearly spaced caps from cap_max down to cap_min (gives 1 stock + 6 caps = 7 points/class)
+        caps = [round(cap_max - i * (cap_max - cap_min) / 5) for i in range(6)]
+        return {
+            "name": "Standard Tier (~1h)",
+            "reps": 2,
+            "caps": caps,
+            "est_run_s": 7.0,
+        }
+    elif tier == "exhaustive":
+        # 10 linearly spaced caps from cap_max down to cap_min (gives 1 stock + 10 caps = 11 points/class)
+        caps = [round(cap_max - i * (cap_max - cap_min) / 9) for i in range(10)]
+        return {
+            "name": "Exhaustive Tier (3x per freq)",
+            "reps": 3,
+            "caps": caps,
+            "est_run_s": 7.5,
+        }
+    else:  # quick
+        mid = round(cap_min + 0.55 * (cap_max - cap_min))
+        low = round(cap_min + 0.15 * (cap_max - cap_min))
+        caps = [cap_max, mid, low]
+        return {
+            "name": "Quick Tier (~20m)",
+            "reps": 1,
+            "caps": caps,
+            "est_run_s": 6.5,
+        }
+
+
+# Dynamic defaults initialized from live discovery (backward-compatible)
+CLASSES_DEF = discover_hardware_classes()
+TIER_CONFIGS = {t: get_tier_config(t) for t in ["quick", "standard", "exhaustive"]}
+
 
 
 class CalibrationRunner:
@@ -129,7 +131,9 @@ class CalibrationRunner:
             if self.is_running and self.start_wall > 0:
                 self.elapsed_s = round(time.monotonic() - self.start_wall, 1)
 
-            tier_info = TIER_CONFIGS.get(self.tier, TIER_CONFIGS["quick"])
+            cap_min, cap_max = discover_freq_limits()
+            tier_info = get_tier_config(self.tier, cap_min, cap_max)
+            discovered_classes = discover_hardware_classes()
             return {
                 "is_running": self.is_running,
                 "session_id": self.session_id,
@@ -144,6 +148,8 @@ class CalibrationRunner:
                 "latest_point": self.latest_point,
                 "points_count": len(self.points_measured),
                 "error": self.error,
+                "classes": discovered_classes,
+                "frequency_limits_khz": {"min": cap_min, "max": cap_max},
             }
 
     def start(
@@ -161,13 +167,12 @@ class CalibrationRunner:
                     "status": self.get_status(),
                 }
 
-            if tier not in TIER_CONFIGS:
-                tier = "quick"
-
-            tier_cfg = TIER_CONFIGS[tier]
-            selected_classes = [c for c in CLASSES_DEF if classes is None or c["class"] in classes]
+            cap_min, cap_max = discover_freq_limits()
+            tier_cfg = get_tier_config(tier, cap_min, cap_max)
+            all_classes = discover_hardware_classes()
+            selected_classes = [c for c in all_classes if classes is None or c["class"] in classes]
             if not selected_classes:
-                selected_classes = CLASSES_DEF
+                selected_classes = all_classes
 
             freq_count = 1 + len(tier_cfg["caps"])
             total_runs = len(selected_classes) * freq_count * tier_cfg["reps"]

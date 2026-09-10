@@ -688,18 +688,40 @@ class LiveEngine:
             fast = cls_map["fast"].get("cpus") or [0, 2, 4, 6]
             eff = cls_map["efficient"].get("cpus") or [1, 3, 5, 7]
         else:
-            fast = [0, 2, 4, 6, 8, 10, 12, 14]
-            eff = [1, 3, 5, 7, 9, 11, 13, 15]
+            try:
+                from core.topology import read_topology, read_core_class_map
+                topo = read_topology()
+                cmap = read_core_class_map(topo)
+                if cmap.n_classes > 1:
+                    s_c = sorted(cmap.classes.items(), key=lambda x: cmap.hw_max_freq.get(x[0], 0), reverse=True)
+                    fast = s_c[0][1]
+                    eff = s_c[1][1]
+                else:
+                    fast = list(range(topo.ncpu))
+                    eff = list(range(topo.ncpu))
+            except Exception:
+                fast = [0, 2, 4, 6, 8, 10, 12, 14]
+                eff = [1, 3, 5, 7, 9, 11, 13, 15]
 
-        fast_phys = [c for c in fast if c < 8] or fast[:4]
-        eff_phys = [c for c in eff if c < 8] or eff[:4]
-        phys = sorted(fast_phys + eff_phys)
-        all_logical = sorted(fast + eff)
+        # Dynamic physical core extraction
+        try:
+            from core.topology import read_topology
+            topo = read_topology()
+            phys = [topo.cores[c][0] for c in sorted(topo.cores.keys())]
+        except Exception:
+            fast_phys = [c for c in fast if c < 8] or fast[:4]
+            eff_phys = [c for c in eff if c < 8] or eff[:4]
+            phys = sorted(fast_phys + eff_phys)
+
+        fast_phys = [c for c in fast if c in phys] or fast[:max(1, len(fast) // 2)]
+        eff_phys = [c for c in eff if c in phys] or eff[:max(1, len(eff) // 2)]
+        phys = sorted(set(fast_phys + eff_phys))
+        all_logical = sorted(set(fast + eff))
         fast_1w = [fast_phys[0]]
         eff_1w = [eff_phys[0]]
 
-        cap_min = 623377
-        cap_max = 2000000
+        from core.topology import discover_freq_limits
+        cap_min, cap_max = discover_freq_limits()
 
         def get_cap(fraction: float) -> int:
             return round(cap_min + fraction * (cap_max - cap_min))
@@ -729,7 +751,7 @@ class LiveEngine:
         for name, cpus, workers, lay in primary_layouts:
             add(f"cfg_{name}_stock", lay, workers, cpus, None, True, f"{name} stock max (highest, {workers}w)")
             add(f"cfg_{name}_cap{cap_min//1000}m", lay, workers, cpus, cap_min, False, f"{name} min cap {cap_min/1e6:.2f} GHz (lowest, {workers}w)")
-            add(f"cfg_{name}_base", lay, workers, cpus, cap_max, False, f"{name} base 2.0 GHz ({workers}w)")
+            add(f"cfg_{name}_base", lay, workers, cpus, cap_max, False, f"{name} base {cap_max/1e6:.1f} GHz ({workers}w)")
 
         # Round 1: Midpoints (50% ~1.31 GHz) + Secondary layouts bounds
         for name, cpus, workers, lay in primary_layouts:
@@ -868,14 +890,14 @@ class LiveEngine:
         fresh_keys = {
             (tuple(rec.configuration.cpu_affinity or []), 1 if rec.configuration.boost else 0, rec.configuration.freq_cap_khz, rec.configuration.worker_count)
             for rec in runs
-            if rec.status == "success" and rec.runtime_s and rec.runtime_s > 0
+            if rec.status == "success" and rec.runtime_s and rec.runtime_s > 0 and rec.configuration
         }
         for k in fresh_keys:
             if k in rows:
                 del rows[k]
 
         for rec in runs:
-            if rec.status == "success" and rec.runtime_s and rec.runtime_s > 0:
+            if rec.status == "success" and rec.runtime_s and rec.runtime_s > 0 and rec.configuration:
                 cfg = rec.configuration
                 add((tuple(cfg.cpu_affinity or []), 1 if cfg.boost else 0, cfg.freq_cap_khz, cfg.worker_count),
                     cfg.cpu_affinity or [], 1 if cfg.boost else 0,
