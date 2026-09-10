@@ -276,6 +276,8 @@ class WatchService:
         self._seg_counter = 0
         self.last_power_w: Optional[float] = None
         self.started_at = time.time()
+        self._last_sample_result: Optional[dict[str, Any]] = None
+        self._last_sample_wall: float = 0.0
 
     def _prime_live_baseline(self) -> Optional[float]:
         """Read instantaneous hardware power on initialization to bootstrap rough idle."""
@@ -358,6 +360,21 @@ class WatchService:
                         helper.apply_configuration({"boost": False})
                 except Exception:
                     pass
+        elif self.optimization_objective == "balanced":
+            # Balanced: clamp out-of-range boost to moderate 2.8 GHz cap
+            self.control_state = "optimized_active"
+            if helper:
+                try:
+                    helper.begin_session()
+                    self._session_active = True
+                    caps = {f"policy{i}": 2800000 for i in range(16)}
+                    helper.apply_configuration({
+                        "boost": False,
+                        "policy_freq_caps_khz": caps,
+                        "clamp_out_of_range": True,
+                    })
+                except Exception:
+                    pass
         else:
             # Default: Max Energy Efficiency (2.0 GHz sweet-spot clamp)
             self.control_state = "optimized_active"
@@ -402,6 +419,15 @@ class WatchService:
             else:
                 saved_j = runtime_s * 10.0
                 saved_pct = 30.0
+        elif self.optimization_objective == "balanced":
+            est_stock_w = 32.5
+            est_stock_j = runtime_s * est_stock_w
+            if actual_j is not None and actual_j > 0:
+                saved_j = max(0.0, est_stock_j - actual_j)
+                saved_pct = round((saved_j / max(est_stock_j, 1e-6)) * 100, 1)
+            else:
+                saved_j = runtime_s * 6.5
+                saved_pct = 20.0
         else:
             # Efficiency sweet-spot mode (~59% savings)
             if actual_j is not None and actual_j > 0:
@@ -499,9 +525,13 @@ class WatchService:
             >= len(getattr(self.backend, "_profile_segments", []))
         )
 
-    def _sample_once(self) -> Optional[dict[str, Any]]:
+    def _sample_once(self, force: bool = False) -> Optional[dict[str, Any]]:
         """Take one sample (real or scripted), feed the detector, return frame data."""
         synthetic = self.source_info.get("synthetic", False)
+        now_wall = time.monotonic()
+        min_gap = max(0.2, self.detector.poll_interval_s * 0.5)
+        if not synthetic and not force and self._last_sample_result is not None and (now_wall - self._last_sample_wall) < min_gap:
+            return self._last_sample_result
         if synthetic:
             # Scripted profile: step simulated time and read power + energy.
             dt_sim = self.detector.poll_interval_s
@@ -532,6 +562,9 @@ class WatchService:
         }
         if segment is not None:
             frame["closed_segment"] = segment
+
+        self._last_sample_wall = now_wall
+        self._last_sample_result = frame
         return frame
 
     def _power_from_energy(self, energy_uj: Optional[int]) -> Optional[float]:
@@ -647,6 +680,7 @@ class WatchService:
             "active_segment_elapsed_s": None,
             "completed_segments_count": len(self.detector.segments),
             "active_control": self.active_control,
+            "is_autopilot": bool(self.active_control and self.target_pid is None),
             "control_state": self.control_state,
             "optimization_objective": self.optimization_objective,
             "recurrence_mode": self.recurrence_mode,

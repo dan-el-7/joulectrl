@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
@@ -62,6 +63,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ---------------------------------------------------------------------------
 # Persistence (Agent B's Store) seeded with fixture-backed experiments.
@@ -190,6 +192,7 @@ def _resolve_selection_model(experiment_id: str) -> Optional[dict[str, Any]]:
 # Watch mode state: live session on B's WatchDetector when started
 # (core/watch.py); None when idle. Read-only per §6b.
 _WATCH_SERVICE: Optional[WatchService] = None
+_AUTOPILOT_TASK: Optional[asyncio.Task] = None
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +281,13 @@ class WatchLaunchAndArmRequest(BaseModel):
     recurrence_mode: str = "repeated"
     time_budget_s: Optional[float] = None
     target_freq_khz: Optional[int] = None
+
+
+class AutoPilotArmRequest(BaseModel):
+    objective: str = "efficiency"  # "efficiency" | "balanced" | "performance"
+    onset_s: float = 2.0
+    idle_grace_s: float = 3.0
+    poll_hz: float = 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -1706,6 +1716,7 @@ def arm_watch(req: WatchArmRequest) -> dict[str, Any]:
         target_freq_khz=req.target_freq_khz,
         store=_STORE,
     )
+    _ensure_autopilot_worker()
     return {
         "ok": True,
         "status": "armed",
@@ -1820,6 +1831,8 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
             store=_STORE,
         )
         ctrl_state = _WATCH_SERVICE.control_state
+        if req.arm_watcher:
+            _ensure_autopilot_worker()
 
     return {
         "ok": True,
@@ -1833,10 +1846,49 @@ def launch_and_arm(req: WatchLaunchAndArmRequest) -> dict[str, Any]:
     }
 
 
+_AUTOPILOT_THREAD: Optional[threading.Thread] = None
+_AUTOPILOT_STOP_EVENT = threading.Event()
+
+
+def _autopilot_thread_worker():
+    """Independent daemon background worker that drives WatchService sampling 24/7."""
+    global _WATCH_SERVICE
+    logger.info("Auto-pilot background thread started.")
+    while not _AUTOPILOT_STOP_EVENT.is_set():
+        if _WATCH_SERVICE is None or _WATCH_SERVICE.detector.state == "stopped":
+            break
+        try:
+            _WATCH_SERVICE._sample_once()
+        except Exception as e:
+            logger.debug("Auto-pilot tick: %s", e)
+        interval = min(_WATCH_SERVICE._poll_interval_wall(), 1.0) if _WATCH_SERVICE else 1.0
+        _AUTOPILOT_STOP_EVENT.wait(interval)
+    logger.info("Auto-pilot background thread ended.")
+
+
+def _ensure_autopilot_worker():
+    global _AUTOPILOT_THREAD, _AUTOPILOT_STOP_EVENT
+    if _AUTOPILOT_THREAD is None or not _AUTOPILOT_THREAD.is_alive():
+        _AUTOPILOT_STOP_EVENT.clear()
+        _AUTOPILOT_THREAD = threading.Thread(
+            target=_autopilot_thread_worker,
+            daemon=True,
+            name="joulectrl-autopilot",
+        )
+        _AUTOPILOT_THREAD.start()
+
+
+def _stop_autopilot_worker():
+    global _AUTOPILOT_THREAD, _AUTOPILOT_STOP_EVENT
+    _AUTOPILOT_STOP_EVENT.set()
+    _AUTOPILOT_THREAD = None
+
+
 @app.post("/api/watch/disarm")
 def disarm_watch() -> dict[str, Any]:
     """Disarm active watcher and restore all stock clocks and normal scheduling immediately."""
     global _WATCH_SERVICE
+    _stop_autopilot_worker()
     if _WATCH_SERVICE is None:
         return {"ok": True, "status": "disarmed", "message": "No watcher was running."}
 
@@ -1845,6 +1897,82 @@ def disarm_watch() -> dict[str, Any]:
         "ok": True,
         "status": "disarmed",
         "message": "Watcher disarmed. Stock hardware clocks and normal scheduling restored.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Dedicated Auto-Pilot Mode Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/autopilot/status")
+def get_autopilot_status() -> dict[str, Any]:
+    """Inspect the live state of system-wide Auto-Pilot."""
+    global _WATCH_SERVICE
+    if _WATCH_SERVICE is None or _WATCH_SERVICE.detector.state == "stopped" or not _WATCH_SERVICE.active_control:
+        return {
+            "enabled": False,
+            "state": "stopped",
+            "control_state": "stopped",
+            "objective": "efficiency",
+            "current_power_w": None,
+            "baseline_w": None,
+            "threshold_w": None,
+            "total_saved_j": 0.0,
+            "active_sessions_count": 0,
+            "latest_savings": None,
+        }
+
+    return {
+        "enabled": True,
+        "state": _WATCH_SERVICE.detector.state,
+        "control_state": _WATCH_SERVICE.control_state,
+        "objective": _WATCH_SERVICE.optimization_objective,
+        "current_power_w": round(_WATCH_SERVICE.last_power_w, 2) if _WATCH_SERVICE.last_power_w is not None else None,
+        "baseline_w": round(_WATCH_SERVICE.detector.baseline_w, 2) if _WATCH_SERVICE.detector.baseline_w is not None else None,
+        "threshold_w": round(_WATCH_SERVICE.detector.threshold_w, 2) if _WATCH_SERVICE.detector.threshold_w is not None else None,
+        "total_saved_j": round(_WATCH_SERVICE.total_saved_energy_j, 1),
+        "active_sessions_count": _WATCH_SERVICE.active_sessions_count,
+        "latest_savings": _WATCH_SERVICE.savings_history[-1] if _WATCH_SERVICE.savings_history else None,
+    }
+
+
+@app.post("/api/autopilot/arm")
+def arm_autopilot(req: Optional[AutoPilotArmRequest] = None) -> dict[str, Any]:
+    """Arm system-wide Auto-Pilot.
+    Monitors package power passively at Stock Boost, clamps sustained spikes to Pareto sweet-spot,
+    and restores Stock Boost automatically when workloads return to idle.
+    """
+    if req is None:
+        req = AutoPilotArmRequest()
+
+    arm_req = WatchArmRequest(
+        pid=None,
+        process_name="System",
+        focus_mode="on",
+        onset_s=req.onset_s,
+        idle_grace_s=req.idle_grace_s,
+        poll_hz=req.poll_hz,
+        optimization_objective=req.objective,
+        recurrence_mode="repeated",
+    )
+    res = arm_watch(arm_req)
+    return {
+        "ok": True,
+        "status": "armed",
+        "objective": req.objective,
+        "control_state": res.get("control_state", "stock_idle"),
+        "message": f"Auto-Pilot armed ({req.objective}). Passively monitoring system power at Stock Boost.",
+    }
+
+
+@app.post("/api/autopilot/disarm")
+def disarm_autopilot() -> dict[str, Any]:
+    """Disarm system-wide Auto-Pilot and restore stock boosts."""
+    res = disarm_watch()
+    return {
+        "ok": True,
+        "status": "disarmed",
+        "message": "Auto-Pilot disarmed. Stock Boost active.",
     }
 
 

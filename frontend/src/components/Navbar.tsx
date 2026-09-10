@@ -2,6 +2,7 @@ import React from 'react';
 import { fetchSystemThermal, SystemThermalStatus } from '../api';
 import { getThemeColors, fonts, fontFeatures, type, radii, ThemeMode } from '../design';
 import { FocusSwitch, FocusMode } from './FocusSwitch';
+import { AutoPilotControl } from './AutoPilotControl';
 
 interface NavbarProps {
   activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'demo' | 'watch' | 'tasks' | 'dashboard' | 'settings';
@@ -289,6 +290,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </select>
           </div>
         )}
+
+        {/* Global Auto-Pilot Mode Switch */}
+        <AutoPilotControl compact={true} />
 
         {/* Focus Switch: reverse (game/foreground priority) | off | on (pinned task priority) */}
         {onChangeFocusMode && (

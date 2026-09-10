@@ -8,6 +8,7 @@ import {
 import { fonts, fontFeatures, radii } from '../design';
 import { useTheme } from '../ThemeContext';
 import { SavingsDashboardResponse, SavingsLedgerEntry } from '../types';
+import { AutoPilotControl } from './AutoPilotControl';
 
 export const SavingsDashboard: React.FC = () => {
   const { theme, themeColors } = useTheme();
@@ -335,6 +336,13 @@ export const SavingsDashboard: React.FC = () => {
               <span>Preload sample demonstration history for exploration</span>
             </label>
           </div>
+        </div>
+      )}
+
+      {/* Auto-Pilot Autonomous Background Optimizer Card */}
+      {isOptedIn && (
+        <div style={{ marginBottom: 20 }}>
+          <AutoPilotControl compact={false} onStatusChange={() => {}} />
         </div>
       )}
 

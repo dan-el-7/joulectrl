@@ -256,6 +256,51 @@ export async function disarmWatch(): Promise<any> {
   return res.json();
 }
 
+export interface AutoPilotStatus {
+  enabled: boolean;
+  state: 'idle' | 'calibrating' | 'active' | 'stopped';
+  control_state: 'stock_idle' | 'optimized_active' | 'shielded_boost' | 'stopped';
+  objective: 'efficiency' | 'balanced' | 'performance';
+  current_power_w: number | null;
+  baseline_w: number | null;
+  threshold_w: number | null;
+  total_saved_j: number;
+  active_sessions_count: number;
+  latest_savings?: {
+    session_id: number;
+    timestamp: string;
+    runtime_s: number;
+    saved_energy_j: number;
+    saved_pct: number;
+  } | null;
+}
+
+export async function fetchAutoPilotStatus(): Promise<AutoPilotStatus> {
+  const res = await fetch(`${API_BASE}/autopilot/status`);
+  if (!res.ok) throw new Error(`Failed to fetch autopilot status: ${res.statusText}`);
+  return res.json();
+}
+
+export async function armAutoPilot(params?: {
+  objective?: 'efficiency' | 'balanced' | 'performance';
+  onset_s?: number;
+  idle_grace_s?: number;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/autopilot/arm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {}),
+  });
+  if (!res.ok) throw new Error(`Failed to arm autopilot: ${res.statusText}`);
+  return res.json();
+}
+
+export async function disarmAutoPilot(): Promise<any> {
+  const res = await fetch(`${API_BASE}/autopilot/disarm`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Failed to disarm autopilot: ${res.statusText}`);
+  return res.json();
+}
+
 export interface DetectedApp {
   key: string;
   name: string;
