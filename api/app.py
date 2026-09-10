@@ -97,11 +97,11 @@ def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
     if exp is None:
         return None
 
-    # Attach runs from persistent SQLite Store so runs are never lost
+    # Attach runs and reconstruct configurations from persistent SQLite Store
     try:
         db_runs = _STORE.get_runs(experiment_id)
+        prof = exp.setdefault("profile", {})
         if db_runs:
-            prof = exp.setdefault("profile", {})
             existing_runs = prof.setdefault("runs", [])
             existing_ids = {r.get("run_id") for r in existing_runs if isinstance(r, dict)}
             for r in db_runs:
@@ -127,8 +127,49 @@ def _resolve_experiment(experiment_id: str) -> Optional[dict[str, Any]]:
                         "energy_available": r.energy_available,
                         "status": r.status,
                     })
+
+        configs = prof.setdefault("configurations", {})
+        if not configs:
+            sel = exp.get("selection") or {}
+            cands = sel.get("candidates") or sel.get("candidate_summaries") or []
+            for c in cands:
+                cid = c.get("config_id") or (c.get("configuration") or {}).get("id")
+                if cid and cid not in configs:
+                    configs[cid] = dict(c)
+
+            if not configs and db_runs:
+                from collections import defaultdict
+                from statistics import median
+                by_cfg: dict[str, list[Any]] = defaultdict(list)
+                for r in db_runs:
+                    if r.config_id and r.status == "success":
+                        by_cfg[r.config_id].append(r)
+                for cid, r_list in by_cfg.items():
+                    rts = [r.runtime_s for r in r_list if r.runtime_s is not None]
+                    nrg = [r.package_energy_j for r in r_list if r.package_energy_j is not None]
+                    first = r_list[0]
+                    cfg_api = (
+                        first.configuration.to_dict()
+                        if hasattr(first.configuration, "to_dict")
+                        else {"layout": "B", "worker_count": 1, "cpu_affinity": []}
+                    )
+                    med_rt = median(rts) if rts else None
+                    med_ej = median(nrg) if nrg else None
+                    configs[cid] = {
+                        "config_id": cid,
+                        "configuration": cfg_api,
+                        "runtime_samples": rts,
+                        "energy_samples": nrg,
+                        "median_runtime_s": med_rt,
+                        "guarded_runtime_s": med_rt,
+                        "median_energy_j": med_ej,
+                        "median_power_w": round(med_ej / med_rt, 2) if med_ej and med_rt else None,
+                        "profile_is_usable": med_ej is not None,
+                        "total_runs": len(r_list),
+                        "is_baseline": any(r.is_baseline for r in r_list),
+                    }
     except Exception as exc:
-        logging.warning("Failed to attach stored runs for %s: %s", experiment_id, exc)
+        logging.warning("Failed to attach stored runs or reconstruct configs for %s: %s", experiment_id, exc)
 
     return exp
 
@@ -183,7 +224,14 @@ class SelectRequest(BaseModel):
 
 class ExplainRequest(BaseModel):
     experiment_id: str
-    provider: str = "template"  # "template" | "local_llm" | "cloud_llm"
+    provider: str = "template"  # "template" | "local_llm" | "ollama" | "cloud_llm"
+    model: Optional[str] = None
+    ollama_url: Optional[str] = None
+
+
+class LLMTestRequest(BaseModel):
+    url: str = "http://localhost:11434"
+    model: str = "llama3.2"
 
 
 class RestoreRequest(BaseModel):
@@ -1167,7 +1215,7 @@ def _grounding_facts(facts: dict[str, Any]) -> list[str]:
 
 @app.post("/api/explain")
 def explain_selection(req: ExplainRequest) -> dict[str, Any]:
-    """Generate explanation via Agent D's deterministic layer (explain/).
+    """Generate explanation via Agent D's deterministic layer or local/cloud LLM.
 
     PLAN §10: Basic templates are the guaranteed default. LLM providers degrade to
     Basic on failure — never to silence, and never with privileged control.
@@ -1186,21 +1234,91 @@ def explain_selection(req: ExplainRequest) -> dict[str, Any]:
         profile=profile,
         validation_pairs=pairs,
     )
-    text = generate_explanation(facts)
 
-    fallback = req.provider != "template"
-    if fallback:
-        # LLM adapters are a later gate; until wired they degrade to Basic explicitly.
-        logger.info("Provider '%s' unavailable; degraded to Basic templates", req.provider)
+    from explain.providers import get_provider
+    provider_inst = get_provider(
+        req.provider,
+        ollama_url=req.ollama_url or "http://localhost:11434",
+        model=req.model or "llama3.2",
+    )
+    text = provider_inst.explain(facts)
+    used_fallback = getattr(provider_inst, "used_fallback", False) or (req.provider != "template" and provider_inst.name == "basic")
 
     return {
         "experiment_id": req.experiment_id,
         "provider": req.provider,
-        "provider_effective": "template",
-        "fallback": fallback,
+        "provider_effective": "template" if (used_fallback or provider_inst.name == "basic") else provider_inst.name,
+        "fallback": used_fallback,
         "text": text,
         "grounding_facts": _grounding_facts(facts),
     }
+
+
+@app.get("/api/llm/models")
+def list_llm_models(url: str = Query("http://localhost:11434")) -> dict[str, Any]:
+    """Scan and list local Ollama models."""
+    from explain.providers import OllamaProvider
+    prov = OllamaProvider(base_url=url)
+    models_raw = prov.list_models()
+    models = [
+        {
+            "name": m.get("name"),
+            "size_mb": round(m.get("size", 0) / (1024 * 1024), 1) if m.get("size") else None,
+            "modified_at": m.get("modified_at"),
+            "parameter_size": (m.get("details") or {}).get("parameter_size"),
+            "quantization_level": (m.get("details") or {}).get("quantization_level"),
+            "family": (m.get("details") or {}).get("family"),
+        }
+        for m in models_raw
+    ]
+    return {
+        "connected": len(models_raw) > 0,
+        "url": url,
+        "models": models,
+        "count": len(models),
+        "message": f"Found {len(models)} local Ollama model(s)" if models else "No Ollama models detected or Ollama service is not running."
+    }
+
+
+@app.post("/api/llm/test")
+def test_llm_model(req: LLMTestRequest) -> dict[str, Any]:
+    """Quick test prompt against the specified Ollama model to verify latency and connectivity."""
+    import time
+    t0 = time.monotonic()
+    payload = {
+        "model": req.model,
+        "messages": [
+            {"role": "user", "content": "Respond with exactly: 'Ollama is connected and ready for Joulectrl.'"}
+        ],
+        "stream": False,
+        "options": {"num_predict": 25, "temperature": 0.1},
+    }
+    try:
+        url = f"{req.url.rstrip('/')}/api/chat"
+        post_req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(post_req, timeout=8.0) as resp:
+            elapsed_ms = round((time.monotonic() - t0) * 1000, 1)
+            data = json.loads(resp.read().decode("utf-8"))
+            content = (data.get("message") or {}).get("content", "").strip()
+            return {
+                "ok": True,
+                "latency_ms": elapsed_ms,
+                "response": content,
+                "model": req.model,
+            }
+    except Exception as exc:
+        elapsed_ms = round((time.monotonic() - t0) * 1000, 1)
+        return {
+            "ok": False,
+            "latency_ms": elapsed_ms,
+            "error": str(exc),
+            "model": req.model,
+        }
 
 
 @app.get("/api/experiments/{id}/export")

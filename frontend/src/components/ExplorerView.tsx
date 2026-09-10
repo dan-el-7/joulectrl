@@ -82,22 +82,36 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 
   const configs = profile?.configurations || {};
   const candList: any[] = (selection as any)?.candidates || (selection as any)?.candidate_summaries || [];
-  const baselineId = profile?.baseline_config_id || (selection as any)?.baseline_config_id || Object.keys(configs)[0];
+
+  // Robust configurations map: profile.configurations if populated, or reconstructed from candList
+  const effectiveConfigs: Record<string, ConfigSummary> = React.useMemo(() => {
+    if (configs && Object.keys(configs).length > 0) {
+      return configs;
+    }
+    const map: Record<string, any> = {};
+    candList.forEach((c: any) => {
+      const cid = c.config_id || c.configuration?.id || c.id;
+      if (cid) map[cid] = c;
+    });
+    return map;
+  }, [configs, candList]);
+
+  const baselineId = profile?.baseline_config_id || (selection as any)?.baseline_config_id || Object.keys(effectiveConfigs)[0];
   const selectedId = selection?.selected_config_id ?? selection?.config_id;
 
-  const baseCfg: any = (baselineId ? configs[baselineId] : undefined)
-    || Object.values(configs).find((c: any) => c.config_id === baselineId || c.configuration?.id === baselineId || c.is_baseline)
+  const baseCfg: any = (baselineId ? effectiveConfigs[baselineId] : undefined)
+    || Object.values(effectiveConfigs).find((c: any) => c.config_id === baselineId || c.configuration?.id === baselineId || c.is_baseline)
     || candList.find((c: any) => c.config_id === baselineId || c.configuration?.id === baselineId || c.is_baseline);
 
-  const selCfg: any = (selectedId ? configs[selectedId] : undefined)
-    || Object.values(configs).find((c: any) => c.config_id === selectedId || c.configuration?.id === selectedId)
+  const selCfg: any = (selectedId ? effectiveConfigs[selectedId] : undefined)
+    || Object.values(effectiveConfigs).find((c: any) => c.config_id === selectedId || c.configuration?.id === selectedId)
     || candList.find((c: any) => c.config_id === selectedId || c.configuration?.id === selectedId)
     || ((selection as any)?.configuration || (selection as any)?.selected_configuration
       ? { config_id: selectedId, configuration: (selection as any)?.configuration || (selection as any)?.selected_configuration }
       : undefined);
 
-  const allConfigsList: any[] = Object.keys(configs).length > 0
-    ? Object.values(configs)
+  const allConfigsList: any[] = Object.keys(effectiveConfigs).length > 0
+    ? Object.values(effectiveConfigs)
     : candList;
 
   // Find lowest energy overall across usable configurations
@@ -338,7 +352,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 
       {/* Main Pareto Scatter Chart */}
       <ParetoChart
-        configurations={configs}
+        configurations={effectiveConfigs}
         selectedConfigId={selectedId}
         baselineConfigId={baselineId}
         deadlineS={tempBudget}

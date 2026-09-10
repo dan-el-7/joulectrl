@@ -85,13 +85,55 @@ export async function restoreSettings(): Promise<any> {
   return res.json();
 }
 
-export async function explainSelection(experimentId: string, provider: string = 'template'): Promise<any> {
+export async function explainSelection(
+  experimentId: string,
+  provider: string = 'template',
+  model?: string,
+  ollamaUrl?: string,
+): Promise<any> {
+  const payload: Record<string, any> = { experiment_id: experimentId, provider };
+  if (model) payload.model = model;
+  if (ollamaUrl) payload.ollama_url = ollamaUrl;
+
   const res = await fetch(`${API_BASE}/explain`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ experiment_id: experimentId, provider }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Failed to generate explanation: ${res.statusText}`);
+  return res.json();
+}
+
+export interface OllamaModelInfo {
+  name: string;
+  size_mb?: number;
+  modified_at?: string;
+  parameter_size?: string;
+  quantization_level?: string;
+  family?: string;
+}
+
+export interface OllamaScanResponse {
+  connected: boolean;
+  url: string;
+  models: OllamaModelInfo[];
+  count: number;
+  message: string;
+}
+
+export async function fetchOllamaModels(url: string = 'http://localhost:11434'): Promise<OllamaScanResponse> {
+  const res = await fetch(`${API_BASE}/llm/models?url=${encodeURIComponent(url)}`);
+  if (!res.ok) throw new Error(`Failed to scan Ollama models: ${res.statusText}`);
+  return res.json();
+}
+
+export async function testOllamaModel(url: string, model: string): Promise<{ ok: boolean; latency_ms: number; response?: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/llm/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, model }),
+  });
+  if (!res.ok) throw new Error(`Failed to test model: ${res.statusText}`);
   return res.json();
 }
 

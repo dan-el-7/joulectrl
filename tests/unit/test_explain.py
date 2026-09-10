@@ -6,7 +6,13 @@ import unittest
 
 from core.models import Configuration, Profile, Selection, ValidationPair
 from explain.facts import extract_explanation_facts
-from explain.providers import BasicProvider, LocalLlamaProvider, CloudOpenAIProvider, get_provider
+from explain.providers import (
+    BasicProvider,
+    LocalLlamaProvider,
+    CloudOpenAIProvider,
+    OllamaProvider,
+    get_provider,
+)
 from explain.templates import generate_explanation
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent.parent / "fixtures" / "synthetic"
@@ -270,6 +276,92 @@ class TestExplanationLayer(unittest.TestCase):
             self.assertIn("Grounding Rules", payload["messages"][0]["content"])
             self.assertIn("cfg_zen5c_4c_3000", payload["messages"][1]["content"])
         finally:
+            server.server_close()
+
+    def test_ollama_provider_fallback_when_offline(self):
+        facts = extract_explanation_facts(self.selection, self.profile, self.val_pairs)
+        basic = BasicProvider()
+        res_basic = basic.explain(facts)
+
+        ollama = OllamaProvider(base_url="http://127.0.0.1:9999", timeout_s=0.2)
+        res_ollama = ollama.explain(facts)
+        self.assertTrue(ollama.used_fallback)
+        self.assertEqual(res_ollama, res_basic)
+
+    def test_ollama_provider_success_with_mock_server(self):
+        import http.server
+        import threading
+
+        facts = extract_explanation_facts(self.selection, self.profile, self.val_pairs)
+        received_payload = []
+
+        class MockOllamaHandler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                if self.path == "/api/chat":
+                    length = int(self.headers.get("Content-Length", 0))
+                    body = json.loads(self.rfile.read(length).decode("utf-8"))
+                    received_payload.append(body)
+
+                    response_data = {
+                        "model": "llama3.2",
+                        "message": {
+                            "role": "assistant",
+                            "content": "Grounded Ollama explanation: cfg_zen5c_4c_3000 saves 44.6% energy.",
+                        },
+                        "done": True,
+                    }
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response_data).encode("utf-8"))
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+            def do_GET(self):
+                if self.path == "/api/tags":
+                    response_data = {
+                        "models": [
+                            {
+                                "name": "llama3.2:latest",
+                                "size": 2048000000,
+                                "details": {
+                                    "parameter_size": "3.2B",
+                                    "quantization_level": "Q4_K_M",
+                                    "family": "llama",
+                                },
+                            }
+                        ]
+                    }
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(response_data).encode("utf-8"))
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+            def log_message(self, format, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), MockOllamaHandler)
+        port = server.server_address[1]
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+
+        try:
+            ollama = OllamaProvider(base_url=f"http://127.0.0.1:{port}", model="llama3.2", timeout_s=2.0)
+            models = ollama.list_models()
+            self.assertEqual(len(models), 1)
+            self.assertEqual(models[0]["name"], "llama3.2:latest")
+
+            res = ollama.explain(facts)
+            self.assertFalse(ollama.used_fallback)
+            self.assertEqual(res, "Grounded Ollama explanation: cfg_zen5c_4c_3000 saves 44.6% energy.")
+            self.assertEqual(len(received_payload), 1)
+            self.assertEqual(received_payload[0]["model"], "llama3.2")
+        finally:
+            server.shutdown()
             server.server_close()
 
 

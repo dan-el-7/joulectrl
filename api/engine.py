@@ -988,6 +988,21 @@ class LiveEngine:
                         self.store.save_selection(selection)
                     except Exception:
                         pass
+                try:
+                    from core.models import Profile, ConfigSummary
+                    base_id = (self._overlay_for(exp_id).get("profile") or {}).get("baseline_config_id") or (next(iter(configs)) if configs else "cfg_baseline")
+                    prof_to_save = Profile(
+                        experiment_id=exp_id,
+                        workload_name=self._overlay_for(exp_id).get("workload_id", "clean_build"),
+                        baseline_config_id=base_id,
+                        configurations={
+                            cid: ConfigSummary.from_dict(c) for cid, c in configs.items()
+                        },
+                        runs=runs,
+                    )
+                    self.store.save_profile(prof_to_save)
+                except Exception as exc:
+                    logger.warning("Failed to save profile to store: %s", exc)
         except Exception:
             logger.exception("persist failed")
 

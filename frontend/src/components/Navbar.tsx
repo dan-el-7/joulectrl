@@ -3,8 +3,8 @@ import { fetchSystemThermal, SystemThermalStatus } from '../api';
 import { getThemeColors, fonts, fontFeatures, type, radii, ThemeMode } from '../design';
 
 interface NavbarProps {
-  activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks';
-  onSelectTab: (tab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks') => void;
+  activeTab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings';
+  onSelectTab: (tab: 'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings') => void;
   restorationStatus: string;
   onEmergencyRestore: () => void;
   isRestoring: boolean;
@@ -26,6 +26,7 @@ const TABS = [
   { id: 'validation', label: 'Validation' },
   { id: 'watch', label: 'Watch' },
   { id: 'tasks', label: 'Tasks' },
+  { id: 'settings', label: 'Settings' },
 ] as const;
 
 /** Terminal states — experiment finished, no longer "running". */

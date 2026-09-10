@@ -162,18 +162,93 @@ class CloudOpenAIProvider(ExplanationProvider):
         except Exception as e:
             logger.warning("Cloud LLM provider failed (%s), falling back to Basic provider.", e)
 
+        self.used_fallback = True
+        return self._fallback.explain(facts)
+
+
+class OllamaProvider(ExplanationProvider):
+    """Local Ollama explanation provider."""
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:11434",
+        model: str = "llama3.2",
+        timeout_s: float = 12.0,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.timeout_s = timeout_s
+        self.used_fallback = False
+        self._fallback = BasicProvider()
+
+    @property
+    def name(self) -> str:
+        return "ollama"
+
+    def list_models(self) -> list[dict[str, Any]]:
+        """List local models installed in Ollama via /api/tags."""
+        try:
+            req = urllib.request.Request(f"{self.base_url}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return data.get("models", [])
+        except Exception as e:
+            logger.debug("Failed to query Ollama models: %s", e)
+        return []
+
+    def explain(self, facts: dict[str, Any]) -> str:
+        """Query local Ollama model via /api/chat; falls back to Basic on error or timeout."""
+        endpoint = f"{self.base_url}/api/chat"
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": GROUNDING_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Explain the following experiment outcome in concise, plain language:\n{json.dumps(facts, indent=2)}"},
+            ],
+            "stream": False,
+            "options": {
+                "temperature": 0.2,
+                "num_predict": 350,
+            },
+        }
+
+        try:
+            req = urllib.request.Request(
+                endpoint,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content = (data.get("message") or {}).get("content", "").strip()
+                    if content:
+                        self.used_fallback = False
+                        return content
+        except Exception as e:
+            logger.warning("Ollama provider failed (%s), falling back to Basic provider.", e)
+
+        self.used_fallback = True
         return self._fallback.explain(facts)
 
 
 def get_provider(provider_type: str = "basic", **kwargs: Any) -> ExplanationProvider:
     """Factory to instantiate explanation provider."""
     ptype = provider_type.lower()
-    if ptype == "local" or ptype == "local_llama":
+    if ptype in ("ollama", "local_llm", "local"):
+        return OllamaProvider(
+            base_url=kwargs.get("base_url") or kwargs.get("ollama_url") or "http://localhost:11434",
+            model=kwargs.get("model", "llama3.2"),
+            timeout_s=kwargs.get("timeout_s", 12.0),
+        )
+    elif ptype in ("local_llama", "llama_cpp"):
         return LocalLlamaProvider(
             endpoint_url=kwargs.get("endpoint_url", "http://127.0.0.1:8081/v1/chat/completions"),
             model=kwargs.get("model", "local-model"),
         )
-    elif ptype == "cloud" or ptype == "cloud_openai":
+    elif ptype in ("cloud", "cloud_openai", "cloud_llm"):
         return CloudOpenAIProvider(
             api_key=kwargs.get("api_key", ""),
             base_url=kwargs.get("base_url", "https://api.openai.com/v1"),

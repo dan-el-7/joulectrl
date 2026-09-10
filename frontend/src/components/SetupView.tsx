@@ -79,8 +79,6 @@ interface SetupViewProps {
   onChangePerfFloor: (val: number) => void;
   calibrationBudgetS: number | null;
   onChangeCalibrationBudget: (val: number | null) => void;
-  expPassiveCaps: boolean;
-  onChangeExpPassiveCaps: (val: boolean) => void;
   taskPriority?: 'top_priority' | 'eco_deadline' | 'best_effort';
   onChangeTaskPriority?: (val: 'top_priority' | 'eco_deadline' | 'best_effort') => void;
   repetitions?: number;
@@ -114,8 +112,6 @@ export const SetupView: React.FC<SetupViewProps> = ({
   onChangePerfFloor,
   calibrationBudgetS,
   onChangeCalibrationBudget,
-  expPassiveCaps,
-  onChangeExpPassiveCaps,
   taskPriority = 'top_priority',
   onChangeTaskPriority,
   repetitions = 1,
@@ -1361,21 +1357,6 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 </span>
               )}
             </div>
-          </div>
-
-          {/* Experimental passive caps */}
-          <div style={{ marginTop: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={expPassiveCaps}
-                onChange={(e) => onChangeExpPassiveCaps(e.target.checked)}
-                style={{ marginTop: 2, accentColor: colors.amber }}
-              />
-              <span style={{ fontSize: '0.75rem', color: colors.textTertiary }}>
-                <span style={{ color: colors.amber, fontWeight: 600 }}>Experimental:</span> test passive mode caps (2.5–4.5 GHz with boost on)
-              </span>
-            </label>
           </div>
         </div>
 

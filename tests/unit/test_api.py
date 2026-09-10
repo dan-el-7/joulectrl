@@ -694,5 +694,90 @@ def test_select_configuration_with_candidate_summaries(client):
     assert data2["runtime_budget_s"] == 20.0
 
 
+def test_llm_models_offline_fallback(client):
+    """GET /api/llm/models should handle unreachable endpoint gracefully."""
+    res = client.get("/api/llm/models?url=http://127.0.0.1:9999")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["connected"] is False
+    assert data["models"] == []
+    assert "No Ollama models detected" in data["message"]
+
+
+def test_llm_models_online_mock(client):
+    """GET /api/llm/models should parse models when Ollama is running."""
+    import http.server
+    import threading
+
+    class MockOllamaTags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/api/tags":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps({
+                        "models": [
+                            {
+                                "name": "llama3.2:3b",
+                                "size": 2048000000,
+                                "details": {
+                                    "parameter_size": "3.2B",
+                                    "quantization_level": "Q4_K_M",
+                                    "family": "llama",
+                                },
+                            }
+                        ]
+                    }).encode("utf-8")
+                )
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), MockOllamaTags)
+    port = server.server_address[1]
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+
+    try:
+        res = client.get(f"/api/llm/models?url=http://127.0.0.1:{port}")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["connected"] is True
+        assert len(data["models"]) == 1
+        assert data["models"][0]["name"] == "llama3.2:3b"
+        assert data["models"][0]["parameter_size"] == "3.2B"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_llm_test_endpoint_offline(client):
+    """POST /api/llm/test returns ok=False when unreachable."""
+    res = client.post("/api/llm/test", json={"url": "http://127.0.0.1:9999", "model": "llama3.2"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is False
+    assert "error" in data
+
+
+def test_explain_with_ollama_provider(client):
+    """POST /api/explain supports provider='ollama' and falls back safely if offline."""
+    res = client.post(
+        "/api/explain",
+        json={"experiment_id": SYNTHETIC_ID, "provider": "ollama", "model": "llama3.2", "ollama_url": "http://127.0.0.1:9999"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "text" in data
+    assert len(data["text"]) > 20
+    assert data["provider"] == "ollama"
+    assert data["fallback"] is True
+
+
+
 
 

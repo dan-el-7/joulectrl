@@ -17,12 +17,13 @@ import { SetupView } from './components/SetupView';
 import { ValidationView } from './components/ValidationView';
 import { WatchPanel } from './components/WatchPanel';
 import { TaskManagerView } from './components/TaskManagerView';
+import { SettingsView } from './components/SettingsView';
 import { ThemeProvider, useTheme } from './ThemeContext';
 import { CapabilitiesResponse, Experiment, WorkloadInfo } from './types';
 
 const AppContent: React.FC = () => {
   const { theme, themeColors, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks'>('explorer');
+  const [activeTab, setActiveTab] = useState<'setup' | 'explorer' | 'calibration' | 'validation' | 'watch' | 'tasks' | 'settings'>('explorer');
   const [capabilities, setCapabilities] = useState<CapabilitiesResponse | null>(null);
   const [workloads, setWorkloads] = useState<WorkloadInfo[]>([]);
   const [experiment, setExperiment] = useState<Experiment | null>(null);
@@ -332,8 +333,6 @@ const AppContent: React.FC = () => {
             onChangePerfFloor={setPerfFloorPct}
             calibrationBudgetS={calibrationBudgetS}
             onChangeCalibrationBudget={handleCalibrationBudgetChange}
-            expPassiveCaps={expPassiveCaps}
-            onChangeExpPassiveCaps={setExpPassiveCaps}
             repetitions={repetitions}
             onChangeRepetitions={handleRepetitionsChange}
             taskPriority={taskPriority}
@@ -386,6 +385,17 @@ const AppContent: React.FC = () => {
               setTargetedProcess({ pid: p.pid, name: p.name });
               setActiveTab('setup');
             }}
+          />
+        )}
+
+        {activeTab === 'settings' && (
+          <SettingsView
+            expPassiveCaps={expPassiveCaps}
+            onChangeExpPassiveCaps={setExpPassiveCaps}
+            repetitions={repetitions}
+            onChangeRepetitions={handleRepetitionsChange}
+            calibrationBudgetS={calibrationBudgetS}
+            onChangeCalibrationBudget={handleCalibrationBudgetChange}
           />
         )}
       </main>
