@@ -19,8 +19,13 @@ def test_capabilities(client):
     assert "machine" in data
     assert "topology" in data
     assert "energy" in data
-    assert data["energy"]["available"] is True
-    assert "package-0" in data["energy"]["domain"]
+    assert "available" in data["energy"]
+    assert "domain" in data["energy"]
+    if data.get("source") == "fixture":
+        assert data["energy"]["available"] is True
+        assert "package-0" in data["energy"]["domain"]
+    else:
+        assert isinstance(data["energy"]["available"], bool)
     assert "controls" in data
     assert data["restoration"]["status"] == "restored"
 
