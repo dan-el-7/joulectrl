@@ -2144,10 +2144,8 @@ def launch_terminal_endpoint(req: Optional[LaunchTerminalRequest] = None) -> dic
             break
 
     if not term_bin:
-        raise HTTPException(
-            status_code=500,
-            detail="No supported desktop terminal emulator found (tested ptyxis, gnome-terminal, xterm, etc.)"
-        )
+        term_bin = "bash"
+        spawn_cmd = ["bash", "-c", bash_script]
 
     bash_script = (
         f"cd {shlex.quote(str(repo_root))} && "
@@ -2168,6 +2166,8 @@ def launch_terminal_endpoint(req: Optional[LaunchTerminalRequest] = None) -> dic
         spawn_cmd = ["konsole", "-p", "tabtitle=joulectrl GCC Demo", "-e", "bash", "-c", bash_script]
     elif term_bin in ("kitty", "alacritty", "foot"):
         spawn_cmd = [term_bin, "-T", "joulectrl GCC Demo", "bash", "-c", bash_script]
+    elif term_bin == "bash":
+        spawn_cmd = ["bash", "-c", bash_script]
     else:
         spawn_cmd = [term_bin, "-title", "joulectrl GCC Demo", "-e", f"bash -c {shlex.quote(bash_script)}"]
 

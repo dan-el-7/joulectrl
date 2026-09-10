@@ -180,12 +180,14 @@ def test_api_measure_compare(api_client):
 
 
 def test_api_launch_terminal_mocked(api_client, monkeypatch):
+    import shutil
     import subprocess
     from unittest.mock import MagicMock
 
     fake_proc = MagicMock()
     fake_proc.pid = 99999
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+    monkeypatch.setattr(shutil, "which", lambda cmd: f"/usr/bin/{cmd}")
 
     res = api_client.post("/api/demo/launch-terminal", json={
         "mode": "kernel",
