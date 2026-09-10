@@ -55,7 +55,7 @@ interface CalibrationData {
   note?: string;
 }
 
-type ClassFilter = 'all' | string;
+type ClassFilter = 'all' | 'combined' | string;
 type ScopeFilter = 'all' | 'single' | 'multi';
 
 /* ------------------------------------------------------------------ */
@@ -365,7 +365,10 @@ export const CalibrationView: React.FC = () => {
   }, [selectedExpId]);
 
   const classes = data?.classes ?? [];
-  const visibleClasses = classFilter === 'all' ? classes : classes.filter((c) => c.label === classFilter);
+  const visibleClasses =
+    classFilter === 'all' || classFilter === 'combined'
+      ? classes
+      : classes.filter((c) => c.label === classFilter);
 
   const filteredPointsByClass = useMemo(() => {
     const m = new Map<string, CalPoint[]>();
@@ -441,6 +444,7 @@ export const CalibrationView: React.FC = () => {
               options={[
                 { key: 'all', label: 'All classes' },
                 ...classes.map((c) => ({ key: c.label, label: classDisplayName(c), color: classColor(c.label) })),
+                { key: 'combined', label: 'Combined overlay' },
               ]}
               value={classFilter}
               onChange={(v) => setClassFilter(v)}
@@ -585,7 +589,7 @@ export const CalibrationView: React.FC = () => {
         </div>
 
         {/* Graph rendering */}
-        {(classFilter === 'all' ? [null] : visibleClasses.map((c) => c.label)).map((single) => {
+        {(classFilter === 'combined' ? [null] : visibleClasses.map((c) => c.label)).map((single) => {
           const chartClasses = single ? visibleClasses.filter((c) => c.label === single) : visibleClasses;
           const pts: Point[] = chartClasses.flatMap((c) => {
             const list = filteredPointsByClass.get(c.label) ?? [];
@@ -613,17 +617,25 @@ export const CalibrationView: React.FC = () => {
 
           if (pts.length === 0) {
             return (
-              <div key={single ?? 'all'} style={{ ...type.small, color: colors.textTertiary, padding: '2rem 0', textAlign: 'center' }}>
+              <div key={single ?? 'combined'} style={{ ...type.small, color: colors.textTertiary, padding: '2rem 0', textAlign: 'center' }}>
                 No measured points found for this selection.
               </div>
             );
           }
 
           return (
-            <div key={single ?? 'all'} style={{ marginTop: single ? 12 : 0 }}>
+            <div
+              key={single ?? 'combined'}
+              style={{
+                marginTop: single && chartClasses[0] !== visibleClasses[0] ? 20 : 0,
+                paddingTop: single && chartClasses[0] !== visibleClasses[0] ? 16 : 0,
+                borderTop: single && chartClasses[0] !== visibleClasses[0] ? `1px solid ${colors.borderSubtle}` : undefined,
+              }}
+            >
               {single && (
-                <div style={{ ...type.smallMedium, color: classColor(single), marginBottom: 6 }}>
-                  {classDisplayName(chartClasses[0])}
+                <div style={{ ...type.smallMedium, color: classColor(single), marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: classColor(single) }} />
+                  <span>{classDisplayName(chartClasses[0])}</span>
                 </div>
               )}
               <ScatterChart

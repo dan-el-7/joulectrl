@@ -78,7 +78,9 @@ function waitForServer(cb, tries = 0) {
   }
 }
 
-function createWindow() {
+app.commandLine.appendSwitch('disable-http-cache');
+
+async function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -90,7 +92,14 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 
   // Clear HTTP and memory cache to ensure updated frontend assets load immediately
-  win.webContents.session.clearCache();
+  try {
+    await win.webContents.session.clearCache();
+    await win.webContents.session.clearStorageData({
+      storages: ['cachestorage', 'shadercache', 'serviceworkers'],
+    });
+  } catch (err) {
+    console.warn('[desktop] Cache clear warning:', err);
+  }
 
   // Enable standard developer keyboard shortcuts (Ctrl+R / F5 reload, Ctrl+Shift+I DevTools)
   win.webContents.on('before-input-event', (event, input) => {
@@ -106,7 +115,7 @@ function createWindow() {
     }
   });
 
-  win.loadURL(`http://127.0.0.1:${PORT}/`);
+  win.loadURL(`http://127.0.0.1:${PORT}/?_v=${Date.now()}`);
 }
 
 app.whenReady().then(() => {
