@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { fetchUserProcesses, setProcessPriority, UserProcess, armWatch } from '../api';
-import { fonts, fontFeatures, radii } from '../design';
+import { colors, fonts, fontFeatures, radii } from '../design';
 import { useTheme } from '../ThemeContext';
 import { FocusSwitch, FocusMode } from './FocusSwitch';
 
@@ -145,7 +145,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
             ? 'pinned to Zen 5 Fast Cores (Nice 0, Boost ON)'
             : 'restored to All 16 Cores (Normal scheduling)';
       const name = target.pattern ? `All matching "${target.pattern}"` : `PID ${target.pid}`;
-      setActionFeedback(`✓ ${name} ${policyLabel}`);
+      setActionFeedback(`${name} ${policyLabel}`);
       setTimeout(() => setActionFeedback(null), 4500);
       await loadProcesses();
     } catch (e: any) {
@@ -469,8 +469,8 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
           style={{
             padding: '10px 14px',
             borderRadius: radii.md,
-            background: actionFeedback.startsWith('✓') ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-            border: `1px solid ${actionFeedback.startsWith('✓') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+            background: actionFeedback.startsWith('✓') ? colors.tint.success : colors.tint.warning,
+            border: `1px solid ${actionFeedback.startsWith('✓') ? colors.tint.successBorder : colors.tint.warning}`,
             color: actionFeedback.startsWith('✓') ? '#10b981' : '#f59e0b',
             fontSize: 12,
             fontWeight: 600,
@@ -525,8 +525,8 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
           style={{
             padding: '6px 12px',
             borderRadius: radii.sm,
-            border: '1px solid rgba(16, 185, 129, 0.4)',
-            background: 'rgba(16, 185, 129, 0.1)',
+            border: `1px solid ${colors.tint.successBorder}`,
+            background: colors.tint.success,
             color: '#10b981',
             fontWeight: 600,
             fontSize: 11,
@@ -546,8 +546,8 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
           style={{
             padding: '6px 12px',
             borderRadius: radii.sm,
-            border: '1px solid rgba(139, 92, 246, 0.4)',
-            background: 'rgba(139, 92, 246, 0.1)',
+            border: `1px solid ${colors.tint.accentSoft}`,
+            background: colors.tint.accentSoft,
             color: '#8b5cf6',
             fontWeight: 600,
             fontSize: 11,
@@ -688,7 +688,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                       key={p.pid}
                       style={{
                         borderBottom: `1px solid ${t.cardBorder}`,
-                        background: p.cpu_pct >= 5 ? (theme === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)') : 'transparent',
+                        background: p.cpu_pct >= 5 ? (theme === 'dark' ? colors.tint.neutral : colors.tint.neutral) : 'transparent',
                       }}
                     >
                       <td style={{ padding: '8px 14px', fontFamily: fonts.mono, color: t.textTertiary }}>
@@ -790,8 +790,8 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                             style={{
                               padding: '3px 8px',
                               borderRadius: radii.sm,
-                              border: '1px solid rgba(245, 158, 11, 0.4)',
-                              background: 'rgba(245, 158, 11, 0.12)',
+                              border: `1px solid ${colors.tint.warning}`,
+                              background: colors.tint.warning,
                               color: '#f59e0b',
                               cursor: isActing ? 'wait' : 'pointer',
                               fontSize: 11,
@@ -807,8 +807,8 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                               style={{
                                 padding: '3px 8px',
                                 borderRadius: radii.sm,
-                                border: '1px solid rgba(113, 112, 255, 0.35)',
-                                background: 'rgba(113, 112, 255, 0.14)',
+                                border: `1px solid ${colors.tint.accentSoft}`,
+                                background: colors.tint.accentSoft,
                                 color: '#818cf8',
                                 cursor: 'pointer',
                                 fontSize: 11,
@@ -1096,7 +1096,7 @@ const ProcessCard: React.FC<ProcessCardProps> = ({
         background: t.cardBg,
         borderRadius: radii.md,
         border: `1px solid ${hovered ? t.cardHoverBorder : t.cardBorder}`,
-        boxShadow: hovered ? '0 4px 12px rgba(0, 0, 0, 0.08)' : t.cardShadow,
+        boxShadow: hovered ? `0 4px 12px ${colors.tint.neutral}` : t.cardShadow,
         padding: '10px 12px',
         display: 'flex',
         flexDirection: 'column',
@@ -1301,8 +1301,8 @@ const ProcessCard: React.FC<ProcessCardProps> = ({
             style={{
               padding: '3px 8px',
               borderRadius: radii.xs,
-              border: '1px solid rgba(113, 112, 255, 0.35)',
-              background: 'rgba(113, 112, 255, 0.12)',
+              border: `1px solid ${colors.tint.accentSoft}`,
+              background: colors.tint.accentSoft,
               color: '#818cf8',
               fontSize: 10,
               fontWeight: 600,

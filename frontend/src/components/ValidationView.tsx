@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { Icon } from '../design';
 import { Experiment } from '../types';
 import { explainSelection, fetchValidationPoints, validateExperiment } from '../api';
-import { getThemeColors, fonts, fontFeatures, radii, ThemeMode } from '../design';
+import { colors, getThemeColors, fonts, fontFeatures, radii, ThemeMode } from '../design';
 import { useTheme } from '../ThemeContext';
 
 interface ValidationViewProps {
@@ -227,29 +228,29 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
     restored: {
       title: 'Restoration Status: Fully Restored',
       color: c.emerald,
-      bg: isLight ? '#ecfdf5' : 'rgba(16,185,129,0.15)',
+      bg: isLight ? '#ecfdf5' : colors.tint.success,
       border: isLight ? '#a7f3d0' : c.emerald,
-      icon: '🛡️',
+      icon: 'shield',
     },
     restoring: {
       title: 'Restoration Status: Restoring…',
       color: c.amber,
-      bg: isLight ? '#fffbeb' : 'rgba(245,158,11,0.10)',
+      bg: isLight ? '#fffbeb' : colors.tint.warning,
       border: isLight ? '#fde68a' : c.amber,
-      icon: '⏳',
+      icon: 'clock',
     },
     recovery_required: {
       title: 'Restoration Status: Recovery Required',
       color: c.red,
-      bg: isLight ? '#fef2f2' : 'rgba(244,88,110,0.15)',
+      bg: isLight ? '#fef2f2' : colors.tint.danger,
       border: isLight ? '#fecaca' : c.red,
-      icon: '⚠️',
+      icon: 'warn',
     },
     not_required: {
       title: 'Restoration Status: No Controls Applied',
       color: c.textTertiary,
-      bg: isLight ? '#f8fafc' : 'rgba(25,26,27,0.15)',
-      border: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
+      bg: isLight ? '#f8fafc' : colors.tint.neutralStrong,
+      border: isLight ? '#e2e8f0' : colors.tint.neutralStrong,
       icon: 'ℹ️',
     },
   };
@@ -286,8 +287,8 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                   fontWeight: 600,
                   fontFamily: fonts.mono,
                   background: clockHoldInfo.requires_passive_mode
-                    ? (isLight ? 'rgba(99,102,241,0.1)' : 'rgba(113,112,255,0.15)')
-                    : (isLight ? 'rgba(22,163,74,0.1)' : 'rgba(16,185,129,0.15)'),
+                    ? (isLight ? colors.tint.accentSoft : colors.tint.accentSoft)
+                    : (isLight ? colors.tint.success : colors.tint.success),
                   color: clockHoldInfo.requires_passive_mode ? c.accent : c.emerald,
                   border: `1px solid ${clockHoldInfo.requires_passive_mode ? (isLight ? '#c7d2fe' : c.accent) : (isLight ? '#bbf7d0' : c.emerald)}`,
                 }}
@@ -316,7 +317,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             style={{
               padding: '0.5rem 1rem',
               borderRadius: radii.md,
-              backgroundColor: isValidating ? (isLight ? '#c7d2fe' : 'rgba(113,112,255,0.3)') : c.accentBg,
+              backgroundColor: isValidating ? (isLight ? '#c7d2fe' : colors.tint.accentSoft) : c.accentBg,
               color: '#ffffff',
               fontSize: '0.85rem',
               fontWeight: 600,
@@ -326,12 +327,12 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
               alignItems: 'center',
               gap: '0.5rem',
               opacity: !selectedConfigId ? 0.6 : 1,
-              boxShadow: isLight ? '0 1px 2px rgba(99,102,241,0.2)' : 'none',
+              boxShadow: isLight ? `0 1px 2px ${colors.tint.accentSoft}` : 'none',
             }}
           >
             {isValidating ? (
               <>
-                <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span>
+                <Icon name="clock" size={14} />
                 Validating on Hardware...
               </>
             ) : (
@@ -344,7 +345,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             style={{
               padding: '0.5rem 1rem',
               borderRadius: radii.md,
-              backgroundColor: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)',
+              backgroundColor: isLight ? '#f1f5f9' : colors.tint.neutralStrong,
               color: c.textPrimary,
               fontSize: '0.85rem',
               fontWeight: 600,
@@ -364,7 +365,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            background: isLight ? '#eef2ff' : 'rgba(113, 112, 255, 0.12)',
+            background: isLight ? '#eef2ff' : colors.tint.accentSoft,
             border: `1px solid ${c.accent}`,
             padding: '0.85rem 1.25rem',
             borderRadius: radii.md,
@@ -389,7 +390,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
       {validationError && (
         <div
           style={{
-            background: isLight ? '#fef2f2' : 'rgba(244, 88, 110, 0.12)',
+            background: isLight ? '#fef2f2' : colors.tint.danger,
             border: `1px solid ${c.red}`,
             padding: '0.85rem 1.25rem',
             borderRadius: radii.md,
@@ -408,7 +409,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: isLight ? '#fffbeb' : 'rgba(245, 158, 11, 0.10)',
+            background: isLight ? '#fffbeb' : colors.tint.warning,
             border: `1px solid ${c.amber}`,
             padding: '1rem 1.25rem',
             borderRadius: radii.md,
@@ -467,13 +468,13 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                 color: validation.verified_savings_pct >= 0 ? c.emerald : (isLight ? '#b91c1c' : '#f87171'),
                 fontWeight: 700,
                 background: validation.verified_savings_pct >= 0
-                  ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.12)')
-                  : (isLight ? '#fef2f2' : 'rgba(239, 68, 68, 0.12)'),
+                  ? (isLight ? '#ecfdf5' : colors.tint.success)
+                  : (isLight ? '#fef2f2' : colors.tint.danger),
                 padding: '0.4rem 0.8rem',
                 borderRadius: radii.md,
                 border: `1px solid ${validation.verified_savings_pct >= 0
-                  ? (isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.3)')
-                  : (isLight ? '#fca5a5' : 'rgba(239, 68, 68, 0.3)')}`,
+                  ? (isLight ? '#a7f3d0' : colors.tint.successBorder)
+                  : (isLight ? '#fca5a5' : colors.tint.dangerBorder)}`,
               }}
             >
               {validation.verified_savings_pct >= 0
@@ -570,22 +571,21 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                           <span
                             style={{
                               color: c.emerald,
-                              background: isLight ? '#ecfdf5' : 'rgba(16,185,129,0.12)',
-                              border: `1px solid ${isLight ? '#a7f3d0' : 'rgba(16,185,129,0.3)'}`,
+                              background: isLight ? '#ecfdf5' : colors.tint.success,
+                              border: `1px solid ${isLight ? '#a7f3d0' : colors.tint.successBorder}`,
                               padding: '0.2rem 0.5rem',
                               borderRadius: radii.sm,
                               fontSize: '0.75rem',
                               fontWeight: 600,
                             }}
-                          >
-                            ✓ Output Verified
+                          >Output Verified
                           </span>
                         ) : (
                           <span
                             style={{
                               color: c.red,
-                              background: isLight ? '#fef2f2' : 'rgba(244,88,110,0.12)',
-                              border: `1px solid ${isLight ? '#fecaca' : 'rgba(244,88,110,0.3)'}`,
+                              background: isLight ? '#fef2f2' : colors.tint.danger,
+                              border: `1px solid ${isLight ? '#fecaca' : colors.tint.dangerBorder}`,
                               padding: '0.2rem 0.5rem',
                               borderRadius: radii.sm,
                               fontSize: '0.75rem',
@@ -641,7 +641,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                   key={cand.config_id}
                   style={{
                     background: isSelected
-                      ? (isLight ? '#eef2ff' : 'rgba(113, 112, 255, 0.08)')
+                      ? (isLight ? '#eef2ff' : colors.tint.accentSoft)
                       : c.surfaceElevated,
                     border: `1px solid ${isSelected ? c.accent : c.border}`,
                     borderRadius: radii.md,
@@ -649,7 +649,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '0.4rem',
-                    boxShadow: isSelected && isLight ? '0 1px 3px rgba(99,102,241,0.15)' : 'none',
+                    boxShadow: isSelected && isLight ? `0 1px 3px ${colors.tint.accentSoft}` : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -658,7 +658,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         color: c.accent,
-                        background: isLight ? '#e0e7ff' : 'rgba(113, 112, 255, 0.15)',
+                        background: isLight ? '#e0e7ff' : colors.tint.accentSoft,
                         padding: '0.15rem 0.45rem',
                         borderRadius: radii.xs,
                       }}
@@ -666,8 +666,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                       Layout {cand.layout}
                     </span>
                     {isSelected && (
-                      <span style={{ fontSize: '0.7rem', color: c.emerald, fontWeight: 600 }}>
-                        ★ Active Layout
+                      <span style={{ fontSize: '0.7rem', color: c.emerald, fontWeight: 600 }}>Active Layout
                       </span>
                     )}
                   </div>
@@ -738,7 +737,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
                   borderRadius: radii.sm,
                   border: `1px solid ${provider === p ? c.accent : c.border}`,
                   backgroundColor: provider === p
-                    ? (isLight ? '#e0e7ff' : 'rgba(113,112,255,0.2)')
+                    ? (isLight ? '#e0e7ff' : colors.tint.accentSoft)
                     : c.surfaceElevated,
                   color: provider === p ? c.accent : c.textTertiary,
                   cursor: isExplaining ? 'wait' : 'pointer',
@@ -761,8 +760,7 @@ export const ValidationView: React.FC<ValidationViewProps> = ({
             }}
           >
             {explanation.fallback && (
-              <div style={{ fontSize: '0.75rem', color: c.amber, marginBottom: '0.5rem' }}>
-                ⚠ Provider unavailable — using default explanation template.
+              <div style={{ fontSize: '0.75rem', color: c.amber, marginBottom: '0.5rem' }}>Provider unavailable — using default explanation template.
               </div>
             )}
             <div style={{ fontSize: '0.9rem', color: c.textPrimary, lineHeight: 1.5, marginBottom: '0.75rem', whiteSpace: 'pre-line' }}>

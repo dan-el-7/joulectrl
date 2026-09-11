@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { Icon } from '../design';
 import {
   fetchCalibration,
   fetchCalibrationStatus,
@@ -424,14 +425,14 @@ export const CalibrationView: React.FC = () => {
     ev.addEventListener('calibration_complete', () => {
       fetchCalibrationStatus().then(setCalibrationStatus).catch(() => {});
       fetchCalibration(selectedExpId || undefined).then(setData).catch(() => {});
-      setActionFeedback('✓ Calibration complete! All measured points plotted on the curve.');
+      setActionFeedback('Calibration complete! All measured points plotted on the curve.');
       setTimeout(() => setActionFeedback(null), 5000);
     });
 
     ev.addEventListener('calibration_cancelled', () => {
       fetchCalibrationStatus().then(setCalibrationStatus).catch(() => {});
       fetchCalibration(selectedExpId || undefined).then(setData).catch(() => {});
-      setActionFeedback('✓ Calibration stopped safely. Hardware restored to stock.');
+      setActionFeedback('Calibration stopped safely. Hardware restored to stock.');
       setTimeout(() => setActionFeedback(null), 5000);
     });
 
@@ -532,7 +533,7 @@ export const CalibrationView: React.FC = () => {
     try {
       setIsStoppingSweep(true);
       const res = await stopCalibration();
-      setActionFeedback(`✓ ${res.message} (Saved ${res.points_saved} points)`);
+      setActionFeedback(`${res.message} (Saved ${res.points_saved} points)`);
       setTimeout(() => setActionFeedback(null), 5000);
       const st = await fetchCalibrationStatus();
       setCalibrationStatus(st);
@@ -568,13 +569,13 @@ export const CalibrationView: React.FC = () => {
     try {
       if (preset === 'performance') {
         await setFocusSwitch({ mode: 'on' });
-        setActionFeedback('✓ Preference applied: Max Performance (Boost ON, Fast cores shielded)');
+        setActionFeedback('Preference applied: Max Performance (Boost ON, Fast cores shielded)');
       } else if (preset === 'powersave') {
         await setFocusSwitch({ mode: 'reverse' });
-        setActionFeedback(`✓ Preference applied: Maximum Power-Saving (Pinned to ${ecoLabel}, Nice +15)`);
+        setActionFeedback(`Preference applied: Maximum Power-Saving (Pinned to ${ecoLabel}, Nice +15)`);
       } else {
         await setFocusSwitch({ mode: 'off' });
-        setActionFeedback('✓ Preference applied: Balanced Sweet Spot (All cores, Pareto-optimal scheduling)');
+        setActionFeedback('Preference applied: Balanced Sweet Spot (All cores, Pareto-optimal scheduling)');
       }
       setTimeout(() => setActionFeedback(null), 4500);
     } catch (e: any) {
@@ -649,8 +650,8 @@ export const CalibrationView: React.FC = () => {
           style={{
             ...card,
             padding: '10px 16px',
-            background: 'rgba(16, 185, 129, 0.12)',
-            border: '1px solid rgba(16, 185, 129, 0.35)',
+            background: colors.tint.success,
+            border: `1px solid ${colors.tint.successBorder}`,
             color: colors.emerald,
             fontSize: 13,
             fontWeight: 600,
@@ -669,10 +670,10 @@ export const CalibrationView: React.FC = () => {
           ...card,
           padding: 20,
           background: calibrationStatus?.is_running
-            ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.08) 0%, rgba(16, 185, 129, 0.06) 100%)'
+            ? `linear-gradient(135deg, ${colors.tint.info} 0%, ${colors.tint.success} 100%)`
             : colors.surface,
-          border: `1px solid ${calibrationStatus?.is_running ? 'rgba(34, 211, 238, 0.4)' : colors.border}`,
-          boxShadow: calibrationStatus?.is_running ? '0 0 24px rgba(34, 211, 238, 0.12)' : colors.cardShadow,
+          border: `1px solid ${calibrationStatus?.is_running ? colors.tint.infoBorder : colors.border}`,
+          boxShadow: calibrationStatus?.is_running ? `0 0 24px ${colors.tint.info}` : colors.cardShadow,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
@@ -687,8 +688,8 @@ export const CalibrationView: React.FC = () => {
                   fontFamily: fonts.mono,
                   padding: '2px 8px',
                   borderRadius: radii.full,
-                  background: 'rgba(99, 102, 241, 0.15)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  background: colors.tint.accentSoft,
+                  border: `1px solid ${colors.tint.accentSoft}`,
                   color: '#a5b4fc',
                 }}
               >
@@ -716,10 +717,10 @@ export const CalibrationView: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                boxShadow: `0 2px 8px ${colors.tint.dangerBorder}`,
               }}
             >
-              <span>⏹</span> {isStoppingSweep ? 'Restoring Hardware...' : 'Stop Calibration'}
+              <Icon name="stop" size={14} /> {isStoppingSweep ? 'Restoring Hardware...' : 'Stop Calibration'}
             </button>
           ) : (
             <button
@@ -737,7 +738,7 @@ export const CalibrationView: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                boxShadow: '0 2px 10px rgba(99, 102, 241, 0.4)',
+                boxShadow: `0 2px 10px ${colors.tint.accentSoft}`,
               }}
             >
               <span>🚀</span> {isStartingSweep ? 'Starting...' : `Start ${selectedTier.toUpperCase()} Sweep`}
@@ -747,7 +748,7 @@ export const CalibrationView: React.FC = () => {
 
         {/* Active Running State */}
         {calibrationStatus?.is_running ? (
-          <div style={{ marginTop: 16, background: 'rgba(0,0,0,0.25)', borderRadius: radii.md, padding: 14, border: '1px solid rgba(34, 211, 238, 0.2)' }}>
+          <div style={{ marginTop: 16, background: colors.tint.overlay, borderRadius: radii.md, padding: 14, border: `1px solid ${colors.tint.infoBorder}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22d3ee', boxShadow: '0 0 8px #22d3ee' }} />
@@ -769,7 +770,7 @@ export const CalibrationView: React.FC = () => {
             </div>
 
             {/* Progress bar */}
-            <div style={{ width: '100%', height: 7, borderRadius: radii.full, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: 7, borderRadius: radii.full, background: colors.tint.neutralStrong, overflow: 'hidden' }}>
               <div
                 style={{
                   width: `${calibrationStatus.percent}%`,
@@ -777,7 +778,7 @@ export const CalibrationView: React.FC = () => {
                   borderRadius: radii.full,
                   background: 'linear-gradient(90deg, #6366f1 0%, #22d3ee 50%, #10b981 100%)',
                   transition: 'width 0.3s ease',
-                  boxShadow: '0 0 10px rgba(34, 211, 238, 0.5)',
+                  boxShadow: `0 0 10px ${colors.tint.infoBorder}`,
                 }}
               />
             </div>
@@ -817,7 +818,7 @@ export const CalibrationView: React.FC = () => {
                     style={{
                       padding: 12,
                       borderRadius: radii.md,
-                      background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                      background: isSelected ? colors.tint.accentSoft : colors.tint.neutral,
                       border: `1.5px solid ${isSelected ? '#818cf8' : colors.border}`,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
@@ -836,7 +837,7 @@ export const CalibrationView: React.FC = () => {
                           fontWeight: 600,
                           padding: '1px 6px',
                           borderRadius: radii.full,
-                          background: isSelected ? 'rgba(129, 140, 248, 0.25)' : 'rgba(255,255,255,0.06)',
+                          background: isSelected ? colors.tint.accentSoft : colors.tint.neutralStrong,
                           color: isSelected ? '#818cf8' : colors.textTertiary,
                         }}
                       >
@@ -858,7 +859,7 @@ export const CalibrationView: React.FC = () => {
       </div>
 
       {/* Preference Mode Sweet Spot Selection Bar */}
-      <div style={{ ...card, padding: 14, background: 'rgba(255,255,255,0.02)', border: `1px solid ${colors.borderSubtle}` }}>
+      <div style={{ ...card, padding: 14, background: colors.tint.neutral, border: `1px solid ${colors.borderSubtle}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -877,8 +878,8 @@ export const CalibrationView: React.FC = () => {
               style={{
                 padding: '4px 12px',
                 borderRadius: radii.sm,
-                border: '1px solid rgba(129, 140, 248, 0.4)',
-                background: 'rgba(129, 140, 248, 0.12)',
+                border: `1px solid ${colors.tint.accentSoft}`,
+                background: colors.tint.accentSoft,
                 color: '#818cf8',
                 fontSize: 12,
                 fontWeight: 600,
@@ -892,8 +893,8 @@ export const CalibrationView: React.FC = () => {
               style={{
                 padding: '4px 12px',
                 borderRadius: radii.sm,
-                border: '1px solid rgba(34, 211, 238, 0.4)',
-                background: 'rgba(34, 211, 238, 0.12)',
+                border: `1px solid ${colors.tint.infoBorder}`,
+                background: colors.tint.info,
                 color: '#22d3ee',
                 fontSize: 12,
                 fontWeight: 600,
@@ -907,8 +908,8 @@ export const CalibrationView: React.FC = () => {
               style={{
                 padding: '4px 12px',
                 borderRadius: radii.sm,
-                border: '1px solid rgba(16, 185, 129, 0.4)',
-                background: 'rgba(16, 185, 129, 0.12)',
+                border: `1px solid ${colors.tint.successBorder}`,
+                background: colors.tint.success,
                 color: '#10b981',
                 fontSize: 12,
                 fontWeight: 600,
@@ -927,7 +928,7 @@ export const CalibrationView: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.7)',
+            background: colors.tint.overlay,
             backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
@@ -943,7 +944,7 @@ export const CalibrationView: React.FC = () => {
               padding: 24,
               maxWidth: 500,
               width: '90%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+              boxShadow: `0 20px 40px ${colors.tint.overlay}`,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -955,7 +956,7 @@ export const CalibrationView: React.FC = () => {
             </p>
 
             {noiseStatus?.detected_apps && noiseStatus.detected_apps.length > 0 ? (
-              <div style={{ marginBottom: 16, background: 'rgba(255,255,255,0.03)', borderRadius: radii.sm, padding: 10, border: `1px solid ${colors.borderSubtle}` }}>
+              <div style={{ marginBottom: 16, background: colors.tint.neutral, borderRadius: radii.sm, padding: 10, border: `1px solid ${colors.borderSubtle}` }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: colors.textPrimary, marginBottom: 8 }}>
                   Detected active background apps:
                 </div>
@@ -1002,7 +1003,7 @@ export const CalibrationView: React.FC = () => {
                 style={{
                   padding: '6px 14px',
                   borderRadius: radii.sm,
-                  background: 'rgba(255,255,255,0.08)',
+                  background: colors.tint.neutralStrong,
                   border: 'none',
                   color: colors.textPrimary,
                   fontSize: 12,

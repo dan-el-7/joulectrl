@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { fetchWatchStatus, startWatch, stopWatch } from '../api';
 import { WatchStatus } from '../types';
-import { fonts, fontFeatures, radii } from '../design';
+import { colors, fonts, fontFeatures, radii } from '../design';
 import { useTheme } from '../ThemeContext';
 
 interface WatchSegmentResult {
@@ -223,7 +223,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             transition: 'all 0.15s ease',
           }}
         >
-          <span>{isWatching ? '⏹ Stop Watching' : '▶ Start Watching Package Power'}</span>
+          <span>{isWatching ? 'Stop Watching' : 'Start Watching Package Power'}</span>
         </button>
       </div>
 
@@ -340,7 +340,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
             {stateLabel === 'active'
               ? `⚡ Spike Active (${(elapsedS || 0).toFixed(1)}s)`
               : stateLabel === 'cooldown'
-              ? '⏳ Cooldown / Idle Grace'
+              ? 'Cooldown / Idle Grace'
               : stateLabel === 'learning' || stateLabel === 'calibrating'
               ? '🔍 Observing Idle...'
               : stateLabel === 'idle'
@@ -361,7 +361,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
       {latestSegment && (
         <div
           style={{
-            background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.1)',
+            background: isLight ? '#ecfdf5' : colors.tint.success,
             border: `1.5px solid ${isLight ? '#059669' : '#10b981'}`,
             borderRadius: radii.lg,
             padding: '22px 24px',
@@ -420,7 +420,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              boxShadow: `0 2px 4px ${colors.tint.overlay}`,
             }}
           >
             <span>Apply to Setup Budget ({latestSegment.suggested_budget_s.toFixed(1)}s)</span>
@@ -452,7 +452,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
         >
           <div
             style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+              background: isLight ? '#f8fafc' : colors.tint.neutral,
               border: `1px solid ${c.borderSubtle}`,
               borderRadius: radii.md,
               padding: '14px',
@@ -468,7 +468,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
 
           <div
             style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+              background: isLight ? '#f8fafc' : colors.tint.neutral,
               border: `1px solid ${c.borderSubtle}`,
               borderRadius: radii.md,
               padding: '14px',
@@ -484,7 +484,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
 
           <div
             style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+              background: isLight ? '#f8fafc' : colors.tint.neutral,
               border: `1px solid ${c.borderSubtle}`,
               borderRadius: radii.md,
               padding: '14px',
@@ -500,7 +500,7 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
 
           <div
             style={{
-              background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+              background: isLight ? '#f8fafc' : colors.tint.neutral,
               border: `1px solid ${c.borderSubtle}`,
               borderRadius: radii.md,
               padding: '14px',
@@ -559,8 +559,8 @@ export const WatchPanel: React.FC<WatchPanelProps> = ({ onApplySuggestedBudget }
                       style={{
                         padding: '4px 10px',
                         borderRadius: radii.sm,
-                        background: isLight ? '#eff6ff' : 'rgba(99, 102, 241, 0.15)',
-                        border: `1px solid ${isLight ? '#bfdbfe' : 'rgba(99, 102, 241, 0.4)'}`,
+                        background: isLight ? '#eff6ff' : colors.tint.accentSoft,
+                        border: `1px solid ${isLight ? '#bfdbfe' : colors.tint.accentSoft}`,
                         color: isLight ? '#1d4ed8' : '#818cf8',
                         fontSize: 11,
                         fontWeight: 600,

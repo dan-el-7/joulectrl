@@ -8,7 +8,7 @@ import {
   AutoPilotCurveOption,
   AutoPilotCurvePoint,
 } from '../api';
-import { fonts, fontFeatures, radii, type } from '../design';
+import { colors, fonts, fontFeatures, radii, type, Icon } from '../design';
 import { useTheme } from '../ThemeContext';
 
 export interface AutoPilotControlProps {
@@ -206,15 +206,15 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
             borderRadius: radii.md,
             border: `1px solid ${
               isClamped
-                ? 'rgba(16, 185, 129, 0.6)'
+                ? colors.tint.successBorder
                 : isArmed
-                  ? 'rgba(16, 185, 129, 0.35)'
+                  ? colors.tint.successBorder
                   : c.border
             }`,
             background: isClamped
-              ? 'rgba(16, 185, 129, 0.22)'
+              ? colors.tint.success
               : isArmed
-                ? 'rgba(16, 185, 129, 0.10)'
+                ? colors.tint.success
                 : c.surfaceElevated,
             color: isClamped
               ? '#10b981'
@@ -226,7 +226,7 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
             cursor: loading ? 'wait' : 'pointer',
             fontFamily: fonts.mono,
             fontFeatureSettings: fontFeatures,
-            boxShadow: isClamped ? '0 0 10px rgba(16, 185, 129, 0.45)' : 'none',
+            boxShadow: isClamped ? `0 0 10px ${colors.tint.successBorder}` : 'none',
             transition: 'all 0.2s ease',
             userSelect: 'none',
           }}
@@ -278,8 +278,8 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
           }}
           title="Configure Auto-Pilot Curve & Target Savings"
         >
-          <span>⚙️</span>
-          <span style={{ fontSize: 8, opacity: 0.7 }}>▼</span>
+          <Icon name="gear" size={12} />
+          <Icon name="chevronDown" size={9} style={{ opacity: 0.7 }} />
         </button>
 
         {/* Compact Settings Popover */}
@@ -294,7 +294,7 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
               background: c.panel,
               border: `1px solid ${c.border}`,
               borderRadius: radii.md,
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+              boxShadow: `0 8px 24px ${colors.tint.overlay}`,
               padding: '12px',
               zIndex: 9999,
               minWidth: 280,
@@ -362,8 +362,8 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
             {matchedPoint && (
               <div
                 style={{
-                  background: 'rgba(16, 185, 129, 0.08)',
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  background: colors.tint.success,
+                  border: `1px solid ${colors.tint.success}`,
                   borderRadius: radii.sm,
                   padding: '6px 8px',
                   fontSize: 10,
@@ -391,14 +391,14 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
                 padding: '5px 10px',
                 borderRadius: radii.sm,
                 border: `1px solid ${isArmed ? '#ef4444' : c.emerald}`,
-                background: isArmed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.18)',
+                background: isArmed ? colors.tint.danger : colors.tint.success,
                 color: isArmed ? '#ef4444' : c.emerald,
                 fontSize: 11,
                 fontWeight: 600,
                 cursor: 'pointer',
               }}
             >
-              {isArmed ? '⏹ Disarm Auto-Pilot' : '▶ Arm Auto-Pilot'}
+              <Icon name={isArmed ? 'stop' : 'play'} size={11} /> {isArmed ? 'Disarm Auto-Pilot' : 'Arm Auto-Pilot'}
             </button>
           </div>
         )}
@@ -411,7 +411,7 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
     <div
       style={{
         background: c.surface,
-        border: `1px solid ${isArmed ? 'rgba(16, 185, 129, 0.35)' : c.border}`,
+        border: `1px solid ${isArmed ? colors.tint.successBorder : c.border}`,
         borderRadius: radii.lg,
         padding: '1.25rem',
         display: 'flex',
@@ -435,12 +435,12 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
                 padding: '2px 8px',
                 borderRadius: radii.full,
                 background: isClamped
-                  ? 'rgba(16, 185, 129, 0.25)'
+                  ? colors.tint.success
                   : isArmed
-                    ? 'rgba(16, 185, 129, 0.15)'
-                    : 'rgba(255, 255, 255, 0.08)',
+                    ? colors.tint.success
+                    : colors.tint.neutralStrong,
                 color: isArmed ? c.emerald : c.textTertiary,
-                border: `1px solid ${isArmed ? 'rgba(16, 185, 129, 0.4)' : c.border}`,
+                border: `1px solid ${isArmed ? colors.tint.successBorder : c.border}`,
               }}
             >
               {isClamped ? '🌿 ACTIVELY CLAMPED' : isArmed ? '🟢 ARMED (STOCK BOOST IDLE)' : '⚡ OFF'}
@@ -461,7 +461,7 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
             padding: '8px 18px',
             borderRadius: radii.md,
             border: `1px solid ${isArmed ? '#ef4444' : c.emerald}`,
-            background: isArmed ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.18)',
+            background: isArmed ? colors.tint.danger : colors.tint.success,
             color: isArmed ? '#ef4444' : c.emerald,
             fontSize: '0.85rem',
             fontWeight: 600,
@@ -470,7 +470,7 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
             userSelect: 'none',
           }}
         >
-          {loading ? 'Updating…' : isArmed ? '⏹ Disarm Auto-Pilot' : '▶ Arm Auto-Pilot'}
+          {loading ? 'Updating…' : <><Icon name={isArmed ? 'stop' : 'play'} size={11} /> {isArmed ? 'Disarm Auto-Pilot' : 'Arm Auto-Pilot'}</>}
         </button>
       </div>
 
@@ -546,7 +546,7 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
                   padding: '4px 10px',
                   borderRadius: radii.full,
                   border: `1px solid ${active ? c.emerald : c.border}`,
-                  background: active ? 'rgba(16, 185, 129, 0.15)' : c.surface,
+                  background: active ? colors.tint.success : c.surface,
                   color: active ? c.emerald : c.textSecondary,
                   fontSize: '0.75rem',
                   fontWeight: 600,
@@ -566,8 +566,8 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
       {matchedPoint && currentCurve && (
         <div
           style={{
-            background: 'rgba(16, 185, 129, 0.04)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
+            background: colors.tint.success,
+            border: `1px solid ${colors.tint.successBorder}`,
             borderRadius: radii.md,
             padding: '14px',
             display: 'flex',
@@ -635,8 +635,8 @@ export const AutoPilotControl: React.FC<AutoPilotControlProps> = ({
           </div>
 
           {!isTargetAchievable && (
-            <div style={{ fontSize: 11, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '6px 10px', borderRadius: radii.sm }}>
-              ⚠️ Desired target ({targetSavings}%) exceeds curve Pareto frontier. Matched to maximal achievable efficiency point (-{matchedPoint.energy_reduction_pct.toFixed(1)}%).
+            <div style={{ fontSize: 11, color: '#f59e0b', background: colors.tint.warning, padding: '6px 10px', borderRadius: radii.sm }}>
+              Desired target ({targetSavings}%) exceeds curve Pareto frontier. Matched to maximal achievable efficiency point (-{matchedPoint.energy_reduction_pct.toFixed(1)}%).
             </div>
           )}
         </div>

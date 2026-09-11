@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../ThemeContext';
-import { getThemeColors, fonts, radii } from '../design';
+import { colors, getThemeColors, fonts, radii } from '../design';
 import { fetchOllamaModels, testOllamaModel, OllamaModelInfo } from '../api';
 import { CapabilitiesResponse } from '../types';
 
@@ -157,13 +157,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               fontWeight: 600,
               fontFamily: fonts.mono,
               background: isConnected
-                ? isLight ? 'rgba(22,163,74,0.1)' : 'rgba(16,185,129,0.15)'
-                : isLight ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.15)',
+                ? isLight ? colors.tint.success : colors.tint.success
+                : isLight ? colors.tint.warning : colors.tint.warning,
               color: isConnected ? c.emerald : c.amber,
               border: `1px solid ${isConnected ? (isLight ? '#bbf7d0' : c.emerald) : (isLight ? '#fde68a' : c.amber)}`,
             }}
           >
-            {isConnected === null ? 'Scanning...' : isConnected ? '✓ Ollama Online' : '⚠️ Offline / Unreachable'}
+            {isConnected === null ? 'Scanning...' : isConnected ? 'Ollama Online' : '⚠️ Offline / Unreachable'}
           </span>
         </div>
 
@@ -210,7 +210,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                boxShadow: isLight ? '0 1px 2px rgba(99,102,241,0.2)' : 'none',
+                boxShadow: isLight ? `0 1px 2px ${colors.tint.accentSoft}` : 'none',
               }}
             >
               {isScanning ? 'Scanning Models…' : '🔄 Scan Installed Models'}
@@ -236,7 +236,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       padding: '0.65rem 0.85rem',
                       borderRadius: radii.md,
                       border: `1.5px solid ${isSel ? c.accent : c.border}`,
-                      background: isSel ? (isLight ? 'rgba(99,102,241,0.1)' : 'rgba(113,112,255,0.18)') : c.surfaceElevated,
+                      background: isSel ? (isLight ? colors.tint.accentSoft : colors.tint.accentSoft) : c.surfaceElevated,
                       textAlign: 'left',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
@@ -331,8 +331,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               padding: '0.75rem 1rem',
               borderRadius: radii.md,
               background: testResult.ok
-                ? (isLight ? 'rgba(22,163,74,0.08)' : 'rgba(16,185,129,0.12)')
-                : (isLight ? 'rgba(239,68,68,0.08)' : 'rgba(244,88,110,0.12)'),
+                ? (isLight ? colors.tint.success : colors.tint.success)
+                : (isLight ? colors.tint.danger : colors.tint.danger),
               border: `1px solid ${testResult.ok ? c.emerald : c.red}`,
               fontSize: '0.82rem',
               color: c.textPrimary,
@@ -340,7 +340,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-              <span>{testResult.ok ? '✓ Model Responded Successfully' : '⚠️ Connection Failed'}</span>
+              <span>{testResult.ok ? 'Model Responded Successfully' : '⚠️ Connection Failed'}</span>
               {testResult.latency_ms && (
                 <span style={{ fontFamily: fonts.mono, color: c.textTertiary }}>
                   {testResult.latency_ms} ms
@@ -374,7 +374,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     padding: '0.6rem 0.85rem',
                     borderRadius: radii.md,
                     border: `1.5px solid ${isSel ? c.accent : c.border}`,
-                    background: isSel ? (isLight ? 'rgba(99,102,241,0.1)' : 'rgba(113,112,255,0.18)') : c.surfaceElevated,
+                    background: isSel ? (isLight ? colors.tint.accentSoft : colors.tint.accentSoft) : c.surfaceElevated,
                     color: isSel ? c.textPrimary : c.textSecondary,
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -473,7 +473,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     padding: '0.4rem 0.75rem',
                     borderRadius: radii.sm,
                     border: `1.5px solid ${isSel ? c.accent : c.border}`,
-                    background: isSel ? (isLight ? '#e0e7ff' : 'rgba(113,112,255,0.22)') : c.surface,
+                    background: isSel ? (isLight ? '#e0e7ff' : colors.tint.accentSoft) : c.surface,
                     color: isSel ? c.accent : c.textSecondary,
                     fontSize: '0.76rem',
                     fontWeight: 600,
@@ -518,7 +518,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     padding: '0.6rem 0.85rem',
                     borderRadius: radii.sm,
                     border: `1.5px solid ${isSel ? c.accent : c.border}`,
-                    background: isSel ? (isLight ? '#e0e7ff' : 'rgba(113,112,255,0.22)') : c.surface,
+                    background: isSel ? (isLight ? '#e0e7ff' : colors.tint.accentSoft) : c.surface,
                     color: isSel ? c.textPrimary : c.textSecondary,
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -553,7 +553,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div style={{ fontSize: '0.78rem', color: c.textTertiary, marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Physical hardware sensors and persistence status (dynamically discovered via sysfs).</span>
           {capabilities?.source && (
-            <span style={{ fontSize: '0.7rem', color: c.emerald, fontFamily: fonts.mono, background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: radii.full, border: `1px solid ${c.emerald}` }}>
+            <span style={{ fontSize: '0.7rem', color: c.emerald, fontFamily: fonts.mono, background: colors.tint.success, padding: '2px 8px', borderRadius: radii.full, border: `1px solid ${c.emerald}` }}>
               ● {capabilities.source === 'live' ? 'Live System Discovered' : 'Fixture Mode'}
             </span>
           )}

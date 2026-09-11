@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../design';
 import { CapabilitiesResponse, WorkloadInfo, classCpus } from '../types';
 import { colors } from '../design';
 import {
@@ -264,7 +265,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           : lane === 'eco'
             ? 'Zen 5c Eco Cores (Low Power)'
             : 'All 16 Cores';
-      setProcessFeedback(`✓ PID ${targetProcess.pid} (${targetProcess.name}) shielded on ${laneName}.`);
+      setProcessFeedback(`PID ${targetProcess.pid} (${targetProcess.name}) shielded on ${laneName}.`);
       setTimeout(() => setProcessFeedback(null), 5000);
       await loadActiveProcesses();
     } catch (e: any) {
@@ -445,7 +446,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               transition: 'all 0.15s ease',
             }}
           >
-            <span>🎯</span> Target Running Process {targetProcess ? `(${targetProcess.name || `PID ${targetProcess.pid}`})` : ''}
+            <Icon name="target" size={14} /> Target Running Process {targetProcess ? `(${targetProcess.name || `PID ${targetProcess.pid}`})` : ''}
           </button>
         </div>
 
@@ -465,8 +466,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                     style={{
                       padding: '0.75rem',
                       borderRadius: '0.5rem',
-                      border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.08)'}`,
-                      backgroundColor: isSelected ? 'rgba(113,112,255,0.14)25' : colors.surfaceElevated,
+                      border: `1.5px solid ${isSelected ? colors.accent : colors.tint.neutralStrong}`,
+                      backgroundColor: isSelected ? `${colors.tint.accentSoft}25` : colors.surfaceElevated,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                     }}
@@ -530,7 +531,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  🖥️ Installed Apps ({installedApps.length || '…'})
+                  Installed Apps ({installedApps.length || '…'})
                 </button>
               </div>
             </div>
@@ -541,7 +542,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 style={{
                   padding: '0.7rem 0.9rem',
                   borderRadius: '0.375rem',
-                  backgroundColor: launchFeedback.includes('❌') ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
+                  backgroundColor: launchFeedback.includes('❌') ? colors.tint.danger : colors.tint.success,
                   border: `1px solid ${launchFeedback.includes('❌') ? colors.red : colors.emerald}`,
                   fontSize: '0.82rem',
                   color: colors.textPrimary,
@@ -597,7 +598,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                           borderRadius: '0.25rem',
                           fontSize: '0.74rem',
                           border: `1px solid ${launchCommand === preset.cmd ? colors.accent : colors.border}`,
-                          background: launchCommand === preset.cmd ? 'rgba(113,112,255,0.2)' : colors.surface,
+                          background: launchCommand === preset.cmd ? colors.tint.accentSoft : colors.surface,
                           color: launchCommand === preset.cmd ? colors.accentHover : colors.textSecondary,
                           cursor: 'pointer',
                         }}
@@ -670,7 +671,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                             padding: '0.45rem 0.65rem',
                             borderRadius: '0.375rem',
                             border: `1px solid ${isSelected ? colors.accent : colors.border}`,
-                            background: isSelected ? 'rgba(113,112,255,0.18)' : colors.surface,
+                            background: isSelected ? colors.tint.accentSoft : colors.surface,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -716,7 +717,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
 
               {launchWatchMode && (
-                <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '0.375rem', padding: '0.75rem', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ background: colors.tint.success, borderRadius: '0.375rem', padding: '0.75rem', border: `1px solid ${colors.tint.success}`, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{ fontSize: '0.75rem', color: colors.textSecondary, lineHeight: 1.4 }}>
                     <strong style={{ color: colors.emerald }}>How It Works:</strong> Starts at <strong>100% Stock Boost (5.09 GHz)</strong> for zero UI lag. When heavy compute begins (power spikes &ge; 2s above baseline), Joulectrl dynamically applies your chosen policy, and instantly restores Stock Boost when the app returns to idle.
                   </div>
@@ -742,7 +743,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                               padding: '0.45rem 0.55rem',
                               borderRadius: '0.25rem',
                               border: `1px solid ${isSel ? colors.emerald : colors.border}`,
-                              background: isSel ? 'rgba(16,185,129,0.18)' : colors.surface,
+                              background: isSel ? colors.tint.success : colors.surface,
                               color: isSel ? colors.textPrimary : colors.textSecondary,
                               fontSize: '0.73rem',
                               fontWeight: isSel ? 600 : 400,
@@ -803,7 +804,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                               padding: '0.45rem 0.55rem',
                               borderRadius: '0.25rem',
                               border: `1px solid ${isSel ? colors.accent : colors.border}`,
-                              background: isSel ? 'rgba(113,112,255,0.18)' : colors.surface,
+                              background: isSel ? colors.tint.accentSoft : colors.surface,
                               color: isSel ? colors.textPrimary : colors.textSecondary,
                               fontSize: '0.73rem',
                               fontWeight: isSel ? 600 : 400,
@@ -842,7 +843,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                           padding: '0.4rem 0.5rem',
                           borderRadius: '0.25rem',
                           border: `1px solid ${isSel ? colors.accent : colors.border}`,
-                          background: isSel ? 'rgba(113,112,255,0.15)' : colors.surface,
+                          background: isSel ? colors.tint.accentSoft : colors.surface,
                           color: isSel ? colors.textPrimary : colors.textSecondary,
                           fontSize: '0.74rem',
                           fontWeight: isSel ? 600 : 400,
@@ -874,7 +875,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   fontWeight: 700,
                   border: 'none',
                   cursor: isLaunchingApp || !launchCommand.trim() ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
+                  boxShadow: `0 2px 8px ${colors.tint.successBorder}`,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
@@ -928,7 +929,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                    <Icon name="target" size={1} />
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontWeight: 700, fontSize: '0.95rem', color: colors.textPrimary }}>
@@ -1000,7 +1001,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                     </span>
                   )}
                   {targetProcess.affinity_label && (
-                    <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: colors.accentHover, background: 'rgba(113,112,255,0.12)', padding: '2px 6px', borderRadius: 4 }}>
+                    <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: colors.accentHover, background: colors.tint.accentSoft, padding: '2px 6px', borderRadius: 4 }}>
                       Affinity: {targetProcess.affinity_label}
                     </span>
                   )}
@@ -1113,7 +1114,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                           background: colors.surfaceElevated,
                           transition: 'background 0.1s ease',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(113,112,255,0.15)')}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = colors.tint.accentSoft)}
                         onMouseLeave={(e) => (e.currentTarget.style.background = colors.surfaceElevated)}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
@@ -1182,7 +1183,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                       style={{
                         padding: '0.5rem',
                         borderRadius: '0.375rem',
-                        border: `1.5px solid ${isSel ? opt.color : 'rgba(255,255,255,0.08)'}`,
+                        border: `1.5px solid ${isSel ? opt.color : colors.tint.neutralStrong}`,
                         background: isSel ? `${opt.color}20` : colors.surface,
                         color: isSel ? colors.textPrimary : colors.textSecondary,
                         textAlign: 'left',
@@ -1250,8 +1251,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   flex: 1,
                   padding: '0.5rem',
                   borderRadius: '0.375rem',
-                  border: `1.5px solid ${objective === obj.id ? colors.emerald : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: objective === obj.id ? 'rgba(16,185,129,0.20)' : colors.surfaceElevated,
+                  border: `1.5px solid ${objective === obj.id ? colors.emerald : colors.tint.neutralStrong}`,
+                  backgroundColor: objective === obj.id ? colors.tint.success : colors.surfaceElevated,
                   color: objective === obj.id ? colors.emerald : colors.textSecondary,
                   fontSize: '0.8rem',
                   fontWeight: 600,
@@ -1266,7 +1267,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
           {/* Conditional inputs based on Objective */}
           {objective === 'deadline' && (
-            <div style={{ background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: `1px solid ${colors.tint.neutralStrong}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ fontSize: '0.85rem', color: colors.textSecondary }}>Runtime Budget:</span>
                 <span style={{ fontSize: '0.95rem', fontWeight: 700, color: colors.emerald }}>
@@ -1301,7 +1302,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
 
               {/* Watch Mode Auto-detect helper */}
               {latestWatchedSegment ? (
-                <div style={{ marginTop: '0.75rem', background: 'rgba(113,112,255,0.08)', border: '1px solid rgba(113,112,255,0.25)', borderRadius: '0.375rem', padding: '0.45rem 0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ marginTop: '0.75rem', background: colors.tint.accentSoft, border: `1px solid ${colors.tint.accentSoft}`, borderRadius: '0.375rem', padding: '0.45rem 0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.76rem', color: colors.textSecondary }}>
                     ⚡ Watched task: <strong>{latestWatchedSegment.duration_s}s</strong> (suggested: {latestWatchedSegment.suggested_budget_s}s)
                   </span>
@@ -1339,7 +1340,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               </div>
               {budgetWarning(runtimeBudgetS, baselineRuntimeS) && (
                 <div style={{ fontSize: '0.75rem', color: colors.amber, marginTop: '0.35rem', display: 'flex', gap: 6 }}>
-                  <span>⚠</span>
+                  <Icon name="warn" size={14} />
                   <span>{budgetWarning(runtimeBudgetS, baselineRuntimeS)}</span>
                 </div>
               )}
@@ -1347,7 +1348,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           )}
 
           {objective === 'preference' && (
-            <div style={{ background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <div style={{ background: colors.surfaceElevated, padding: '1rem', borderRadius: '0.5rem', border: `1px solid ${colors.tint.neutralStrong}`, display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: colors.textSecondary, marginBottom: '0.3rem' }}>
                   <span>Energy Target:</span>
@@ -1385,7 +1386,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   <NumField value={perfFloorPct} onCommit={onChangePerfFloor} unit="%" />
                 </div>
               </div>
-              <div style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '0.375rem', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: '0.2rem' }}>
+              <div style={{ background: colors.tint.accentSoft, border: `1px solid ${colors.tint.accentSoft}`, borderRadius: '0.375rem', padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: '0.2rem' }}>
                 <span style={{ fontSize: '0.74rem', color: colors.textSecondary }}>
                   💡 <strong>Preference Mode operates on empirical curves</strong>. Run multithreaded frequency calibration first to map real efficiency frontiers.
                 </span>
@@ -1418,14 +1419,14 @@ export const SetupView: React.FC<SetupViewProps> = ({
         </div>
 
         {/* Task Priority & Catch-Up Policy */}
-        <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: `1px solid ${colors.tint.neutralStrong}` }}>
           {/* Focus Switch (Reverse / Off / On) */}
           {onChangeFocusMode && (
             <div
               style={{
                 marginBottom: '0.85rem',
                 paddingBottom: '0.85rem',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+                borderBottom: `1px solid ${colors.tint.neutralStrong}`,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -1443,7 +1444,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                       color: focusMode === 'reverse' ? '#10b981' : focusMode === 'on' ? '#818cf8' : colors.textTertiary,
                       padding: '1px 6px',
                       borderRadius: 4,
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      background: colors.tint.neutral,
                     }}
                   >
                     {focusMode === 'reverse' ? 'Gaming / Foreground Shield' : focusMode === 'on' ? 'Task Priority Shield' : 'Balanced Scheduler'}
@@ -1503,8 +1504,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   style={{
                     padding: '0.6rem 0.75rem',
                     borderRadius: '0.375rem',
-                    border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.08)'}`,
-                    backgroundColor: isSelected ? 'rgba(113,112,255,0.18)' : colors.surface,
+                    border: `1.5px solid ${isSelected ? colors.accent : colors.tint.neutralStrong}`,
+                    backgroundColor: isSelected ? colors.tint.accentSoft : colors.surface,
                     color: isSelected ? colors.textPrimary : colors.textSecondary,
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -1528,8 +1529,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
               marginTop: '0.75rem',
               padding: '0.65rem 0.85rem',
               borderRadius: '0.375rem',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.07)',
+              background: colors.tint.neutral,
+              border: `1px solid ${colors.tint.neutralStrong}`,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -1553,7 +1554,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   padding: '5px 12px',
                   borderRadius: '0.375rem',
                   border: `1px solid ${colors.accent}`,
-                  background: 'rgba(113, 112, 255, 0.15)',
+                  background: colors.tint.accentSoft,
                   color: colors.accentHover,
                   fontSize: '0.75rem',
                   fontWeight: 600,
@@ -1570,7 +1571,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
         </div>
 
         {/* Accuracy & Repeatability Control */}
-        <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ marginBottom: '1.5rem', background: colors.surfaceElevated, padding: '0.85rem 1rem', borderRadius: '0.5rem', border: `1px solid ${colors.tint.neutralStrong}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1592,8 +1593,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '0.375rem',
-                    border: `1.5px solid ${repetitions === opt.val ? colors.accent : 'rgba(255,255,255,0.1)'}`,
-                    backgroundColor: repetitions === opt.val ? 'rgba(113,112,255,0.22)' : colors.surface,
+                    border: `1.5px solid ${repetitions === opt.val ? colors.accent : colors.tint.neutralStrong}`,
+                    backgroundColor: repetitions === opt.val ? colors.tint.accentSoft : colors.surface,
                     color: repetitions === opt.val ? colors.accentHover : colors.textSecondary,
                     fontSize: '0.78rem',
                     fontWeight: 600,
@@ -1612,8 +1613,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
         <div
           style={{
             marginBottom: '1.5rem',
-            background: noiseStatus?.is_quiet ? 'rgba(16,185,129,0.05)' : 'rgba(245,158,11,0.08)',
-            border: `1px solid ${noiseStatus?.is_quiet ? 'rgba(16,185,129,0.22)' : 'rgba(245,158,11,0.28)'}`,
+            background: noiseStatus?.is_quiet ? colors.tint.success : colors.tint.warning,
+            border: `1px solid ${noiseStatus?.is_quiet ? colors.tint.success : colors.tint.warning}`,
             borderRadius: '0.5rem',
             padding: '0.85rem 1rem',
           }}
@@ -1631,7 +1632,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 }}
               >
                 <span>
-                  {noiseStatus?.is_quiet ? '✓ System Baseline Quiet' : '⚠️ Background Noise Detected'}
+                  {noiseStatus?.is_quiet ? 'System Baseline Quiet' : '⚠️ Background Noise Detected'}
                   {thermalStatus?.cpu_temp_c != null && (
                     <span style={{ fontSize: '0.75rem', fontWeight: 400, color: colors.textTertiary, marginLeft: 8 }}>
                       · CPU {thermalStatus.cpu_temp_c.toFixed(1)}°C ({thermalStatus.warning_level === 'normal' ? 'Normal' : thermalStatus.warning_level.toUpperCase()})
@@ -1655,8 +1656,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '0.375rem',
-                    backgroundColor: 'rgba(52, 211, 153, 0.15)',
-                    border: '1px solid rgba(52, 211, 153, 0.4)',
+                    backgroundColor: colors.tint.success,
+                    border: `1px solid ${colors.tint.successBorder}`,
                     color: '#34d399',
                     fontSize: '0.78rem',
                     fontWeight: 600,
@@ -1674,8 +1675,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '0.375rem',
-                    backgroundColor: 'rgba(245,158,11,0.18)',
-                    border: '1px solid rgba(245,158,11,0.4)',
+                    backgroundColor: colors.tint.warning,
+                    border: `1px solid ${colors.tint.warning}`,
                     color: '#f59e0b',
                     fontSize: '0.78rem',
                     fontWeight: 600,
@@ -1708,8 +1709,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             )}
           </div>
           {quietSuccessMsg && (
-            <div style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: colors.emerald, fontWeight: 500 }}>
-              ✓ {quietSuccessMsg}
+            <div style={{ marginTop: '0.45rem', fontSize: '0.75rem', color: colors.emerald, fontWeight: 500 }}>{quietSuccessMsg}
             </div>
           )}
         </div>
@@ -1719,7 +1719,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           <div
             style={{
               marginBottom: '1.5rem',
-              background: thermalStatus.warning_level === 'critical' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+              background: thermalStatus.warning_level === 'critical' ? colors.tint.danger : colors.tint.warning,
               border: `1px solid ${thermalStatus.warning_level === 'critical' ? colors.red : colors.amber}`,
               borderRadius: '0.5rem',
               padding: '0.85rem 1rem',
@@ -1745,7 +1745,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           style={{
             marginBottom: '1.5rem',
             background: colors.surfaceElevated,
-            border: `1px solid ${hasCalibration ? 'rgba(16,185,129,0.22)' : colors.border}`,
+            border: `1px solid ${hasCalibration ? colors.tint.success : colors.border}`,
             borderRadius: '0.5rem',
             padding: '1rem',
           }}
@@ -1766,28 +1766,27 @@ export const SetupView: React.FC<SetupViewProps> = ({
             {hasCalibration ? (
               <span
                 style={{
-                  background: 'rgba(16,185,129,0.12)',
+                  background: colors.tint.success,
                   color: colors.emerald,
                   fontSize: '0.7rem',
                   fontWeight: 600,
                   padding: '0.2rem 0.5rem',
                   borderRadius: '0.25rem',
-                  border: '1px solid rgba(16,185,129,0.3)',
+                  border: `1px solid ${colors.tint.successBorder}`,
                   whiteSpace: 'nowrap',
                 }}
-              >
-                ✓ Saved Data Ready
+              >Saved Data Ready
               </span>
             ) : (
               <span
                 style={{
-                  background: 'rgba(245,158,11,0.12)',
+                  background: colors.tint.warning,
                   color: colors.amber,
                   fontSize: '0.7rem',
                   fontWeight: 600,
                   padding: '0.2rem 0.5rem',
                   borderRadius: '0.25rem',
-                  border: '1px solid rgba(245,158,11,0.3)',
+                  border: `1px solid ${colors.tint.warning}`,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -1805,8 +1804,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 style={{
                   padding: '0.35rem 0.65rem',
                   borderRadius: '0.375rem',
-                  border: `1.5px solid ${calibrationBudgetS === 0 ? colors.emerald : 'rgba(255,255,255,0.1)'}`,
-                  backgroundColor: calibrationBudgetS === 0 ? 'rgba(16,185,129,0.15)' : colors.surface,
+                  border: `1.5px solid ${calibrationBudgetS === 0 ? colors.emerald : colors.tint.neutralStrong}`,
+                  backgroundColor: calibrationBudgetS === 0 ? colors.tint.success : colors.surface,
                   color: calibrationBudgetS === 0 ? colors.emerald : colors.textSecondary,
                   fontSize: '0.76rem',
                   fontWeight: 600,
@@ -1833,8 +1832,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   style={{
                     padding: '0.35rem 0.65rem',
                     borderRadius: '0.375rem',
-                    border: `1.5px solid ${isSelected ? colors.accent : 'rgba(255,255,255,0.1)'}`,
-                    backgroundColor: isSelected ? 'rgba(113,112,255,0.22)' : colors.surface,
+                    border: `1.5px solid ${isSelected ? colors.accent : colors.tint.neutralStrong}`,
+                    backgroundColor: isSelected ? colors.tint.accentSoft : colors.surface,
                     color: isSelected ? colors.accentHover : colors.textSecondary,
                     fontSize: '0.76rem',
                     fontWeight: 600,
@@ -1853,8 +1852,8 @@ export const SetupView: React.FC<SetupViewProps> = ({
               style={{
                 padding: '0.35rem 0.65rem',
                 borderRadius: '0.375rem',
-                border: `1.5px solid ${calibrationBudgetS === null ? colors.accent : 'rgba(255,255,255,0.1)'}`,
-                backgroundColor: calibrationBudgetS === null ? 'rgba(113,112,255,0.22)' : colors.surface,
+                border: `1.5px solid ${calibrationBudgetS === null ? colors.accent : colors.tint.neutralStrong}`,
+                backgroundColor: calibrationBudgetS === null ? colors.tint.accentSoft : colors.surface,
                 color: calibrationBudgetS === null ? colors.accentHover : colors.textSecondary,
                 fontSize: '0.76rem',
                 fontWeight: 600,
@@ -1867,7 +1866,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
           </div>
 
           {/* Slider + NumField */}
-          <div style={{ background: colors.surface, padding: '0.75rem', borderRadius: '0.375rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ background: colors.surface, padding: '0.75rem', borderRadius: '0.375rem', border: `1px solid ${colors.tint.neutralStrong}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: colors.textTertiary, marginBottom: '0.4rem' }}>
               <span>Scan time:</span>
               <span style={{ color: colors.textSecondary, fontWeight: 600 }}>
@@ -1920,8 +1919,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             {/* Simple Human Explanation */}
             <div style={{ marginTop: '0.5rem', fontSize: '0.73rem', color: colors.textTertiary, lineHeight: '1.4' }}>
               {calibrationBudgetS === 0 ? (
-                <span style={{ color: colors.emerald }}>
-                  ✓ Instant: Skips scanning and optimizes immediately using your saved CPU calibration curves.
+                <span style={{ color: colors.emerald }}>Instant: Skips scanning and optimizes immediately using your saved CPU calibration curves.
                 </span>
               ) : calibrationBudgetS === null ? (
                 <span style={{ color: colors.textSecondary }}>
@@ -1951,7 +1949,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             fontWeight: 700,
             border: 'none',
             cursor: (isStarting || isLaunchingApp || (workloadMode === 'launch' && !launchCommand.trim())) ? 'not-allowed' : 'pointer',
-            boxShadow: workloadMode === 'launch' ? '0 4px 12px rgba(16, 185, 129, 0.35)' : '0 4px 6px -1px rgba(37, 99, 235, 0.3)',
+            boxShadow: workloadMode === 'launch' ? `0 4px 12px ${colors.tint.successBorder}` : `0 4px 6px -1px ${colors.tint.accentSoft}`,
             transition: 'background-color 0.15s ease',
           }}
         >
@@ -1995,7 +1993,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             {capabilities.source === 'fixture' && (
               <div
                 style={{
-                  background: 'rgba(245,158,11,0.10)',
+                  background: colors.tint.warning,
                   border: `1px solid ${colors.amber}`,
                   borderRadius: '0.5rem',
                   padding: '0.6rem 0.75rem',
@@ -2009,7 +2007,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             {capabilities.source === 'live' && (
               <div
                 style={{
-                  background: 'rgba(16,185,129,0.10)',
+                  background: colors.tint.success,
                   border: `1px solid ${colors.emerald}`,
                   borderRadius: '0.5rem',
                   padding: '0.6rem 0.75rem',
@@ -2020,7 +2018,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 <strong>Live hardware discovered</strong> from this machine.
               </div>
             )}
-            <div style={{ background: colors.surfaceElevated, padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ background: colors.surfaceElevated, padding: '0.75rem', borderRadius: '0.5rem', border: `1px solid ${colors.tint.neutralStrong}` }}>
               <div style={{ color: colors.textTertiary, fontSize: '0.75rem' }}>Processor / Topology</div>
               <div style={{ fontWeight: 600, color: colors.textPrimary, marginTop: '0.2rem' }}>
                 {capabilities.machine.cpu_model}
@@ -2033,7 +2031,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   <span
                     key={cls}
                     style={{
-                      background: cls === 'fast' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.10)',
+                      background: cls === 'fast' ? colors.tint.success : colors.tint.warning,
                       color: cls === 'fast' ? colors.emerald : colors.amber,
                       padding: '0.15rem 0.4rem',
                       borderRadius: '0.25rem',
@@ -2050,19 +2048,19 @@ export const SetupView: React.FC<SetupViewProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Package-energy access (RAPL)</span>
-                <span style={{ color: colors.emerald, fontWeight: 700 }}>✓ Verified ({capabilities.energy.idle_watts} W idle)</span>
+                <span style={{ color: colors.emerald, fontWeight: 700 }}>Verified ({capabilities.energy.idle_watts} W idle)</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>CPU Frequency Caps</span>
-                <span style={{ color: colors.emerald, fontWeight: 700 }}>✓ Verified (16 policies)</span>
+                <span style={{ color: colors.emerald, fontWeight: 700 }}>Verified (16 policies)</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Global Boost Toggle</span>
-                <span style={{ color: colors.emerald, fontWeight: 700 }}>✓ Verified</span>
+                <span style={{ color: colors.emerald, fontWeight: 700 }}>Verified</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Restoration Engine</span>
-                <span style={{ color: colors.emerald, fontWeight: 700 }}>✓ Available</span>
+                <span style={{ color: colors.emerald, fontWeight: 700 }}>Available</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Tuned PM Profile</span>
@@ -2071,7 +2069,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>AC Power Supply</span>
                 <span style={{ color: capabilities.machine.ac_power ? colors.emerald : colors.amber, fontWeight: 600 }}>
-                  {capabilities.machine.ac_power ? '✓ Connected' : '⚠ On Battery'}
+                  {capabilities.machine.ac_power ? 'Connected' : 'On Battery'}
                 </span>
               </div>
             </div>
@@ -2094,7 +2092,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.78)',
+            backgroundColor: colors.tint.overlay,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2105,12 +2103,12 @@ export const SetupView: React.FC<SetupViewProps> = ({
           <div
             style={{
               background: colors.surface,
-              border: '1px solid rgba(255,255,255,0.15)',
+              border: `1px solid ${colors.tint.neutralStrong}`,
               borderRadius: '0.75rem',
               padding: '1.5rem',
               maxWidth: '500px',
               width: '90%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.6)',
+              boxShadow: `0 20px 25px -5px ${colors.tint.overlay}`,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.85rem' }}>
@@ -2129,7 +2127,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                 background: colors.surfaceElevated,
                 borderRadius: '0.5rem',
                 padding: '0.75rem',
-                border: '1px solid rgba(255,255,255,0.06)',
+                border: `1px solid ${colors.tint.neutralStrong}`,
                 maxHeight: '180px',
                 overflowY: 'auto',
               }}
@@ -2171,7 +2169,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                     fontSize: '0.75rem',
                     color: colors.textTertiary,
                     marginTop: '0.4rem',
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    borderTop: `1px solid ${colors.tint.neutralStrong}`,
                     paddingTop: '0.4rem',
                   }}
                 >
@@ -2188,7 +2186,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   padding: '0.45rem 0.8rem',
                   borderRadius: '0.375rem',
                   background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  border: `1px solid ${colors.tint.neutralStrong}`,
                   color: colors.textSecondary,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
@@ -2206,7 +2204,7 @@ export const SetupView: React.FC<SetupViewProps> = ({
                   padding: '0.45rem 0.8rem',
                   borderRadius: '0.375rem',
                   background: colors.surfaceElevated,
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  border: `1px solid ${colors.tint.neutralStrong}`,
                   color: colors.textPrimary,
                   fontSize: '0.82rem',
                   cursor: 'pointer',

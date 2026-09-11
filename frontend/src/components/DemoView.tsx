@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { launchDemoTerminal, measureCommand } from '../api';
-import { fonts, radii } from '../design';
+import { colors, fonts, radii } from '../design';
 import { useTheme } from '../ThemeContext';
 
 export const DemoView: React.FC = () => {
@@ -112,7 +112,7 @@ export const DemoView: React.FC = () => {
   const c = {
     bg: isDark ? 'transparent' : '#f8fafc',
     cardBg: isDark ? '#141516' : '#ffffff',
-    border: isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+    border: isDark ? colors.tint.neutralStrong : '#e2e8f0',
     primaryText: isDark ? '#f7f8f8' : '#0f172a',
     secondaryText: isDark ? '#8a8f98' : '#64748b',
     accent: '#6366f1',
@@ -134,9 +134,9 @@ export const DemoView: React.FC = () => {
               fontWeight: 700,
               padding: '2px 8px',
               borderRadius: radii.full,
-              backgroundColor: 'rgba(99, 102, 241, 0.15)',
+              backgroundColor: colors.tint.accentSoft,
               color: '#818cf8',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
+              border: `1px solid ${colors.tint.accentSoft}`,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}
@@ -183,7 +183,7 @@ export const DemoView: React.FC = () => {
                   padding: '12px 14px',
                   borderRadius: radii.md,
                   border: `1px solid ${preset === 'standard' ? c.accent : c.border}`,
-                  backgroundColor: preset === 'standard' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  backgroundColor: preset === 'standard' ? colors.tint.accentSoft : 'transparent',
                   color: c.primaryText,
                   cursor: 'pointer',
                 }}
@@ -208,7 +208,7 @@ export const DemoView: React.FC = () => {
                   padding: '12px 14px',
                   borderRadius: radii.md,
                   border: `1px solid ${preset === 'extended' ? c.accent : c.border}`,
-                  backgroundColor: preset === 'extended' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  backgroundColor: preset === 'extended' ? colors.tint.accentSoft : 'transparent',
                   color: c.primaryText,
                   cursor: 'pointer',
                 }}
@@ -233,12 +233,12 @@ export const DemoView: React.FC = () => {
                   padding: '12px 14px',
                   borderRadius: radii.md,
                   border: `1px solid ${preset === 'custom' ? c.accent : c.border}`,
-                  backgroundColor: preset === 'custom' ? 'rgba(99, 102, 241, 0.12)' : 'transparent',
+                  backgroundColor: preset === 'custom' ? colors.tint.accentSoft : 'transparent',
                   color: c.primaryText,
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: '13px' }}>🛠️ Custom Command / App</div>
+                <div style={{ fontWeight: 600, fontSize: '13px' }}>Custom Command / App</div>
                 <div style={{ fontSize: '12px', color: c.secondaryText, marginTop: '2px' }}>
                   Execute arbitrary compiler invocation, build script, or command
                 </div>
@@ -325,7 +325,7 @@ export const DemoView: React.FC = () => {
                 border: 'none',
                 cursor: isRunning ? 'not-allowed' : 'pointer',
                 opacity: isRunning ? 0.6 : 1,
-                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                boxShadow: `0 2px 6px ${colors.tint.successBorder}`,
               }}
             >
               <span style={{ fontSize: '16px' }}>🖥️</span> Launch in OS Terminal
@@ -351,18 +351,17 @@ export const DemoView: React.FC = () => {
                 opacity: isRunning ? 0.6 : 1,
               }}
             >
-              <span>{isRunning ? '⏳ Running 10s+ Compilation Benchmark…' : '▶️ Run Benchmark in App'}</span>
+              <span>{isRunning ? 'Running 10s+ Compilation Benchmark…' : '▶️ Run Benchmark in App'}</span>
             </button>
           </div>
 
           {terminalMsg && (
-            <div style={{ padding: '8px 12px', borderRadius: radii.sm, backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', fontSize: '12px' }}>
-              ✓ {terminalMsg}
+            <div style={{ padding: '8px 12px', borderRadius: radii.sm, backgroundColor: colors.tint.success, color: '#34d399', fontSize: '12px' }}>{terminalMsg}
             </div>
           )}
 
           {errorMsg && (
-            <div style={{ padding: '8px 12px', borderRadius: radii.sm, backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', fontSize: '12px' }}>
+            <div style={{ padding: '8px 12px', borderRadius: radii.sm, backgroundColor: colors.tint.danger, color: '#f87171', fontSize: '12px' }}>
               ✗ {errorMsg}
             </div>
           )}
@@ -419,10 +418,10 @@ export const DemoView: React.FC = () => {
           <div
             style={{
               backgroundColor: c.termBg,
-              border: '1px solid rgba(255, 255, 255, 0.12)',
+              border: `1px solid ${colors.tint.neutralStrong}`,
               borderRadius: radii.lg,
               overflow: 'hidden',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+              boxShadow: `0 4px 16px ${colors.tint.overlay}`,
             }}
           >
             {/* Terminal Title Bar */}
@@ -432,8 +431,8 @@ export const DemoView: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '10px 14px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                backgroundColor: colors.tint.neutral,
+                borderBottom: `1px solid ${colors.tint.neutralStrong}`,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -481,8 +480,7 @@ export const DemoView: React.FC = () => {
                 </div>
               ))}
               {isRunning && (
-                <div style={{ color: '#fbbf24', marginTop: '6px' }}>
-                  ⏳ Compiling full project across all threads (10s–30s) and reading hardware energy counters...
+                <div style={{ color: '#fbbf24', marginTop: '6px' }}>Compiling full project across all threads (10s–30s) and reading hardware energy counters...
                 </div>
               )}
             </div>

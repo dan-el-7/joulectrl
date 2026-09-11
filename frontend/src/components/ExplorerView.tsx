@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Icon } from '../design';
 import { ConfigSummary, Experiment, Selection } from '../types';
 import { fetchValidationPoints } from '../api';
 import { ParetoChart } from './ParetoChart';
@@ -432,7 +433,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 fontWeight: 600,
                 cursor: 'pointer',
                 border: '1px solid ' + (!isExtrapolating ? colors.emerald : colors.border),
-                background: !isExtrapolating ? 'rgba(16, 185, 129, 0.15)' : colors.surfaceElevated,
+                background: !isExtrapolating ? colors.tint.success : colors.surfaceElevated,
                 color: !isExtrapolating ? colors.emerald : colors.textTertiary,
               }}
             >
@@ -447,7 +448,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 fontWeight: 600,
                 cursor: 'pointer',
                 border: '1px solid ' + (isExtrapolating ? colors.accentHover : colors.border),
-                background: isExtrapolating ? 'rgba(56, 189, 248, 0.15)' : colors.surfaceElevated,
+                background: isExtrapolating ? colors.tint.accentSoft : colors.surfaceElevated,
                 color: isExtrapolating ? colors.accentHover : colors.textTertiary,
               }}
             >
@@ -465,7 +466,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               flexWrap: 'wrap',
               gap: '0.75rem',
               paddingTop: '0.5rem',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
+              borderTop: `1px solid ${colors.tint.neutralStrong}`,
             }}
           >
             {/* Reference Stock Duration Input */}
@@ -506,7 +507,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                       padding: '0.15rem 0.45rem',
                       borderRadius: 4,
                       border: '1px solid ' + (taskDuration === p.sec ? colors.accentHover : colors.border),
-                      background: taskDuration === p.sec ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                      background: taskDuration === p.sec ? colors.tint.accentSoft : 'transparent',
                       color: taskDuration === p.sec ? colors.accentHover : colors.textTertiary,
                       fontSize: '0.7rem',
                       cursor: 'pointer',
@@ -538,7 +539,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                       padding: '0.15rem 0.45rem',
                       borderRadius: 4,
                       border: '1px solid ' + (isActive ? colors.emerald : colors.border),
-                      background: isActive ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                      background: isActive ? colors.tint.success : 'transparent',
                       color: isActive ? colors.emerald : colors.textTertiary,
                       fontSize: '0.7rem',
                       cursor: 'pointer',
@@ -556,7 +557,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       {/* Comparison Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
         {/* Card 1: Default Baseline */}
-        <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: `1px solid ${colors.tint.neutralStrong}` }}>
           <div style={{ fontSize: '0.75rem', color: colors.red, fontWeight: 600, textTransform: 'uppercase' }}>
             Default Baseline
           </div>
@@ -601,14 +602,13 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           const isLowestFeasible = extLowestGuarded <= tempBudget;
 
           return (
-            <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: `1px solid ${!isLowestFeasible ? 'rgba(239, 68, 68, 0.35)' : 'rgba(255,255,255,0.08)'}` }}>
+            <div style={{ background: colors.surface, borderRadius: '0.75rem', padding: '1rem', border: `1px solid ${!isLowestFeasible ? colors.tint.dangerBorder : colors.tint.neutralStrong}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.75rem', color: colors.amber, fontWeight: 600, textTransform: 'uppercase' }}>
                   Lowest Energy Overall
                 </span>
                 {!isLowestFeasible && (
-                  <span style={{ fontSize: '0.68rem', fontWeight: 600, color: colors.red }}>
-                    ⚠ Infeasible for {tempBudget}s budget
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, color: colors.red }}>Infeasible for {tempBudget}s budget
                   </span>
                 )}
               </div>
@@ -655,9 +655,9 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
             : (selCfg?.median_energy_j ?? 0);
 
           return (
-            <div style={{ background: 'rgba(16,185,129,0.12)', borderRadius: '0.75rem', padding: '1rem', border: '1.5px solid ' + colors.emerald }}>
+            <div style={{ background: colors.tint.success, borderRadius: '0.75rem', padding: '1rem', border: '1.5px solid ' + colors.emerald }}>
               <div style={{ fontSize: '0.75rem', color: colors.emerald, fontWeight: 600, textTransform: 'uppercase' }}>
-                Selected Within Budget ★
+                Selected Within Budget
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: colors.emerald, marginTop: '0.2rem' }}>
                 {selCfg ? selCfg.config_id : selectedId ? selectedId : 'Profiling in progress…'}
@@ -745,15 +745,15 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   gap: '0.4rem',
                   padding: '0.45rem 0.7rem',
                   borderRadius: '0.5rem',
-                  border: `1.5px solid ${selected ? colors.emerald : 'rgba(255,255,255,0.08)'}`,
-                  backgroundColor: selected ? 'rgba(16,185,129,0.20)' : colors.surfaceElevated,
+                  border: `1.5px solid ${selected ? colors.emerald : colors.tint.neutralStrong}`,
+                  backgroundColor: selected ? colors.tint.success : colors.surfaceElevated,
                   cursor: 'pointer',
                   fontSize: '0.78rem',
                   color: selected ? colors.emerald : colors.textSecondary,
                 }}
                 title={c.description ?? (c.cpus ? `cpus: ${c.cpus.join(',')}` : c.cpu_mask)}
               >
-                <span style={{ fontWeight: 700 }}>{selected ? '✓' : '＋'}</span>
+                <span style={{ fontWeight: 700 }}><Icon name="check" size={12} /></span>
                 <span style={{ fontFamily: 'monospace' }}>{c.config_id}</span>
                 {c.measured ? (
                   <span style={{ fontSize: '0.65rem', color: colors.accentHover }}>(
@@ -784,7 +784,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: colors.textTertiary }}>
+                <tr style={{ borderBottom: `1px solid ${colors.tint.neutralStrong}`, color: colors.textTertiary }}>
                   <th style={{ padding: '0.5rem' }}>Run ID</th>
                   <th style={{ padding: '0.5rem' }}>Configuration</th>
                   <th style={{ padding: '0.5rem' }}>Layout</th>
@@ -804,13 +804,13 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                       key={r.run_id}
                       style={{
                         borderBottom: colors.border,
-                        backgroundColor: isSelected ? 'rgba(16,185,129,0.15)' : isBase ? 'rgba(244,88,110,0.10)' : 'transparent',
+                        backgroundColor: isSelected ? colors.tint.success : isBase ? colors.tint.danger : 'transparent',
                       }}
                     >
                       <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{r.run_id}</td>
                       <td style={{ padding: '0.5rem', fontWeight: isSelected || isBase ? 600 : 400 }}>
                         {r.config_id}
-                        {isSelected && <span style={{ color: colors.emerald, marginLeft: 4 }}>★</span>}
+                        {isSelected && <Icon name="star" size={14} color={colors.emerald} />}
                       </td>
                       <td style={{ padding: '0.5rem' }}>{r.configuration?.layout ?? '-'}</td>
                       <td style={{ padding: '0.5rem' }}>#{r.repetition}</td>
@@ -822,7 +822,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                         {r.package_energy_j != null && r.runtime_s ? (r.package_energy_j / r.runtime_s).toFixed(1) + ' W' : '-'}
                       </td>
                       <td style={{ padding: '0.5rem' }}>
-                        <span style={{ color: colors.emerald, fontWeight: 600 }}>✓ verified</span>
+                        <span style={{ color: colors.emerald, fontWeight: 600 }}>verified</span>
                       </td>
                     </tr>
                   );

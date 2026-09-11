@@ -1,5 +1,5 @@
 import React from 'react';
-import { fonts, fontFeatures, radii } from '../design';
+import { fonts, fontFeatures, radii, Icon } from '../design';
 import { useTheme } from '../ThemeContext';
 
 export type FocusMode = 'reverse' | 'off' | 'on';
@@ -26,7 +26,7 @@ export const FocusSwitch: React.FC<FocusSwitchProps> = ({
   const options: {
     id: FocusMode;
     label: string;
-    icon: string;
+    icon: 'reset' | 'ban' | 'target';
     color: string;
     activeBg: string;
     tooltip: string;
@@ -35,27 +35,27 @@ export const FocusSwitch: React.FC<FocusSwitchProps> = ({
     {
       id: 'reverse',
       label: 'Reverse',
-      icon: '🔄',
+      icon: 'reset',
       color: '#10b981', // Emerald / Eco
-      activeBg: 'rgba(16, 185, 129, 0.18)',
+      activeBg: themeColors.tint.success,
       tooltip: 'Reverse Focus: Deprioritize target app over running foreground apps (e.g. gaming). Runs on Eco cores with Nice +15.',
       desc: 'Target app deprioritized to Eco cores (Nice +15). Fast cores reserved for foreground games/apps.',
     },
     {
       id: 'off',
       label: 'Off',
-      icon: '⚪',
+      icon: 'ban',
       color: themeColors.textSecondary,
-      activeBg: 'rgba(255, 255, 255, 0.10)',
+      activeBg: themeColors.tint.neutralStrong,
       tooltip: 'Focus Off: Standard balanced OS scheduling across all 16 cores.',
       desc: 'Standard balanced scheduling across all 16 cores.',
     },
     {
       id: 'on',
       label: 'On',
-      icon: '🎯',
+      icon: 'target',
       color: '#818cf8', // Indigo / Accent
-      activeBg: 'rgba(129, 140, 248, 0.20)',
+      activeBg: themeColors.tint.accentSoft,
       tooltip: 'Focus On: Pinned task boosted on Zen 5 Fast cores with maximum priority to finish in time.',
       desc: 'Pinned task boosted on Zen 5 Fast cores. Strict deadline prioritization.',
     },
@@ -120,7 +120,7 @@ export const FocusSwitch: React.FC<FocusSwitchProps> = ({
                 fontFeatureSettings: fontFeatures,
               }}
             >
-              <span style={{ fontSize: isSmall ? 10 : 12 }}>{opt.icon}</span>
+              <Icon name={opt.icon as any} size={isSmall ? 11 : 12} color={isActive ? opt.color : undefined} />
               <span>{opt.label}</span>
             </button>
           );

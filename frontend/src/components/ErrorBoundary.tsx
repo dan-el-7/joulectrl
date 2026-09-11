@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { colors } from '../design';
 
 interface Props {
   children: ReactNode;
@@ -51,10 +52,10 @@ export class ErrorBoundary extends Component<Props, State> {
               maxWidth: '600px',
               width: '100%',
               backgroundColor: '#121417',
-              border: '1px solid rgba(244, 88, 110, 0.4)',
+              border: `1px solid ${colors.tint.dangerBorder}`,
               borderRadius: '0.75rem',
               padding: '2rem',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+              boxShadow: `0 8px 32px ${colors.tint.overlay}`,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -63,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
-                  backgroundColor: 'rgba(244, 88, 110, 0.15)',
+                  backgroundColor: colors.tint.danger,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -93,7 +94,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   fontSize: '0.8rem',
                   color: '#f4586e',
                   overflowX: 'auto',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  border: `1px solid ${colors.tint.neutralStrong}`,
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                   maxHeight: '160px',
@@ -126,7 +127,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   padding: '0.6rem 1.2rem',
                   backgroundColor: 'transparent',
                   color: '#8b949e',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  border: `1px solid ${colors.tint.neutralStrong}`,
                   borderRadius: '0.375rem',
                   fontSize: '0.85rem',
                   cursor: 'pointer',

@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Icon } from '../design';
 import {
   fetchSavingsDashboard,
   setSavingsOptIn,
   resetSavingsLedger,
   getSavingsExportUrl,
 } from '../api';
-import { fonts, fontFeatures, radii } from '../design';
+import { colors, fonts, fontFeatures, radii } from '../design';
 import { useTheme } from '../ThemeContext';
 import { SavingsDashboardResponse, SavingsLedgerEntry } from '../types';
 import { AutoPilotControl } from './AutoPilotControl';
@@ -130,7 +131,7 @@ export const SavingsDashboard: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 24 }}>🌱</span>
+            <Icon name="leaf" size={24} />
             <h1
               style={{
                 fontSize: 22,
@@ -155,8 +156,8 @@ export const SavingsDashboard: React.FC = () => {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              background: isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.08)',
-              border: `1px solid ${isLight ? '#a7f3d0' : 'rgba(16, 185, 129, 0.25)'}`,
+              background: isLight ? '#ecfdf5' : colors.tint.success,
+              border: `1px solid ${isLight ? '#a7f3d0' : colors.tint.success}`,
               padding: '6px 12px',
               borderRadius: radii.md,
               fontSize: 12,
@@ -178,10 +179,10 @@ export const SavingsDashboard: React.FC = () => {
               background: isOptedIn
                 ? isLight
                   ? '#eff6ff'
-                  : 'rgba(99, 102, 241, 0.12)'
+                  : colors.tint.accentSoft
                 : isLight
                 ? '#f1f5f9'
-                : 'rgba(255, 255, 255, 0.05)',
+                : colors.tint.neutral,
               border: `1px solid ${
                 isOptedIn ? (isLight ? '#93c5fd' : c.accent) : c.border
               }`,
@@ -251,7 +252,7 @@ export const SavingsDashboard: React.FC = () => {
               style={{
                 padding: '12px 14px',
                 borderRadius: radii.md,
-                background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                background: isLight ? '#f8fafc' : colors.tint.neutral,
                 border: `1px solid ${c.borderSubtle}`,
               }}
             >
@@ -267,7 +268,7 @@ export const SavingsDashboard: React.FC = () => {
               style={{
                 padding: '12px 14px',
                 borderRadius: radii.md,
-                background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                background: isLight ? '#f8fafc' : colors.tint.neutral,
                 border: `1px solid ${c.borderSubtle}`,
               }}
             >
@@ -283,7 +284,7 @@ export const SavingsDashboard: React.FC = () => {
               style={{
                 padding: '12px 14px',
                 borderRadius: radii.md,
-                background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+                background: isLight ? '#f8fafc' : colors.tint.neutral,
                 border: `1px solid ${c.borderSubtle}`,
               }}
             >
@@ -561,7 +562,7 @@ export const SavingsDashboard: React.FC = () => {
       {/* Architectural Transparency Notice */}
       <div
         style={{
-          background: isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.02)',
+          background: isLight ? '#f8fafc' : colors.tint.neutral,
           border: `1px solid ${c.borderSubtle}`,
           borderRadius: radii.md,
           padding: '14px 18px',
@@ -585,7 +586,7 @@ export const SavingsDashboard: React.FC = () => {
               fontSize: 11,
               padding: '3px 8px',
               borderRadius: radii.sm,
-              background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)',
+              background: isLight ? '#e2e8f0' : colors.tint.neutralStrong,
               color: c.textTertiary,
               fontFamily: fonts.mono,
             }}
@@ -597,7 +598,7 @@ export const SavingsDashboard: React.FC = () => {
               fontSize: 11,
               padding: '3px 8px',
               borderRadius: radii.sm,
-              background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.06)',
+              background: isLight ? '#e2e8f0' : colors.tint.neutralStrong,
               color: c.textTertiary,
               fontFamily: fonts.mono,
             }}
@@ -684,7 +685,7 @@ export const SavingsDashboard: React.FC = () => {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
-                  background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)',
+                  background: isLight ? '#f1f5f9' : colors.tint.neutral,
                   border: `1px solid ${c.border}`,
                   borderRadius: radii.md,
                   padding: '6px 12px',
@@ -706,7 +707,7 @@ export const SavingsDashboard: React.FC = () => {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
-                  background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.05)',
+                  background: isLight ? '#f1f5f9' : colors.tint.neutral,
                   border: `1px solid ${c.border}`,
                   borderRadius: radii.md,
                   padding: '6px 12px',
@@ -727,7 +728,7 @@ export const SavingsDashboard: React.FC = () => {
                   alignItems: 'center',
                   gap: 4,
                   background: 'transparent',
-                  border: `1px solid ${isLight ? '#fecaca' : 'rgba(244, 88, 110, 0.3)'}`,
+                  border: `1px solid ${isLight ? '#fecaca' : colors.tint.dangerBorder}`,
                   borderRadius: radii.md,
                   padding: '6px 12px',
                   fontSize: 12,
@@ -736,7 +737,7 @@ export const SavingsDashboard: React.FC = () => {
                   cursor: 'pointer',
                 }}
               >
-                <span>🗑️ Reset</span>
+                <span>Reset</span>
               </button>
             </div>
           </div>
@@ -745,8 +746,8 @@ export const SavingsDashboard: React.FC = () => {
           {showResetConfirm && (
             <div
               style={{
-                background: isLight ? '#fef2f2' : 'rgba(244, 88, 110, 0.08)',
-                border: `1px solid ${isLight ? '#fca5a5' : 'rgba(244, 88, 110, 0.3)'}`,
+                background: isLight ? '#fef2f2' : colors.tint.danger,
+                border: `1px solid ${isLight ? '#fca5a5' : colors.tint.dangerBorder}`,
                 borderRadius: radii.md,
                 padding: '12px 16px',
                 marginBottom: 16,
@@ -875,10 +876,10 @@ export const SavingsDashboard: React.FC = () => {
                                 entry.objective === 'efficiency'
                                   ? isLight
                                     ? '#dcfce7'
-                                    : 'rgba(16, 185, 129, 0.15)'
+                                    : colors.tint.success
                                   : isLight
                                   ? '#eff6ff'
-                                  : 'rgba(99, 102, 241, 0.15)',
+                                  : colors.tint.accentSoft,
                               color:
                                 entry.objective === 'efficiency'
                                   ? isLight
@@ -929,7 +930,7 @@ export const SavingsDashboard: React.FC = () => {
                               borderRadius: radii.sm,
                               fontSize: 11,
                               fontWeight: 700,
-                              background: isLight ? '#dcfce7' : 'rgba(16, 185, 129, 0.15)',
+                              background: isLight ? '#dcfce7' : colors.tint.success,
                               color: isLight ? '#166534' : '#34d399',
                               fontFamily: fonts.mono,
                             }}

@@ -216,9 +216,9 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                 fontWeight: 600,
                 padding: '0.15rem 0.5rem',
                 borderRadius: '9999px',
-                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                backgroundColor: colors.tint.accentSoft,
                 color: colors.accentHover,
-                border: '1px solid rgba(56, 189, 248, 0.3)',
+                border: `1px solid ${colors.tint.accentSoft}`,
               }}
             >
               Extrapolated for {formatDuration(taskDuration)} ({(taskDuration / baseRuntime).toFixed(1)}× scale)
@@ -283,7 +283,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
             padding: '2px 7px',
             borderRadius: '0.25rem',
             border: `1px solid ${selectedLayout === 'ALL' ? colors.accentHover : colors.border}`,
-            background: selectedLayout === 'ALL' ? 'rgba(113,112,255,0.2)' : 'transparent',
+            background: selectedLayout === 'ALL' ? colors.tint.accentSoft : 'transparent',
             color: selectedLayout === 'ALL' ? colors.accentHover : colors.textTertiary,
             fontSize: '0.7rem',
             cursor: 'pointer',
@@ -306,7 +306,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                 padding: '2px 7px',
                 borderRadius: '0.25rem',
                 border: `1px solid ${isSel ? info.bg : colors.border}`,
-                background: isSel ? 'rgba(255,255,255,0.08)' : 'transparent',
+                background: isSel ? colors.tint.neutralStrong : 'transparent',
                 color: isSel ? colors.textPrimary : colors.textTertiary,
                 fontSize: '0.7rem',
                 cursor: 'pointer',
@@ -357,8 +357,8 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
           })}
 
           {/* Axes */}
-          <line x1={padLeft} y1={padTop + chartH} x2={width - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
-          <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" />
+          <line x1={padLeft} y1={padTop + chartH} x2={width - padRight} y2={padTop + chartH} stroke={colors.tint.neutralStrong} strokeWidth="1.5" />
+          <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke={colors.tint.neutralStrong} strokeWidth="1.5" />
 
           <text x={padLeft + chartW / 2} y={height - 10} fill={colors.textTertiary} fontSize="11" textAnchor="middle">
             {isExtrapolated ? `Full Task Runtime (extrapolated from ${baseRuntime.toFixed(1)}s benchmark)` : 'Runtime (seconds) — Monotonic Clock'}
@@ -505,12 +505,12 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
               top: '10px',
               right: '15px',
               background: colors.surfaceElevated,
-              border: `1px solid ${hoveredItem.isFeasible ? 'rgba(255,255,255,0.12)' : 'rgba(239, 68, 68, 0.4)'}`,
+              border: `1px solid ${hoveredItem.isFeasible ? colors.tint.neutralStrong : colors.tint.dangerBorder}`,
               borderRadius: '0.5rem',
               padding: '0.6rem 0.8rem',
               fontSize: '0.75rem',
               color: colors.textPrimary,
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.4)',
+              boxShadow: `0 4px 6px -1px ${colors.tint.overlay}`,
               pointerEvents: 'none',
               maxWidth: '280px',
             }}
@@ -524,18 +524,17 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({
                   color: hoveredItem.isFeasible ? colors.emerald : colors.red,
                 }}
               >
-                {hoveredItem.isFeasible ? '✓ Within Budget' : '⚠ Exceeds Budget'}
+                {hoveredItem.isFeasible ? 'Within Budget' : 'Exceeds Budget'}
               </span>
             </div>
             <div>Layout: {LAYOUT_COLORS[hoveredItem.cfg.configuration?.layout]?.name ?? hoveredItem.cfg.configuration?.layout}</div>
             <div>Workers: {hoveredItem.cfg.configuration?.worker_count} | Boost: {hoveredItem.cfg.configuration?.boost ? 'On' : 'Off'}</div>
             <div>Cap: {hoveredItem.cfg.configuration?.freq_cap_khz ? `${hoveredItem.cfg.configuration.freq_cap_khz / 1e6} GHz` : 'Stock'}</div>
             {hoveredItem.isDominated && (
-              <div style={{ color: colors.amber, fontSize: '0.68rem', marginTop: '0.2rem' }}>
-                ⚠ Dominated configuration (slower and higher energy than frontier)
+              <div style={{ color: colors.amber, fontSize: '0.68rem', marginTop: '0.2rem' }}>Dominated configuration (slower and higher energy than frontier)
               </div>
             )}
-            <div style={{ marginTop: '0.3rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.3rem' }}>
+            <div style={{ marginTop: '0.3rem', borderTop: `1px solid ${colors.tint.neutralStrong}`, paddingTop: '0.3rem' }}>
               <div>
                 <strong>Runtime:</strong> {formatDuration(hoveredItem.runtime)} (guarded: {formatDuration(hoveredItem.guardedRuntime)})
               </div>
