@@ -262,7 +262,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 fontWeight: 600,
                 padding: '0.15rem 0.5rem',
                 borderRadius: '9999px',
-                backgroundColor: colors.emerald,
+                backgroundColor: colors.tint.success,
                 color: colors.emerald,
               }}
             >

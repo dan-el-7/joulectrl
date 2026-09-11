@@ -288,7 +288,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 thermal.warning_level === 'critical'
                   ? c.tint.dangerBorder
                   : thermal.warning_level === 'elevated'
-                    ? 'colors.tint.warning'
+                    ? colors.tint.warning
                     : undefined
               }
               background={
@@ -351,7 +351,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             style={{
               ...type.label,
               padding: '5px 12px',
-              background: theme === 'light' ? '#f1f5f9' : 'colors.tint.neutral',
+              background: theme === 'light' ? c.surfaceElevated : colors.tint.neutralStrong,
               color: isRestoring ? c.textTertiary : c.textSecondary,
               border: `1px solid ${c.border}`,
               borderRadius: radii.md,
@@ -378,7 +378,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               style={{
                 ...type.label,
                 padding: '4px 10px',
-                background: theme === 'light' ? '#f1f5f9' : 'colors.tint.neutralStrong',
+                background: theme === 'light' ? c.surfaceElevated : colors.tint.neutral,
                 color: c.textPrimary,
                 border: `1px solid ${c.border}`,
                 borderRadius: radii.md,
