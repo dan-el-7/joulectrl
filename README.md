@@ -1,3 +1,5 @@
+# slophouse made by 4 glm 5.3's (and occassionally antigravity) co-ordinating via hermes on 4 different laptops for an event
+
 # joulectrl
 
 > **Find the lowest energy needed to get the job done on time.**
